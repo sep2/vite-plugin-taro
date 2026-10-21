@@ -4,7 +4,7 @@
 // VPT, 2026-10-18
 
 import { ensure, noop, toCamelCase, toDashed } from '@tarojs/shared'
-import { blockElements, ensureHtmlClass, inlineElements } from 'vite-plugin-taro-runtime/plugin-html/html-elements'
+import { ensureHtmlClass } from 'vite-plugin-taro-runtime/plugin-html/html-elements'
 import { flushSync } from 'vite-plugin-taro-runtime/react'
 import {
     COMMENT,
@@ -25,6 +25,7 @@ import {
 } from 'vite-plugin-taro-runtime/runtime/mini'
 import { createPageIdentity } from '../mini/vpt/create-page-identity.ts'
 import { getFormChangeEvent } from '../mini/vpt/get-form-change-event.ts'
+import { getNativeHtmlTag } from '../mini/vpt/get-native-html-tag.ts'
 import { getPageQuery } from '../mini/vpt/get-page-query.ts'
 import type { MiniHost } from '../mini/vpt/mini-host.d.ts'
 import { mountPage } from '../mini/vpt/mount-page.ts'
@@ -283,21 +284,10 @@ function getNativePropertyName(type: string, name: string): string {
     return type === 'share-element' && name === 'mapkey' ? 'key' : toDashed(name)
 }
 
-function getHtmlTagName(name: string): 'view' | 'text' | undefined {
-    // Mini view retains its native class contract; HTML aliases retain their logical tag names.
-    if (name !== 'view' && blockElements.has(name)) {
-        return 'view'
-    }
-    if (inlineElements.has(name)) {
-        return 'text'
-    }
-    return undefined
-}
-
 function setNativeClass(node: HostElement, value: string): void {
     const native = node.nativeNode!
     // Semantic HTML classes belong to native presentation, alongside the user's logical class list.
-    const className = getHtmlTagName(node.nodeName) ? ensureHtmlClass(node.nodeName, value) : value
+    const className = getNativeHtmlTag(node.nodeName) ? ensureHtmlClass(node.nodeName, value) : value
     getTemplateBindings(native).c(native, className)
 }
 
@@ -327,7 +317,7 @@ function createPageDocument(root: WxRoot): TaroDocument {
 
     pageDoc.createElement = (name) => {
         const type = name.toLowerCase()
-        const htmlTag = getHtmlTagName(type)
+        const htmlTag = getNativeHtmlTag(type)
 
         // Page roots group owned children without changing percentage heights or native Page flex layout.
         const native = type === 'root' ? root.createVirtualNode(type) : root.createComponent(htmlTag ?? type)

@@ -248,6 +248,7 @@ test('ships Mini activation capsules with separate VPT integration and template 
         'create-page-identity.js',
         'create-vpt-app.js',
         'get-form-change-event.js',
+        'get-native-html-tag.js',
         'get-page-query.js',
         'mount-page.js',
         'vpt-runtime.js'

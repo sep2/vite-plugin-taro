@@ -1,4 +1,5 @@
 import { DEFAULT_COMPONENTS, ensure, noop, TT_SPECIFIC_COMPONENTS, toCamelCase } from '@tarojs/shared'
+import { ensureHtmlClass } from 'vite-plugin-taro-runtime/plugin-html/html-elements'
 import {
     createPageConfig,
     document,
@@ -22,6 +23,7 @@ import type {
 } from 'vite-plugin-taro-runtime/runtime/tt-document'
 import { createPageIdentity } from '../mini/vpt/create-page-identity.ts'
 import { getFormChangeEvent } from '../mini/vpt/get-form-change-event.ts'
+import { getNativeHtmlTag } from '../mini/vpt/get-native-html-tag.ts'
 import type { MiniHost } from '../mini/vpt/mini-host.d.ts'
 import { mountPage } from '../mini/vpt/mount-page.ts'
 
@@ -73,8 +75,9 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
 
         // 与 H5 的页面 div 相同，root 自己拥有一个可离线构建的原生根元素。
         // 它会参与布局；平台 Page document 是后续挂载目标，二者的身份始终分开。
-        // 其他名称按 SDK 的组件注册解析；组件内部及 slot 的呈现由 SDK 管理。
-        const name = node.nodeName
+        // HTML aliases use native built-ins; other names retain SDK component and slot resolution.
+        const htmlTag = getNativeHtmlTag(node.nodeName)
+        const name = htmlTag ?? node.nodeName
 
         node.nativeNode =
             node instanceof TaroRootElement
@@ -82,6 +85,14 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
                 : builtInComponents.has(name)
                   ? nativeDocument.createElement(name)
                   : nativeDocument.createNativeComponent(name, { __tt__inner__options__: { name } })
+
+        if (htmlTag) {
+            node.nativeNode.setAttribute('class', ensureHtmlClass(node.nodeName, ''))
+        }
+        if (node.nodeName === 'br') {
+            // Native presentation owns the newline; the logical HTML void element stays childless.
+            node.nativeNode.appendChild(nativeDocument.createTextNode('\n'))
+        }
 
         // TT SDK 4.4.0.3 通用元素没有实时 value/checked getter，getAttribute 读取 JS 属性存储。
         // 常驻值事件进入共享 Taro 表单流程，支持无业务处理器时的值同步及 text input 受控恢复。
@@ -134,7 +145,9 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
     // Taro 已维护 props、dataset、ID 和移除拦截；这里只转发当前属性，保留原值。
     // style 的设置/移除已触发 Style 委托，其原生写入统一由该委托完成。
     TaroElement.extend('delegateAttributeUpdate', function (this: HostElement, name: string, value: unknown) {
-        if (name !== 'style') {
+        if (name === 'class' && getNativeHtmlTag(this.nodeName)) {
+            this.nativeNode!.setAttribute('class', ensureHtmlClass(this.nodeName, String(value)))
+        } else if (name !== 'style') {
             this.nativeNode!.setAttribute(nativeAttributeName(name), value)
             if (name === 'catchMove') {
                 updateTouchMove(this)
@@ -142,7 +155,9 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
         }
     })
     TaroElement.extend('delegateAttributeRemoval', function (this: HostElement, name: string) {
-        if (name !== 'style') {
+        if (name === 'class' && getNativeHtmlTag(this.nodeName)) {
+            this.nativeNode!.setAttribute('class', ensureHtmlClass(this.nodeName, ''))
+        } else if (name !== 'style') {
             this.nativeNode!.removeAttribute(nativeAttributeName(name))
             if (name === 'catchMove') {
                 updateTouchMove(this)
@@ -176,8 +191,10 @@ export function createDomHost(nativeDocument: TTNativeDocument): MiniHost {
             }
             updateNativeListener(this, 'bindregionchange', subscribed)
         } else {
-            // 与上游 @tarojs/react 的 TT setEvent 一致：普通事件使用 bind 前缀。
-            updateNativeListener(this, `bind${type}`, subscribed)
+            // HTML click handlers share Taro's tap array; custom component events retain their names.
+            const click = type === 'click' && this.getEventHandlers('click')
+            const name = click && click === this.getEventHandlers('tap') ? 'tap' : type
+            updateNativeListener(this, `bind${name}`, subscribed)
         }
     })
 

@@ -57,7 +57,7 @@ for (const mode of ['development', 'production'] as const) {
                     },
                     load(id) {
                         if (id === entry) {
-                            return `${fixture}\n${eventsFixture}\n${nativeComponentsFixture}\n${pagesFixture}\n${cloneFixture}\n}\n${templateFixture}`
+                            return `${fixture}\n${eventsFixture}\n${nativeComponentsFixture}\n${htmlFixture}\n${pagesFixture}\n${cloneFixture}\n}\n${templateFixture}`
                         }
                         if (id === hostModule) {
                             // The SDK exists before the selected application host initializes; do not replace that host.
@@ -331,6 +331,8 @@ import React from 'react'
 import ReactDOM from 'vite-plugin-taro-runtime/react'
 import { hooks, isEnableTTDom, toCamelCase } from '@tarojs/shared'
 import 'vite-plugin-taro-runtime/plugin-platform-tt/runtime'
+import 'vite-plugin-taro-runtime/plugin-html/runtime'
+import { blockElements, inlineElements } from 'vite-plugin-taro-runtime/plugin-html/html-elements'
 import { Current, document, eventHandler, FormElement, getNearestCtx, Style, TaroElement, TaroNode, TaroRootElement, TaroText } from 'vite-plugin-taro-runtime/runtime/mini'
 import { useLoad, useUnload } from 'vite-plugin-taro-runtime/plugin-framework-react/runtime'
 import { createVptApp } from ${JSON.stringify(resolveVptRuntime('mini/vpt/create-vpt-app'))}
@@ -1128,6 +1130,120 @@ function checkClones() {
         ['append', rootClone.nativeNode, rootClone.firstChild.nativeNode]
     ])
     expectChildren(rootClone, [rootClone.firstChild])
+}
+`
+
+const htmlFixture = `
+checkHtmlElements()
+function checkHtmlElements() {
+    // The logical HTML name remains available to selectors and refs; only native presentation is mapped.
+    for (const [names, nativeName] of [[blockElements, 'view'], [inlineElements, 'text']]) {
+        for (const name of names) {
+            if (name === 'view') {
+                continue
+            }
+            calls.length = 0
+            const node = document.createElement(name.toUpperCase())
+            assert.equal(node.nodeName, name)
+            assert.equal(node.nativeNode.name, nativeName, name + ' must use a built-in native element')
+            assert.equal(calls.some(call => call[0] === 'component'), false)
+            assert.equal(node.className, '')
+            assert.equal(node.nativeNode.attributes.class, 'h5-' + name + ' ')
+            node.className = 'item'
+            assert.equal(node.className, 'item')
+            assert.equal(node.nativeNode.attributes.class, 'h5-' + name + ' item')
+            node.classList.add('active')
+            assert.equal(node.nativeNode.attributes.class, 'h5-' + name + ' item active')
+            node.className = 'h5-' + name + ' explicit'
+            assert.equal(node.nativeNode.attributes.class, 'h5-' + name + ' explicit')
+            node.removeAttribute('class')
+            assert.equal(node.className, '')
+            assert.equal(node.nativeNode.attributes.class, 'h5-' + name + ' ')
+            const clone = node.cloneNode(true)
+            assert.notStrictEqual(clone.nativeNode, node.nativeNode)
+            assert.equal(clone.nativeNode.name, nativeName)
+            assert.equal(clone.nativeNode.attributes.class, 'h5-' + name + ' ')
+            if (name === 'br') {
+                assert.equal(node.childNodes.length, 0)
+                assert.equal(clone.childNodes.length, 0)
+                assert.deepEqual(node.nativeNode.childNodes.map(child => child.nodeValue), ['\\n'])
+                assert.deepEqual(clone.nativeNode.childNodes.map(child => child.nodeValue), ['\\n'])
+            }
+        }
+    }
+    // Refs retain the history row's nodes; the journal observes click delivery across React updates.
+    const nodes = {}
+    const deliveries = []
+    const historyContainer = document.createElement('view')
+    const historyRoot = ReactDOM.createRoot(historyContainer)
+    function History({ className, amount }) {
+        return React.createElement('scroll-view', { scrollY: true, className: 'flex flex-col flex-1' },
+            React.createElement('div', {
+                ref: node => { nodes.row = node },
+                id: 'history-row', className,
+                onClick: className === undefined ? undefined : event => deliveries.push([className, event.target.id])
+            }, React.createElement('div', { className: 'flex flex-col' },
+                React.createElement('span', {
+                    ref: node => { nodes.label = node }, id: 'history-label', className: 'text-xs'
+                }, '公积金贷30年'),
+                React.createElement('span', { ref: node => { nodes.amount = node }, className: 'text-base' }, amount + '万'))))
+    }
+    try {
+        calls.length = 0
+        ReactDOM.flushSync(() => historyRoot.render(React.createElement(History, { className: 'flex flex-row', amount: 100 })))
+        const row = nodes.row
+        const native = row.nativeNode
+        assert.equal(historyContainer.nativeNode.firstChild.name, 'scroll-view')
+        assert.equal(native.name, 'view')
+        assert.equal(nodes.label.nativeNode.name, 'view')
+        assert.equal(native.attributes.class, 'h5-div flex flex-row')
+        assert.equal(nodes.label.nativeNode.attributes.class, 'h5-span text-xs')
+        assert.equal(nodes.label.nativeNode.firstChild.nodeValue, '公积金贷30年')
+        assert.equal(nodes.amount.nativeNode.firstChild.nodeValue, '100万')
+        assert.equal(calls.some(call => call[0] === 'component'), false)
+        assert.equal(native.listeners.get('bindclick'), undefined)
+        assert.equal(native.listeners.get('bindtap').size, 1)
+        emitNative(row, 'tap', {}, nodes.label)
+        assert.deepEqual(deliveries, [['flex flex-row', 'history-label']])
+        for (const className of ['changed', 'h5-div explicit', undefined, 'restored']) {
+            calls.length = 0
+            ReactDOM.flushSync(() => historyRoot.render(React.createElement(History, { className, amount: 200 })))
+            assert.strictEqual(nodes.row, row)
+            assert.strictEqual(row.nativeNode, native)
+            assert.equal(row.className, className ?? '')
+            assert.equal(native.attributes.class.trim(), className?.startsWith('h5-div') ? className : ['h5-div', className].filter(Boolean).join(' '))
+            assert.equal(nodes.amount.nativeNode.firstChild.nodeValue, '200万')
+            const count = deliveries.length
+            emitNative(row, 'tap', {}, nodes.label)
+            assert.equal(deliveries.length, count + Number(className !== undefined))
+            assert.equal(native.listeners.get('bindtap').size, Number(className !== undefined))
+            if (className !== undefined) {
+                assert.deepEqual(deliveries.at(-1), [className, 'history-label'])
+            }
+            if (className === 'changed' || className === 'h5-div explicit') {
+                assert.equal(calls.some(call => call[0] === 'listen' || call[0] === 'unlisten'), false)
+            }
+        }
+        const clone = row.cloneNode(true)
+        assert.equal(clone.nativeNode.name, 'view')
+        assert.equal(clone.nativeNode.attributes.class, 'h5-div restored')
+        assert.equal(clone.firstChild.firstChild.nativeNode.attributes.class, 'h5-span text-xs')
+        assert.equal(clone.textContent, row.textContent)
+        assert.deepEqual([...clone.nativeNode.listeners], [])
+        const custom = document.createElement('native-card')
+        custom.addEventListener('click', () => deliveries.push('custom'))
+        assert.equal(custom.nativeNode.listeners.get('bindclick').size, 1)
+        assert.equal(custom.nativeNode.listeners.get('bindtap'), undefined)
+        emitNative(custom, 'click', {}, custom)
+        assert.equal(deliveries.at(-1), 'custom')
+        custom.remove()
+    } finally {
+        ReactDOM.flushSync(() => historyRoot.unmount())
+        assert.equal(historyContainer.nativeNode.childNodes.length, 0)
+        assert.ok(Object.values(nodes).every(node => node === null))
+        calls.length = 0
+        reads.length = 0
+    }
 }
 `
 
