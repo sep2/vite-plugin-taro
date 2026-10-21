@@ -3,9 +3,9 @@ import test from 'node:test'
 import { specializePageCapsule } from './specialize-page-capsule.ts'
 
 const source = `import './app.js'
-import { createVptPage } from '../vpt/vpt-runtime.js'
+import host from '\\0vpt:renderer-host'
 import PageComponent from '\0vpt:page-component'
-export default createVptPage(PageComponent, __VPT_PAGE_OPTIONS__)`
+export default host.createPage(PageComponent, __VPT_PAGE_OPTIONS__)`
 
 test('specializes the Page capsule with one options object', () => {
     const id = '/plugin/runtime/mini/capsule/page.js?route=pages%2Fhome%2Findex'

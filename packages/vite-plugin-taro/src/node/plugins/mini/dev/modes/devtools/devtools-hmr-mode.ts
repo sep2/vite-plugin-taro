@@ -102,13 +102,13 @@ function createDevtoolsPagePlugin(): Plugin {
  * The shared shell owns this one registration call; no platform choice or import-source parsing belongs in HMR.
  */
 export function injectPageShellHmr(code: string): { code: string; map: null } {
-    const registration = 'Page(pageConfig)'
+    const registration = 'registerPage(pageConfig)'
     if (!code.includes(registration)) {
         throw new Error('Mini Program Page shell must register pageConfig')
     }
 
     return {
-        code: code.replace(registration, 'Page(__rolldown_runtime__.injectPageHmr(pageConfig))'),
+        code: code.replace(registration, 'registerPage(__rolldown_runtime__.injectPageHmr(pageConfig))'),
         map: null
     }
 }

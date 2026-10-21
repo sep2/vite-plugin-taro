@@ -3,8 +3,8 @@ import './app.ts'
 
 // @ts-expect-error: The Mini Program build replaces this private import with the configured Page component.
 import PageComponent from '\0vpt:page-component'
-import { createVptPage } from '../vpt/vpt-runtime.ts'
+import host from '\0vpt:renderer-host'
 
-const config = createVptPage(PageComponent, __VPT_PAGE_OPTIONS__)
+const config = host.createPage(PageComponent, __VPT_PAGE_OPTIONS__)
 
 export default config

@@ -1,6 +1,8 @@
-// biome-ignore assist/source/organizeImports: VPT runtime must initialize before the Page capsule.
+// Initialize the shared runtime before activating the Page capsule.
 import '../amphibious/bootstrap.ts'
 
 import pageConfig from '\0vpt:page-capsule'
 
-Page(pageConfig)
+const registerPage = 'methods' in pageConfig ? Component : Page
+
+registerPage(pageConfig)

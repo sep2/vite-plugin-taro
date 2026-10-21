@@ -4,7 +4,7 @@ import { toCamelCase, toDashed } from '@tarojs/shared'
 import { createWxTestRoot } from './create-wx-test-root.ts'
 import { bundleRuntimeEntry, createExecutionContext, executeRuntimeEntry } from './runtime-entry-test-utils.ts'
 
-test('WX host creates, mutates and detaches Page-owned native nodes', async (t) => {
+test('WX host manages Page-owned content under SDK-owned roots', async (t) => {
     function extend(ctor: { prototype: object }, name: string, method: object): void {
         Object.defineProperty(ctor.prototype, name, {
             enumerable: true,
@@ -99,6 +99,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     const instance = { root: sdk }
     const getRoot = t.mock.fn((instance: { root: typeof sdk }) => instance.root)
     const host = createDomHost(getRoot)
+    const onUnmount = t.mock.fn()
     const app = {
         mount(component: unknown, id: string, ...callbacks: unknown[]) {
             assert.strictEqual(this, app)
@@ -106,6 +107,7 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
             return [component, id, ...callbacks]
         },
         unmount(_id: string, complete?: () => void) {
+            onUnmount()
             complete?.()
         }
     }
@@ -439,17 +441,41 @@ test('WX host creates, mutates and detaches Page-owned native nodes', async (t) 
     assert.throws(() => host.createElement(null, parent, 'view'), /Page document/)
     assert.throws(() => host.createText(null, parent, 'text'), /Page document/)
     const outlet = host.createElement(null, parent, 'vpt_page_outlet')
+    const removeNativeRoot = t.mock.method(sdk, 'removeChild')
+    assert.strictEqual(outlet.delegateChildRemoval, outlet.delegateChildInsertion, 'the outlet is entirely logical')
+    assert.strictEqual(nativeRoot.parentNode, sdk, 'the Page shadow root owns the native root')
     outlet.delegateChildInsertion(root)
     outlet.delegateChildRemoval(root, { cleanRef: false })
-    assert.equal(sdk.childNodes.length, 1)
-    outlet.delegateChildRemoval(root, {})
     outlet.delegateChildRemoval(root, {})
     outlet.delegateChildReset()
-    assert.equal(sdk.childNodes.length, 0)
+    assert.strictEqual(sdk.childNodes[0], nativeRoot)
+    assert.equal(removeNativeRoot.mock.callCount(), 0)
+    root.delegateChildRemoval(view)
+    assert.equal(nativeRoot.childNodes.length, 0, 'ordinary Page content removal updates the SDK tree')
+    root.delegateChildInsertion(view, null)
+    assert.strictEqual(nativeRoot.childNodes[0], nativeView)
     host.afterCommit(null)
-    app.unmount('A', complete)
+    const flushesBeforeUnload = sync.mock.callCount()
+    onUnmount.mock.mockImplementation(() => outlet.delegateChildRemoval(root, {}))
+    const released = t.mock.fn()
+    app.unmount('A', released)
+    assert.equal(released.mock.callCount(), 1)
+    assert.strictEqual(sdk.childNodes[0], nativeRoot, 'the SDK owns Page teardown')
     assert.equal(host.getPageRootType('A'), 'root')
     assert.strictEqual(host.getChildHostContext(parent, type), parent)
     app.unmount('A')
-    assert.equal(sync.mock.callCount(), 2)
+    assert.equal(sync.mock.callCount(), flushesBeforeUnload + 2)
+    app.mount(component, 'A', getCtx, complete)
+    assert.equal(getRoot.mock.callCount(), 3)
+
+    onUnmount.mock.mockImplementation(() => {
+        throw new Error('unmount failure')
+    })
+    assert.throws(() => app.unmount('A'), /unmount failure/)
+    assert.equal(host.getPageRootType('A'), type, 'failed cleanup retains the Page document')
+    onUnmount.mock.mockImplementation(() => outlet.delegateChildRemoval(root, {}))
+    app.unmount('A', released)
+    assert.equal(host.getPageRootType('A'), 'root')
+    assert.equal(released.mock.callCount(), 2)
+    assert.equal(removeNativeRoot.mock.callCount(), 0)
 })

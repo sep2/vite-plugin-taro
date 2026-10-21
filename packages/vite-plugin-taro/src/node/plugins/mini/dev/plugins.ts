@@ -132,7 +132,7 @@ export function createMiniDevelopmentPlugin(contract: MiniContract, styles: Mini
                 return host?.close()
             }
         },
-        // Only serve rewrites the Page capsule: production must pass PageComponent directly to createVptPage(),
+        // Only serve rewrites the Page capsule: production must pass PageComponent directly to host.createPage(),
         // while a late-opened dev Page must select its installed HMR factory before Taro captures the original export.
         {
             name: 'vpt:mini-page-capsule-hmr',

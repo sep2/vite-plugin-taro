@@ -190,7 +190,7 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
 
             const unmount = app.unmount
             app.unmount = (id: string, complete?: () => void) => {
-                // Native onUnload must finish React ref/layout cleanup before the SDK destroys this Page.
+                // Release React ownership synchronously; the SDK owns the native Page and its exit scene.
                 return flushSync(() =>
                     unmount.call(app, id, () => {
                         docs.delete(pageType(id))
@@ -221,8 +221,9 @@ export function createDomHost(getRoot: (instance: MpInstance) => WxRoot): MiniHo
 
             const outlet = document.createElement(type)
 
+            // The outlet is logical; native Page roots belong to their SDK shadow roots.
             outlet.delegateChildInsertion = noop
-            outlet.delegateChildRemoval = removePageRoot
+            outlet.delegateChildRemoval = noop
 
             return outlet
         },
@@ -310,13 +311,6 @@ function removeNativeProperty(native: WxNativeElement, name: string): void {
         setNativeProperty(native, name, undefined)
     } else {
         native.removeAttribute(name)
-    }
-}
-
-function removePageRoot(child: HostNode, options: Parameters<TaroNode['delegateChildRemoval']>[1]): void {
-    if (options.cleanRef !== false) {
-        const native = child.nativeNode!
-        native.parentNode?.removeChild(native)
     }
 }
 

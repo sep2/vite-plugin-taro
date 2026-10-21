@@ -934,15 +934,21 @@ function checkWxPageCreation() {
         checkWxHtmlElements(app)
     } finally {
         app.unmount('B')
-        assert.equal(natives.B.root.childNodes.length, 0)
+        assertWxPageReleased('B', natives.B.root)
         app.unmount('A')
-        assert.equal(natives.A.root.childNodes.length, 0)
+        assertWxPageReleased('A', natives.A.root)
         ReactDOM.flushSync(() => ReactDOM.createRoot(document.getElementById('wx-owner-app')).unmount())
         Object.assign(rendererHost, savedHost)
         const restoredContext = {}
         assert.equal(rendererHost.getPageRootType('after-unload'), 'root')
         assert.strictEqual(rendererHost.getChildHostContext(restoredContext, 'view'), restoredContext)
     }
+}
+
+function assertWxPageReleased(id, root) {
+    assert.equal(root.childNodes.length, 1, 'the SDK owns the native exit scene')
+    assert.equal(document.getElementById(id), null, 'logical Page identity is released')
+    assert.equal(rendererHost.getPageRootType(id), 'root', 'the creation document is released')
 }
 
 function checkWxTextInput(app) {
@@ -1059,7 +1065,7 @@ function checkWxTextInput(app) {
             assert.equal(root.childNodes[0].childNodes[0].childNodes.length, 0)
         } finally {
             app.unmount(id)
-            assert.equal(root.childNodes.length, 0)
+            assertWxPageReleased(id, root)
         }
     }
 }
@@ -1138,7 +1144,7 @@ function checkWxHtmlElements(app) {
         assert.deepEqual(events.at(-1), ['restored', 'html-label'])
     } finally {
         app.unmount('html')
-        assert.equal(root.childNodes.length, 0)
+        assertWxPageReleased('html', root)
         assert.ok(Object.values(nodes).every(node => node === null))
     }
 }
@@ -1225,7 +1231,7 @@ function checkWxFormChange(app) {
             assert.equal(root.childNodes[0].childNodes[0].childNodes.length, 0)
         } finally {
             app.unmount(id)
-            assert.equal(root.childNodes.length, 0)
+            assertWxPageReleased(id, root)
         }
     }
 }
@@ -1320,7 +1326,7 @@ function checkWxPropertyUpdates(app) {
             }
         } finally {
             app.unmount(id)
-            assert.equal(root.childNodes.length, 0)
+            assertWxPageReleased(id, root)
         }
     }
 }
@@ -1378,7 +1384,7 @@ function checkWxDatasetUpdates(app) {
         }
     } finally {
         app.unmount('dataset')
-        assert.equal(root.childNodes.length, 0)
+        assertWxPageReleased('dataset', root)
     }
 }
 
@@ -1474,7 +1480,7 @@ function checkWxEventBubbling(app) {
         assert.strictEqual(child.parentNode, parent)
     } finally {
         app.unmount('bubbling')
-        assert.equal(root.childNodes.length, 0)
+        assertWxPageReleased('bubbling', root)
     }
 }
 

@@ -55,7 +55,7 @@ test('creates fresh Page plugins with exact shell identity filtering', async () 
     assert.equal(idFilter.test(`${miniPageShellId}X`), false)
     assert.equal(idFilter.test('/project/runtime/native/page.ts'), false)
 
-    const transformed = await Reflect.apply(transformHook.handler, {}, ['Page(pageConfig)', miniPageShellId])
+    const transformed = await Reflect.apply(transformHook.handler, {}, ['registerPage(pageConfig)', miniPageShellId])
     assert.ok(transformed && typeof transformed === 'object' && 'code' in transformed)
     assert.match(String(transformed.code), /injectPageHmr/)
 })
@@ -75,9 +75,9 @@ test('filters only the shared shell, not the runtime or prerender helper', () =>
 })
 
 test('injects Page HMR immediately before native registration', () => {
-    const result = injectPageShellHmr("import pageConfig from 'capsule'\nPage(pageConfig)")
+    const result = injectPageShellHmr("import pageConfig from 'capsule'\nregisterPage(pageConfig)")
 
-    assert.match(result.code, /Page\(__rolldown_runtime__\.injectPageHmr\(pageConfig\)\)$/)
+    assert.match(result.code, /registerPage\(__rolldown_runtime__\.injectPageHmr\(pageConfig\)\)$/)
     assert.equal(result.map, null)
 })
 

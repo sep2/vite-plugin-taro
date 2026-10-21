@@ -3,7 +3,7 @@ declare module '\0vpt:global-binding' {
     export const vptGlobal: typeof globalThis
 }
 
-/** Final native route config, with an object or data factory selected by its capsule. */
+/** Native configuration created by the selected renderer and exported by the capsule. */
 declare module '\0vpt:page-capsule' {
     const config: typeof import('./capsule/page.ts').default
     export default config
