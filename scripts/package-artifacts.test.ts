@@ -183,11 +183,12 @@ test('public packages preserve their published entrypoints and scaffold dependen
         assert.match(config, /customize: true/)
         assert.match(config, /disableABTest: true/)
         assert.match(config, /componentFramework: 'glass-easel',\s+glassEaselWebview: true/)
-        assert.match(
-            config,
-            /function createPageJson\(target: VptTarget\): VptJsonObject \{\s+switch \(target\) \{\s+case 'wx': \{\s+return \{\s+glassEaselWebview: true/
+        assert.match(config, /window:\s*\{\s*glassEaselWebview: true/)
+        const pageJsonFunction = config.slice(
+            config.indexOf('function createPageJson'),
+            config.indexOf('function createAppJson')
         )
-        assert.doesNotMatch(config, /window:\s*\{[^}]*glassEaselWebview:/)
+        assert.doesNotMatch(pageJsonFunction, /^\s*glassEaselWebview:/m)
         assert.doesNotMatch(config, /sdkVersionBegin|sdkVersionEnd/)
         assert.doesNotMatch(config, /\bsitemapJson\s*:/)
         const project = JSON.parse(readFileSync(path.join(projectPath, 'package.json'), 'utf8'))
