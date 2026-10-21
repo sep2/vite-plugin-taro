@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VptOptions } from '../../../options.ts'
+import { miniPageCapsuleId } from '../mini/module/module.ts'
 import { createTtSkeleton } from './create-tt-skeleton.ts'
 import { createTtMiniContract, createTtMiniPlugins } from './plugins.ts'
 
@@ -35,6 +36,36 @@ test('binds TT runtime and style paths without translating native configuration'
             (plugin) => plugin && typeof plugin === 'object' && 'name' in plugin && plugin.name === 'vpt:mini-override'
         )
     )
+})
+
+test('uses ordinary Page initialization for every TT route while preserving caller options', () => {
+    const input: VptOptions = {
+        ...options,
+        pages: [undefined, false, true].map((prerender, index) => ({
+            path: `pages/route-${index}/index`,
+            config: { navigationBarTitleText: `Route ${index}` },
+            ...(prerender === undefined ? {} : { prerender })
+        }))
+    }
+    const original = structuredClone(input)
+    const plugin = createTtMiniPlugins(input).find(
+        (plugin) => plugin && typeof plugin === 'object' && 'name' in plugin && plugin.name === 'vpt:mini'
+    )
+    assert.ok(plugin && typeof plugin === 'object' && 'transform' in plugin)
+    const transform = plugin.transform
+    assert.ok(transform && typeof transform === 'object' && 'handler' in transform)
+    assert.equal(typeof transform.handler, 'function')
+    for (const page of input.pages) {
+        const result: unknown = Reflect.apply(
+            transform.handler,
+            { environment: { config: { build: { sourcemap: false } } } },
+            ['const options = __VPT_PAGE_OPTIONS__', `${miniPageCapsuleId}?route=${encodeURIComponent(page.path)}`]
+        )
+        assert.ok(result && typeof result === 'object' && 'code' in result && typeof result.code === 'string')
+        const compiled: unknown = Function(`${result.code}; return options`)()
+        assert.deepEqual(compiled, { path: page.path, config: page.config, prerender: false })
+    }
+    assert.deepEqual(input, original)
 })
 
 for (const isProduction of [false, true]) {

@@ -8,7 +8,13 @@ import { createTtSkeleton } from './create-tt-skeleton.ts'
 
 /** Adapts the shared Mini Program pipeline to TikTok. */
 export function createTtMiniPlugins(options: VptOptions): PluginOption[] {
-    return createMiniTargetPlugins(createTtMiniContract(options))
+    return createMiniTargetPlugins(
+        createTtMiniContract({
+            ...options,
+            // TT requires object-form initial Page data.
+            pages: options.pages.map((page) => ({ ...page, prerender: false }))
+        })
+    )
 }
 
 /** Binds TT's runtime, native templates, styles, and socket transport to the shared compiler. */

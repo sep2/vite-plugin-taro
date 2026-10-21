@@ -44,7 +44,8 @@ export type VptPageOption = {
     config?: VptPageConfig
 
     /**
-     * Synchronously render the page on mount. This makes wx Skyline ShareElement draws on first frame.
+     * Synchronously render the page through native data factories, including WX Skyline first-frame ShareElement draws.
+     * TT always uses ordinary mounting with object-form initial Page data.
      */
     prerender?: boolean
 }
