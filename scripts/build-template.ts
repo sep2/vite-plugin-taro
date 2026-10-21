@@ -32,6 +32,7 @@ try {
         stdio: 'pipe',
         timeout: 25_000
     })
+    copyFileSync(path.join(creatorRoot, '.env.local'), path.join(project, '.env.local'))
     // Keep Tailwind's automatic source discovery inside the generated application.
     execFileSync('git', ['init', '--quiet', project], { cwd: repoRoot, stdio: 'pipe', timeout: 25_000 })
     for (const name of ['react', 'react-dom', 'vite', 'rolldown', 'vite-plugin-taro']) {
