@@ -23,6 +23,10 @@ pnpm --filter docs preview
 
 文档内容位于 `src/content/docs`。线上文档部署在 <https://vpt.js.org>。
 
+## 部署
+
+CI 在稳定版 npm 包成功发布后，将同一提交的文档部署到 GitHub Pages，并显示该发布版本。文档更新随下一次稳定版发布上线。Pull Request 会运行文档测试和构建检查。
+
 ## AI 可读文档
 
 构建会从相同的内容源码生成独立的 Markdown 文档，请勿手动维护构建产物：

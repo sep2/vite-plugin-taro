@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 # Never cancel a running main release or publish the same version concurrently.
 concurrency:
@@ -27,24 +26,12 @@ jobs:
       id-token: write
     runs-on: ubuntu-latest
     outputs:
-      documentation: ${{ steps.changes.outputs.documentation }}
       stable_version: ${{ steps.documentation.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           persist-credentials: false
-
-      - name: Check documentation changes
-        id: changes
-        uses: dorny/paths-filter@v4
-        with:
-          base: ${{ github.ref }}
-          filters: |
-            documentation:
-              - '.github/workflows/website.yml'
-              - 'docs/**'
-              - 'pnpm-*.yaml'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -113,7 +100,7 @@ jobs:
       deploy: false
 
   documentation:
-    if: needs.publish.outputs.documentation == 'true' || needs.publish.outputs.stable_version != ''
+    if: needs.publish.outputs.stable_version != ''
     needs: publish
     permissions:
       contents: read
