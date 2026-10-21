@@ -170,7 +170,14 @@ test('public packages preserve their published entrypoints and scaffold dependen
         assert.match(env, /^VITE_VPT_TIKTOK_APP_ID=testAppId$/m)
         const config = readFileSync(path.join(projectPath, 'vite.config.ts'), 'utf8')
         assert.match(config, /env\.VITE_VPT_TIKTOK_APP_ID\b/)
-        assert.match(config, /pages: tabPages\.map\(\(\{ path \}\) => \(\{\s*path,\s*prerender: true/)
+        assert.match(config, /pages: \[/)
+        assert.deepEqual(
+            Array.from(
+                config.matchAll(/path: '([^']+)',\s*prerender: true,\s*config: createPageJson\(target\)/g),
+                (match) => match[1]
+            ),
+            ['pages/home/index', 'pages/explore/explore-page', 'pages/about/about-page']
+        )
         assert.match(config, /list: tabPages\.map\(\(\{ path, label \}\) => \(\{ pagePath: path, text: label \}\)\)/)
         assert.match(config, /custom: true/)
         assert.match(config, /customize: true/)

@@ -18,13 +18,25 @@ export default defineConfig(({ mode }) => {
             vpt({
                 target,
                 app: 'src/app.tsx',
-                pages: tabPages.map(({ path }) => ({
-                    path,
-                    prerender: true,
-                    config: createPageJson(target)
-                })),
+                pages: [
+                    {
+                        path: 'pages/home/index',
+                        prerender: true,
+                        config: createPageJson(target)
+                    },
+                    {
+                        path: 'pages/explore/explore-page',
+                        prerender: true,
+                        config: createPageJson(target)
+                    },
+                    {
+                        path: 'pages/about/about-page',
+                        prerender: true,
+                        config: createPageJson(target)
+                    }
+                ],
                 appJson: createAppJson(target),
-                projectConfigJson: createProjectConfigJson({ target, appId }),
+                projectConfigJson: createProjectConfigJson(target, appId),
                 projectPrivateConfigJson: createProjectPrivateConfigJson(target),
                 hmr: {
                     mode: target === 'wx' ? 'devtools' : 'interpreter'
@@ -127,7 +139,7 @@ function createAppJson(target: VptTarget): VptJsonObject {
     }
 }
 
-function createProjectConfigJson({ target, appId }: { target: VptTarget; appId: string | undefined }): VptJsonObject {
+function createProjectConfigJson(target: VptTarget, appId: string | undefined): VptJsonObject {
     switch (target) {
         case 'wx': {
             return {

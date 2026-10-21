@@ -18,12 +18,23 @@ export default defineConfig(({ mode }) => {
             vpt({
                 target,
                 app: 'src/app.tsx',
-                pages: tabPages.map(({ path }) => ({
-                    path,
-                    // 预渲染，防止切换 tab 闪屏
-                    prerender: true,
-                    config: createPageJson(target)
-                })),
+                pages: [
+                    {
+                        path: 'pages/home/index',
+                        prerender: true,
+                        config: createPageJson(target)
+                    },
+                    {
+                        path: 'pages/explore/explore-page',
+                        prerender: true,
+                        config: createPageJson(target)
+                    },
+                    {
+                        path: 'pages/about/about-page',
+                        prerender: true,
+                        config: createPageJson(target)
+                    }
+                ],
                 appJson: createAppJson(target),
                 projectConfigJson: createProjectConfigJson({ target, appId }),
                 projectPrivateConfigJson: createProjectPrivateConfigJson(target),

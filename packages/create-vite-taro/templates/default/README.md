@@ -87,7 +87,7 @@ npm run dev:h5
 
 每个页面负责自己的全屏布局和 `TabBar`，`src/app.tsx` 负责应用生命周期和全局样式，直接返回 `children`。通过 `Taro.switchTab()` 切换 Tab 时，已访问页面的 React 状态会保留。
 
-`vite.config.ts` 根据 `tabPages` 生成页面和原生 Tab 路由配置，并启用 `prerender: true`。微信使用 `tabBar.custom: true`，由页面中的 React 标签栏负责渲染；`tabBar.list` 保留原生 `switchTab()` 所需的路由声明。
+`vite.config.ts` 显式声明页面并启用 `prerender: true`，原生 Tab 路由由 `tabPages` 生成。微信使用 `tabBar.custom: true`，由页面中的 React 标签栏负责渲染；`tabBar.list` 保留原生 `switchTab()` 所需的路由声明。
 
 VPT 通过虚拟模块提供 Taro 组件和 API：
 
