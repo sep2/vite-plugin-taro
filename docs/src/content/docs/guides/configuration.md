@@ -20,13 +20,32 @@ target: 'wx'
 | `tt` | 抖音小程序 |
 | `h5` | Web 应用 |
 
-输出目录由 Vite 配置，不属于 `vpt()`：
+## `renderer`
+
+小程序渲染器，默认 `template`。
 
 ```ts
-build: {
-    outDir: `dist/${target}`
-}
+renderer: 'dom'
 ```
+
+| 值 | 行为                                                                          |
+| --- |-------------------------------------------------------------------------------|
+| `template` | 使用 Taro 的递归模板与 `setData` 进行渲染。                                   |
+| `dom` | 使用原生 DOM 渲染，性能极佳，与原生持平；当前支持微信、抖音。支付宝暂不支持。 |
+
+微信 DOM 模式需要开启 `glass-easel`。 DOM 渲染同时支持 `Webview` 和 `Skyeline`。
+
+DOM 模式为了保证兼容性，仍然会打包递归模版文件，在运行时检测到当前环境不支持 DOM 渲染时，无缝退回到 template 模式。
+
+:::note
+如何确认现在是 DOM 模式渲染？在微信开发者工具中，确认节点没有 `sid` 属性。
+
+因为递归模版需要用 `sid` 来绑定节点关系，而 DOM 渲染直接操作视图层，不需要这个属性。
+
+确认了现在是 DOM 模式后，可以手动删除递归模版 `base.wxml` 文件，重启开发者工具，渲染仍然生效。
+:::
+
+[首页性能图表](/#renderer-benchmark-title)展示微信开发者工具中的实测对比；[benchmark-demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/benchmark-demo)包含可复现的 benchmark。
 
 ## `app`
 
