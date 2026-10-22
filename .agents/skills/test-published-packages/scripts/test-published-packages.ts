@@ -1,12 +1,21 @@
 #!/usr/bin/env node
 
-import { type ChildProcess, spawn, spawnSync } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { findNativeCounter } from './find-native-counter.ts'
+import type { PublishedFixture, PublishedRenderer } from './published-package-fixture.ts'
+import {
+    assertPublishedRenderer,
+    getPublishedRenderers,
+    nativeCounterProbeId,
+    parseNativeCounterProperty,
+    preparePublishedFixture
+} from './published-package-fixture.ts'
 
 interface CommandResult {
     status: number | null
@@ -26,11 +35,13 @@ interface PublishedRelease {
     releaseTag: ReleaseTag
     creatorVersion: string
     pluginVersion: string
+    runtimeVersion: string
     publishedAt: number
 }
 
 interface PackageIdentity extends PublishedRelease {
     pluginTarball: string
+    runtimeTarball: string
 }
 
 interface ProjectPaths {
@@ -38,9 +49,12 @@ interface ProjectPaths {
     output: string
     source: string
     backup: string
-    viteLog: string
+    config: string
+    counter: string
+    nativeCounter: string
 }
 
+const renderers = getPublishedRenderers(process.argv.slice(2))
 const skillDirectory = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
 const repositoryRoot = resolve(skillDirectory, '../../..')
 const temporaryDirectory = resolve(repositoryRoot, 'packages/vite-plugin-taro/tmp')
@@ -50,7 +64,9 @@ const projectPaths: ProjectPaths = {
     output: resolve(temporaryRoot, 'dist/wx'),
     source: resolve(temporaryRoot, 'src/pages/home/index.tsx'),
     backup: resolve(temporaryRoot, '.hmr-test-index.tsx.backup'),
-    viteLog: resolve(temporaryDirectory, 'vpt-published-packages-test-vite.log')
+    config: resolve(temporaryRoot, 'vite.config.ts'),
+    counter: resolve(temporaryRoot, 'src/components/counter/counter.tsx'),
+    nativeCounter: resolve(temporaryRoot, 'src/components/counter/native-counter.tsx')
 }
 const miniProgramSkill = resolve(repositoryRoot, '.agents/skills/miniprogram-dev-skill')
 const originalText = 'Build naturally. Ship everywhere.'
@@ -183,11 +199,21 @@ async function pollUntil<T>(
 }
 
 function readPublishedVersion(packageName: string, releaseTag: ReleaseTag): string {
-    return requireCommand('npm', ['view', `${packageName}@${releaseTag}`, 'version'], repositoryRoot, undefined).trim()
+    return requireCommand(
+        'npm',
+        ['view', `${packageName}@${releaseTag}`, 'version', '--prefer-online'],
+        repositoryRoot,
+        undefined
+    ).trim()
 }
 
 function readPublishedAt(packageName: string, version: string): number {
-    const timestamp = requireCommand('npm', ['view', packageName, `time[${version}]`], repositoryRoot, undefined).trim()
+    const timestamp = requireCommand(
+        'npm',
+        ['view', packageName, `time[${version}]`, '--prefer-online'],
+        repositoryRoot,
+        undefined
+    ).trim()
     const publishedAt = Date.parse(timestamp)
     if (Number.isNaN(publishedAt)) {
         throw new Error(`npm returned an invalid publication time for ${packageName}@${version}: ${timestamp}`)
@@ -198,44 +224,48 @@ function readPublishedAt(packageName: string, version: string): number {
 function readPublishedRelease(releaseTag: ReleaseTag): PublishedRelease {
     const creatorVersion = readPublishedVersion('create-vite-taro', releaseTag)
     const pluginVersion = readPublishedVersion('vite-plugin-taro', releaseTag)
-    if (creatorVersion !== pluginVersion) {
+    const runtimeVersion = readPublishedVersion('vite-plugin-taro-runtime', releaseTag)
+    if (creatorVersion !== pluginVersion || pluginVersion !== runtimeVersion) {
         throw new Error(
-            `npm ${releaseTag} tags are inconsistent: create-vite-taro@${creatorVersion} and vite-plugin-taro@${pluginVersion}`
+            `npm ${releaseTag} tags are inconsistent: create-vite-taro@${creatorVersion}, vite-plugin-taro@${pluginVersion}, vite-plugin-taro-runtime@${runtimeVersion}. Wait for publication to complete before rerunning.`
         )
     }
 
     const publishedAt = Math.max(
         readPublishedAt('create-vite-taro', creatorVersion),
-        readPublishedAt('vite-plugin-taro', pluginVersion)
+        readPublishedAt('vite-plugin-taro', pluginVersion),
+        readPublishedAt('vite-plugin-taro-runtime', runtimeVersion)
     )
     return {
         releaseTag: releaseTag,
         creatorVersion: creatorVersion,
         pluginVersion: pluginVersion,
+        runtimeVersion: runtimeVersion,
         publishedAt: publishedAt
     }
+}
+
+function readPublishedTarball(packageName: string, version: string): string {
+    const tarball = requireCommand(
+        'npm',
+        ['view', `${packageName}@${version}`, 'dist.tarball', '--prefer-online'],
+        repositoryRoot,
+        undefined
+    ).trim()
+    if (!tarball.startsWith('https://')) {
+        throw new Error(`Published ${packageName} tarball is not an HTTPS registry artifact: ${tarball}`)
+    }
+    return tarball
 }
 
 function readPublishedPackageIdentity(): PackageIdentity {
     const stableRelease = readPublishedRelease('latest')
     const betaRelease = readPublishedRelease('beta')
     const selectedRelease = betaRelease.publishedAt > stableRelease.publishedAt ? betaRelease : stableRelease
-    const pluginTarball = requireCommand(
-        'npm',
-        ['view', `vite-plugin-taro@${selectedRelease.pluginVersion}`, 'dist.tarball'],
-        repositoryRoot,
-        undefined
-    ).trim()
-
-    if (!pluginTarball.startsWith('https://')) {
-        throw new Error(`Published plugin tarball is not an HTTPS registry artifact: ${pluginTarball}`)
-    }
     return {
-        releaseTag: selectedRelease.releaseTag,
-        creatorVersion: selectedRelease.creatorVersion,
-        pluginVersion: selectedRelease.pluginVersion,
-        publishedAt: selectedRelease.publishedAt,
-        pluginTarball: pluginTarball
+        ...selectedRelease,
+        pluginTarball: readPublishedTarball('vite-plugin-taro', selectedRelease.pluginVersion),
+        runtimeTarball: readPublishedTarball('vite-plugin-taro-runtime', selectedRelease.runtimeVersion)
     }
 }
 
@@ -244,7 +274,7 @@ function createFreshProject(identity: PackageIdentity): void {
     rmSync(projectPaths.root, { recursive: true, force: true })
     requireCommand(
         'npm',
-        ['create', `vite-taro@${identity.releaseTag}`, 'vpt-published-packages-test'],
+        ['create', '--yes', `vite-taro@${identity.creatorVersion}`, 'vpt-published-packages-test'],
         temporaryDirectory,
         undefined
     )
@@ -256,18 +286,21 @@ function readJsonFile(path: string): Record<string, unknown> {
     return requireRecord(parseJson(readFileSync(path, 'utf8'), path), path)
 }
 
-function validateInstalledPlugin(identity: PackageIdentity): void {
+function validateInstalledPackages(identity: PackageIdentity): void {
     const lock = readJsonFile(resolve(projectPaths.root, 'package-lock.json'))
     const packages = requireRecord(lock.packages, 'package-lock packages')
-    const plugin = requireRecord(packages['node_modules/vite-plugin-taro'], 'installed vite-plugin-taro')
-    const installedVersion = requireString(plugin.version, 'installed vite-plugin-taro version')
-    const resolved = requireString(plugin.resolved, 'installed vite-plugin-taro resolution')
-
-    if (installedVersion !== identity.pluginVersion) {
-        throw new Error(`Expected vite-plugin-taro ${identity.pluginVersion}, received ${installedVersion}`)
-    }
-    if (resolved !== identity.pluginTarball) {
-        throw new Error(`Expected registry tarball ${identity.pluginTarball}, received ${resolved}`)
+    for (const [name, version, tarball] of [
+        ['vite-plugin-taro', identity.pluginVersion, identity.pluginTarball],
+        ['vite-plugin-taro-runtime', identity.runtimeVersion, identity.runtimeTarball]
+    ]) {
+        const installed = requireRecord(packages[`node_modules/${name}`], `installed ${name}`)
+        const installedVersion = requireString(installed.version, `installed ${name} version`)
+        const resolved = requireString(installed.resolved, `installed ${name} resolution`)
+        if (installedVersion !== version || resolved !== tarball) {
+            throw new Error(
+                `Expected registry artifact ${name}@${version} from ${tarball}, received ${installedVersion} from ${resolved}`
+            )
+        }
     }
 }
 
@@ -279,29 +312,22 @@ function readAppId(): string {
     return appId
 }
 
-function installProbeId(source: string): string {
-    const literalOccurrences = source.split(originalText).length - 1
-    if (literalOccurrences !== 1) {
-        throw new Error(`Expected one source occurrence of: ${originalText}`)
+function readPublishedFixture(): PublishedFixture {
+    return {
+        config: readFileSync(projectPaths.config, 'utf8'),
+        page: readFileSync(projectPaths.source, 'utf8'),
+        counter: readFileSync(projectPaths.counter, 'utf8'),
+        nativeCounter: readFileSync(projectPaths.nativeCounter, 'utf8')
     }
-    const literalIndex = source.indexOf(originalText)
-    const openingTagIndex = source.lastIndexOf('<Text ', literalIndex)
-    const openingTagEnd = source.indexOf('>', openingTagIndex)
-    if (openingTagIndex < 0 || openingTagEnd < openingTagIndex) {
-        throw new Error('Unable to locate the HMR probe Text element')
-    }
-    const openingTag = source.slice(openingTagIndex, openingTagEnd)
-    if (openingTag.includes(' id=')) {
-        throw new Error('The HMR probe Text element already has an id')
-    }
-    return `${source.slice(0, openingTagIndex)}<Text id="${probeId}"${source.slice(openingTagIndex + 5)}`
 }
 
-function configureDisposableProject(): void {
+function configureDisposableProject(sources: PublishedFixture, renderer: PublishedRenderer): void {
+    const fixture = preparePublishedFixture(sources, renderer, { id: probeId, text: originalText })
     writeFileSync(resolve(projectPaths.root, '.env.local'), `VITE_VPT_WECHAT_APP_ID=${readAppId()}\n`)
-
-    const source = readFileSync(projectPaths.source, 'utf8')
-    writeFileSync(projectPaths.source, installProbeId(source))
+    writeFileSync(projectPaths.config, fixture.config)
+    writeFileSync(projectPaths.source, fixture.page)
+    writeFileSync(projectPaths.counter, fixture.counter)
+    writeFileSync(projectPaths.nativeCounter, fixture.nativeCounter)
 }
 
 function validateProjectConfig(): void {
@@ -337,13 +363,25 @@ function validateDevToolsStatus(): void {
     if (result.loginExpired !== false) {
         throw new Error('WeChat DevTools login is expired')
     }
+    if (result.versionRelation !== 'equal' && result.versionRelation !== 'agent_ahead') {
+        throw new Error('Synchronize the WeChat DevTools skill before running the published-package checks')
+    }
+    if (result.tokenRequired !== false) {
+        throw new Error(
+            'WeChat DevTools requires a CLI access token; configure CLI authorization before running this check'
+        )
+    }
 }
 
-function startDevServer(): ChildProcess {
+function viteLogPath(renderer: PublishedRenderer): string {
+    return resolve(temporaryDirectory, `vpt-published-packages-test-${renderer}-vite.log`)
+}
+
+function startDevServer(renderer: PublishedRenderer): ChildProcess {
     rmSync(projectPaths.output, { recursive: true, force: true })
-    rmSync(projectPaths.viteLog, { force: true })
+    rmSync(viteLogPath(renderer), { force: true })
     mkdirSync(resolve(projectPaths.output, '..'), { recursive: true })
-    const logDescriptor = openSync(projectPaths.viteLog, 'w')
+    const logDescriptor = openSync(viteLogPath(renderer), 'w')
     const invocation = createCommandInvocation('npm', ['run', 'dev:wx'])
     const child = spawn(invocation.executable, invocation.args, {
         cwd: projectPaths.root,
@@ -354,11 +392,13 @@ function startDevServer(): ChildProcess {
     return child
 }
 
-function devServerReady(child: ChildProcess): boolean {
+function devServerReady(child: ChildProcess, renderer: PublishedRenderer): boolean {
     if (child.exitCode !== null) {
         throw new Error(`Published dev server exited with code ${child.exitCode}`)
     }
-    return existsSync(projectPaths.viteLog) && readFileSync(projectPaths.viteLog, 'utf8').includes(devServerReadyMarker)
+    return (
+        existsSync(viteLogPath(renderer)) && readFileSync(viteLogPath(renderer), 'utf8').includes(devServerReadyMarker)
+    )
 }
 
 function hasCode(value: unknown, code: string): boolean {
@@ -426,7 +466,42 @@ function currentRoute(): string | undefined {
     return typeof result.currentPage.route === 'string' ? result.currentPage.route : undefined
 }
 
-function readNativeCounter() {
+function validateActiveRenderer(renderer: PublishedRenderer): void {
+    const response = requireRecord(
+        callWechatide(
+            'automation_evaluate',
+            [
+                '--project',
+                projectPaths.output,
+                '--fn-source',
+                `function() {
+            const pages = getCurrentPages();
+            const page = pages[pages.length - 1];
+            return { nativeRoot: !!page.__vptWxRoot, renderer: page.renderer, dataKeys: Object.keys(page.data) };
+        }`
+            ],
+            true
+        ),
+        'renderer evaluation'
+    )
+    const environment = requireRecord(
+        requireRecord(response.result, 'renderer evaluation response').result,
+        'renderer environment'
+    )
+    assertPublishedRenderer(renderer, environment)
+    console.log(`Active ${renderer} renderer: ${JSON.stringify(environment)}`)
+}
+
+function readNativeCounter(renderer: PublishedRenderer) {
+    if (renderer === 'dom') {
+        const selector = `#${nativeCounterProbeId}`
+        const value = callWechatide(
+            'automation_element_action',
+            ['--project', projectPaths.output, '--selector', selector, '--action', 'property', '--name', 'count'],
+            true
+        )
+        return { selector, count: parseNativeCounterProperty(value) }
+    }
     const result = callWechatide(
         'automation_page_action',
         ['--project', projectPaths.output, '--action', 'getData'],
@@ -438,8 +513,8 @@ function readNativeCounter() {
     return findNativeCounter(result.data.page)
 }
 
-function readCounterCount(): number | undefined {
-    return readNativeCounter()?.count
+function readCounterCount(renderer: PublishedRenderer): number | undefined {
+    return readNativeCounter(renderer)?.count
 }
 
 function readProbeText(): string | undefined {
@@ -515,7 +590,7 @@ function readConsoleDiagnostics(): readonly string[] {
     return [...new Set(lines)].sort()
 }
 
-function collectHmrDiagnostics(rootHashes: Map<string, string>): void {
+function collectHmrDiagnostics(rootHashes: Map<string, string>, renderer: PublishedRenderer): void {
     stage('HMR diagnostics')
     const network = callWechatide(
         'get_simulator_network',
@@ -532,7 +607,7 @@ function collectHmrDiagnostics(rootHashes: Map<string, string>): void {
     console.log(
         `App roots unchanged: ${JSON.stringify([...rootHashes].every(([file, hash]) => readRootHashes().get(file) === hash))}`
     )
-    console.log(`Vite log tail:\n${tail(readFileSync(projectPaths.viteLog, 'utf8'), 40)}`)
+    console.log(`Vite log tail:\n${tail(readFileSync(viteLogPath(renderer), 'utf8'), 40)}`)
 }
 
 async function waitForProbeText(expectedText: string): Promise<void> {
@@ -544,7 +619,8 @@ async function waitForProbeText(expectedText: string): Promise<void> {
 async function verifyTextAndState(
     expectedText: string,
     expectedCount: number,
-    rootHashes: Map<string, string>
+    rootHashes: Map<string, string>,
+    renderer: PublishedRenderer
 ): Promise<void> {
     try {
         await waitForProbeText(expectedText)
@@ -552,7 +628,7 @@ async function verifyTextAndState(
             `native counter value ${expectedCount}`,
             transitionDeadlineMs,
             pollIntervalMs,
-            readCounterCount,
+            () => readCounterCount(renderer),
             (value) => value === expectedCount
         )
         if (count !== expectedCount) {
@@ -560,12 +636,12 @@ async function verifyTextAndState(
         }
         assertRootHashes(rootHashes)
     } catch (error) {
-        collectHmrDiagnostics(rootHashes)
+        collectHmrDiagnostics(rootHashes, renderer)
         throw error
     }
 }
 
-async function proveHmr(): Promise<void> {
+async function proveHmr(renderer: PublishedRenderer): Promise<void> {
     const initialText = await pollUntil(
         'initial visible probe text',
         transitionDeadlineMs,
@@ -573,11 +649,12 @@ async function proveHmr(): Promise<void> {
         readProbeText,
         (text) => text.includes(originalText)
     )
+    validateActiveRenderer(renderer)
     const initialCounter = await pollUntil(
         'initial native counter state',
         transitionDeadlineMs,
         pollIntervalMs,
-        readNativeCounter,
+        () => readNativeCounter(renderer),
         (counter) => counter.count === 0
     )
     const initialCount = initialCounter.count
@@ -588,7 +665,7 @@ async function proveHmr(): Promise<void> {
         'incremented native counter state',
         transitionDeadlineMs,
         pollIntervalMs,
-        readCounterCount,
+        () => readCounterCount(renderer),
         (count) => count === initialCount + 1
     )
     const baselineConsoleDiagnostics = readConsoleDiagnostics()
@@ -604,7 +681,7 @@ async function proveHmr(): Promise<void> {
             () => patchContains(updatedText),
             (ready) => ready
         )
-        await verifyTextAndState(updatedText, retainedCount, rootHashes)
+        await verifyTextAndState(updatedText, retainedCount, rootHashes, renderer)
         console.log(`After edit: text=${JSON.stringify(updatedText)}, count=${retainedCount}`)
 
         restoreSource()
@@ -615,7 +692,7 @@ async function proveHmr(): Promise<void> {
             () => patchContains(originalText),
             (ready) => ready
         )
-        await verifyTextAndState(originalText, retainedCount, rootHashes)
+        await verifyTextAndState(originalText, retainedCount, rootHashes, renderer)
         console.log(`After restoration: text=${JSON.stringify(originalText)}, count=${retainedCount}`)
     } finally {
         restoreSource()
@@ -630,19 +707,19 @@ async function proveHmr(): Promise<void> {
     }
 }
 
-async function runDevToolsValidation(): Promise<void> {
-    const devServer = startDevServer()
+async function runDevToolsValidation(renderer: PublishedRenderer): Promise<void> {
+    const devServer = startDevServer(renderer)
     try {
         await pollUntil(
             'published WX dev server',
             90_000,
             500,
-            () => devServerReady(devServer),
+            () => devServerReady(devServer, renderer),
             (ready) => ready
         )
         validateDevelopmentOutput()
-        callWechatide('open_project_window', ['--project', projectPaths.output], true)
         try {
+            callWechatide('open_project_window', ['--project', projectPaths.output], true)
             await pollUntil(
                 'home page route',
                 90_000,
@@ -650,10 +727,10 @@ async function runDevToolsValidation(): Promise<void> {
                 currentRoute,
                 (route) => route === '/pages/home/index'
             )
-            await proveHmr()
+            await proveHmr(renderer)
         } finally {
             restoreSource()
-            callWechatide('close_project_window', ['--project', projectPaths.output], false)
+            callWechatide('close_project_window', ['--project', projectPaths.output], true)
         }
     } finally {
         await stopDevServer(devServer)
@@ -666,25 +743,30 @@ async function main(): Promise<void> {
     console.log(`npm dist-tag: ${identity.releaseTag}`)
     console.log(`create-vite-taro@${identity.creatorVersion}`)
     console.log(`vite-plugin-taro@${identity.pluginVersion}`)
+    console.log(`vite-plugin-taro-runtime@${identity.runtimeVersion}`)
     console.log(`release completed at ${new Date(identity.publishedAt).toISOString()}`)
-
-    stage('Creating and installing a fresh disposable project')
-    createFreshProject(identity)
-    validateInstalledPlugin(identity)
-    configureDisposableProject()
-
-    stage('Running typecheck and production WX build')
-    validateStaticBuild()
+    readAppId()
 
     stage('Checking WeChat DevTools')
     validateDevToolsStatus()
 
-    stage('Validating published-package HMR')
-    await runDevToolsValidation()
+    stage('Creating and installing a fresh disposable project')
+    createFreshProject(identity)
+    validateInstalledPackages(identity)
+    const fixture = readPublishedFixture()
+
+    for (const renderer of renderers) {
+        stage(`Configuring WX ${renderer} renderer`)
+        configureDisposableProject(fixture, renderer)
+        stage(`Running ${renderer} typecheck and production WX build`)
+        validateStaticBuild()
+        stage(`Validating ${renderer} published-package HMR`)
+        await runDevToolsValidation(renderer)
+    }
 
     stage('PASS')
     console.log(
-        `Published ${identity.releaseTag} packages create-vite-taro@${identity.creatorVersion} and vite-plugin-taro@${identity.pluginVersion} passed.`
+        `Published ${identity.releaseTag} ${identity.pluginVersion} packages passed for ${renderers.join(' and ')} rendering.`
     )
     console.log(`Disposable project retained at ${projectPaths.root}`)
 }
