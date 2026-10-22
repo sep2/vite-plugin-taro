@@ -16,6 +16,8 @@ import {
     parseNativeCounterProperty,
     preparePublishedFixture
 } from './published-package-fixture.ts'
+import { removeDirectory } from './remove-directory.ts'
+import { rendererEnvironmentSource } from './renderer-environment-source.ts'
 
 interface CommandResult {
     status: number | null
@@ -271,7 +273,7 @@ function readPublishedPackageIdentity(): PackageIdentity {
 
 function createFreshProject(identity: PackageIdentity): void {
     mkdirSync(temporaryDirectory, { recursive: true })
-    rmSync(projectPaths.root, { recursive: true, force: true })
+    removeDirectory(projectPaths.root)
     requireCommand(
         'npm',
         ['create', '--yes', `vite-taro@${identity.creatorVersion}`, 'vpt-published-packages-test'],
@@ -378,7 +380,7 @@ function viteLogPath(renderer: PublishedRenderer): string {
 }
 
 function startDevServer(renderer: PublishedRenderer): ChildProcess {
-    rmSync(projectPaths.output, { recursive: true, force: true })
+    removeDirectory(projectPaths.output)
     rmSync(viteLogPath(renderer), { force: true })
     mkdirSync(resolve(projectPaths.output, '..'), { recursive: true })
     const logDescriptor = openSync(viteLogPath(renderer), 'w')
@@ -470,16 +472,7 @@ function validateActiveRenderer(renderer: PublishedRenderer): void {
     const response = requireRecord(
         callWechatide(
             'automation_evaluate',
-            [
-                '--project',
-                projectPaths.output,
-                '--fn-source',
-                `function() {
-            const pages = getCurrentPages();
-            const page = pages[pages.length - 1];
-            return { nativeRoot: !!page.__vptWxRoot, renderer: page.renderer, dataKeys: Object.keys(page.data) };
-        }`
-            ],
+            ['--project', projectPaths.output, '--fn-source', rendererEnvironmentSource],
             true
         ),
         'renderer evaluation'
