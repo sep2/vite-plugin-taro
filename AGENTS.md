@@ -55,6 +55,7 @@ Under `demo/`:
 - `page-styles-demo`: App/Page CSS isolation, shared/lazy styles, and native HMR checks for `wx`, `zfb`, and `tt`.
 - `hmr-stress-demo`: deep React tree HMR fixture for `wx` and `zfb`; automated IDE harness is WX-only.
 - `towxml-stream-demo`: native Towxml streaming fixture for `wx` only.
+- `benchmark-demo`: keyed React list renderer benchmark for WX DevTools; DOM/template results feed the docs homepage.
 
 `patches/series/` contains ordered feature patches; See `patches/README.md` for more.
 

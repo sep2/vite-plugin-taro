@@ -1,5 +1,7 @@
 ---
 // biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import HomeLink from './home-link.astro'
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
 import HomeSectionHeading from './home-section-heading.astro'
 ---
 
@@ -30,7 +32,7 @@ import HomeSectionHeading from './home-section-heading.astro'
             </ul>
 
             <nav class="app-view-links" aria-label="App 与页面文档">
-                <a class="primary-link" href="/guides/app-and-pages/">了解 App 与页面 <span aria-hidden="true">→</span></a>
+                <HomeLink href="/guides/app-and-pages/">了解 App 与页面</HomeLink>
             </nav>
         </div>
 
@@ -480,24 +482,6 @@ import HomeSectionHeading from './home-section-heading.astro'
         flex-wrap: wrap;
         gap: 0.9rem 1.2rem;
         margin-top: 2rem;
-    }
-
-    .app-view-links a {
-        color: var(--vpt-accent-strong);
-        font-weight: 700;
-        text-decoration: none;
-    }
-
-    .app-view-links .primary-link {
-        padding: 0.75rem 1rem;
-        border: 1px solid var(--vpt-border-strong);
-        border-radius: 999px;
-        background: var(--vpt-surface);
-        box-shadow: 0 10px 24px var(--vpt-shadow);
-    }
-
-    .app-view-links a:hover {
-        text-decoration: underline;
     }
 
     .page-deck-demo {
@@ -1318,8 +1302,7 @@ import HomeSectionHeading from './home-section-heading.astro'
         outline-offset: -4px;
     }
 
-    .app-tabs button:focus-visible,
-    .app-view-links a:focus-visible {
+    .app-tabs button:focus-visible {
         outline: 3px solid color-mix(in srgb, var(--deck-green, var(--vpt-accent)) 44%, transparent);
         outline-offset: 3px;
     }

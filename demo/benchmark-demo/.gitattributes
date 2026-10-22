@@ -1,0 +1,2 @@
+# Keep measured source fingerprints identical across checkouts.
+* text=auto eol=lf

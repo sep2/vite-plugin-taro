@@ -1,0 +1,4080 @@
+{
+    "schemaVersion": 3,
+    "metadata": {
+        "startedAt": "2026-10-22T05:54:47.437Z",
+        "gitCommit": "9e85eb14528b4e6e7b2bc3fdf2b96841c7011084",
+        "gitStatus": "M ../../AGENTS.md\n M ../../docs/scripts/page-frame.test.ts\n M ../../docs/src/components/home-page.astro\n M ../../docs/src/content/docs/guides/configuration.md\n M ../../docs/src/lib/home-translations.ts\n M ../../package.json\nAD ../../packages/vite-plugin-taro/src/runtime/mini/vpt/prepare-page-mount.ts\n M ../../pnpm-lock.yaml\n?? ./\n?? ../../docs/scripts/renderer-benchmark.test.ts\n?? ../../docs/src/components/renderer-benchmark-showcase.astro",
+        "node": "v26.12.1",
+        "devtoolsVersion": "2.02.2608272",
+        "packages": {
+            "react": "19.3.0",
+            "vite": "8.3.4",
+            "vite-plugin-taro": "0.7.13"
+        },
+        "runtimeVersion": "0.7.13",
+        "sourceHashes": {
+            "demo/benchmark-demo/src/app.css": "6964610edc3d4c5365eb3c65e4140f811232a2b6b08f37fb28c6d9785e6e95f0",
+            "demo/benchmark-demo/src/app.tsx": "3724dbf3e6d0c6e45a78e219c230d0798342bf61a20bcc23d6371935abdcaf46",
+            "demo/benchmark-demo/src/benchmark-row.tsx": "b3c18f7f158f98d6f2aebfb851a25a6ff8f84eae801c8b41ae6a635e06fe3c58",
+            "demo/benchmark-demo/src/measure-native-update.ts": "4432de653aa7c1641c32a66e6b256ab62a47da6cd2a3f60d743884869c40b9fb",
+            "demo/benchmark-demo/src/native.ts": "d393a026c1cffa5eb58ab0c4764063efadd3f93ebd592af42770b5125f755367",
+            "demo/benchmark-demo/src/pages/index/index.tsx": "5dd7619f46b319cabf3439217b8c5f38f971a69acdf8fbb693102e84041fd399",
+            "demo/benchmark-demo/src/update-measurement.ts": "7d3d2d59babaa5290ecf9d7a81018f33afbf454f9f0179a91a1b5c90ef92bcc0",
+            "demo/benchmark-demo/src/workload.ts": "b66b78be3abbd506cd0622328606c7687cd6ca767f0c13adc948ffc5ba19e681",
+            "demo/benchmark-demo/scripts/collector.test.ts": "61560a1407c8e30095c469381f04bf4ec1b7e1040c5aae31849c58e48c2fe3c5",
+            "demo/benchmark-demo/scripts/create-benchmark-channel.ts": "fcca4327566e5a1fcc2ba0865424f6b1ee62cca28c63e7a6bc94a47889233fde",
+            "demo/benchmark-demo/scripts/native-layout.test.ts": "e00bcb9d6bf215071c4c962d200de925a3dde7a645b6f62919e6bd56b6f9fcf0",
+            "demo/benchmark-demo/scripts/results.test.ts": "6e182b5142ecea4f178ea603d02168d207fe4e1eedcebc16e34dc2380d2b5d07",
+            "demo/benchmark-demo/scripts/run-benchmark.ts": "22dcf8aa2ca28078fa979691e15ea7d95d35d1d3229cfca682b026e554cf4cff",
+            "demo/benchmark-demo/scripts/statistics.ts": "1ea61a8e4a1b9ce742ed375a64807c8da0e55237af546b5c9ef8e349da3b8100",
+            "demo/benchmark-demo/scripts/test-benchmark-row.tsx": "e49c6a1f2ae9c6840e3a4f7be5f6cafbe7c06636ba2c70c353c8055fac5af3cf",
+            "demo/benchmark-demo/scripts/workload.test.ts": "25ffdeef93e84c2595192113cc08d667f9965f446ff4dd826f3492d589078a56",
+            "packages/vite-plugin-taro/src/runtime/client/taro/api.ts": "cabbd25a86d40f3b2bdcb1db140663fa7a8b24195edde53d93bf50f2dfa5108c",
+            "packages/vite-plugin-taro/src/runtime/client/taro/component.ts": "104b0511f89976c0e02a371910063e542a42acdf95f9157d519bb1d934107ab9",
+            "packages/vite-plugin-taro/src/runtime/client/taro/framework-apis.ts": "4c18c54e7873b87663896443bda512eef672b4a46f44b6bc094ebb02f9eee8c6",
+            "packages/vite-plugin-taro/src/runtime/client/taro/native.test.ts": "e31106d6316555e793bebc13ca7a2f4bf19ae4e122f28578b02d7f611ed7f564",
+            "packages/vite-plugin-taro/src/runtime/client/taro/native.ts": "f5a199396a1e869c958767e085bb16ce2c56ae1729f522bb1846459bd72a8225",
+            "packages/vite-plugin-taro/src/runtime/global/vpt-global.test.ts": "bba002714bd7bf8b231e92601a821e791211b00dc36019badbf3a8061e541778",
+            "packages/vite-plugin-taro/src/runtime/global/vpt-global.ts": "8450b877f99946124d6b56d3ac6ac3c580d228996fc640b130a4d2c157c46e19",
+            "packages/vite-plugin-taro/src/runtime/h5/app.ts": "596e5c4044b853ace7ed1a9c331c1961f1cebc323d52eb89d65ccd173f38cc45",
+            "packages/vite-plugin-taro/src/runtime/h5/taro-api-exports.ts": "e8f033e79bd24d9130b5f38752dc0ab115a663d2a8debe217259e3a019a67adf",
+            "packages/vite-plugin-taro/src/runtime/h5/taro-api.ts": "1bd78c6c3f25f0623bd1336d2be4d3fa8da6dfc47623869b81441af298249f46",
+            "packages/vite-plugin-taro/src/runtime/h5/taro-css.d.ts": "87974f8695d285afcedb756d870863a77ff48443d8b4524931800d4ff3a057cf",
+            "packages/vite-plugin-taro/src/runtime/h5/taro-runtime.ts": "97bc569ce6b304e6372b2c79e0f13223a41f6af7befb36f92b727de65d79b102",
+            "packages/vite-plugin-taro/src/runtime/mini/amphibious/bootstrap.ts": "ffe40655fb125c5c7ea6563a4fd53920cb5fb184781bd845c844ee279d509822",
+            "packages/vite-plugin-taro/src/runtime/mini/capsule/app.ts": "e0cb51d1375eb079e96d239a403df78bd3dfc7799f08609954dd476ecb60c343",
+            "packages/vite-plugin-taro/src/runtime/mini/capsule/component.ts": "a3ed2cc9afcf100ec3710b3566d32715ea2b33524e64678a7847f9927a88b77a",
+            "packages/vite-plugin-taro/src/runtime/mini/capsule/page.ts": "21d5c5a7564f8334dcfe4187025bdf0853020c00ebe0745f249f630d6740e1d4",
+            "packages/vite-plugin-taro/src/runtime/mini/dev/hmr-protocol.ts": "424c561129934d06a7f16e0a80e40f38c3cac0c80bc61d0ebd4afe3fee386e68",
+            "packages/vite-plugin-taro/src/runtime/mini/dev/mini-hmr-runtime.ts": "47d6c8c2c739f2d4d2898eb480473254750f990e324f8d09e13c8507c50c6474",
+            "packages/vite-plugin-taro/src/runtime/mini/dev/modes/devtools/devtools-runtime.test.ts": "5f72c4a2a8e1459e6fceec5052b8f748431819d644113e1bc8bd24d8d2d4eedb",
+            "packages/vite-plugin-taro/src/runtime/mini/dev/modes/devtools/devtools-runtime.ts": "948728e9ab7b62075190834c16ac7acef6814b87d8d016f4f3f5103a8fe30b5f",
+            "packages/vite-plugin-taro/src/runtime/mini/dev/modes/devtools/inject-page-hmr.test.ts": "143b6dc418e43f9eb6a7674f5b3732a2cee67eed18b207c8e2762e4554466dbe",
+            "packages/vite-plugin-taro/src/runtime/mini/dev/modes/devtools/inject-page-hmr.ts": "5ae6221545d8be1b63a5485a4152ba7713b155606b6eb7f649c71e1b7890d71b",
+            "packages/vite-plugin-taro/src/runtime/mini/dev/modes/interpreter/interpreter-protocol.ts": "44df676e65c1defb32aed2be1ca0d10dc51273d23cd8c09ff4a171298f931832",
+            "packages/vite-plugin-taro/src/runtime/mini/dev/modes/interpreter/interpreter-runtime.test.ts": "8a73a2d91a282e7cca76fc6736cc38aea17affb29c79ae867a96b9174e9d2878",
+            "packages/vite-plugin-taro/src/runtime/mini/dev/modes/interpreter/interpreter-runtime.ts": "cb27322caaa825b3f0d3baa3658ae85d9cb3ce2a42002403a68858398477eee0",
+            "packages/vite-plugin-taro/src/runtime/mini/dev/polyfill/polyfill-queue-microtask.test.ts": "eddba398cefc8499baf0db96400f3a01b26454d84e3ceba4426e1c352b014f34",
+            "packages/vite-plugin-taro/src/runtime/mini/dev/polyfill/polyfill-queue-microtask.ts": "d82ab914d5032753fc7ee085a39ed34d3c9619047e5119ae7e80cf9887fb9152",
+            "packages/vite-plugin-taro/src/runtime/mini/dev/vite-client.test.ts": "07fc1e353a2b4ceecce73d56a7269d8b6d28012edb867f2b1edd29c2d3310ca7",
+            "packages/vite-plugin-taro/src/runtime/mini/dev/vite-client.ts": "e8e8c5a52a238e54609e1e146fdc43fa5e1ad52d979679a365e1e2dc52f0db15",
+            "packages/vite-plugin-taro/src/runtime/mini/mini-program.d.ts": "f4d1c21cb98c5283685efffa904badea2e836a0c548ee3b61763749c12fc7462",
+            "packages/vite-plugin-taro/src/runtime/mini/native/app.ts": "4455b57227c82b73cc54d2c34fbf8ba474e9f15976b70dda8a24fbbce8545faa",
+            "packages/vite-plugin-taro/src/runtime/mini/native/component.ts": "11136ff8b3505616bf0a21627fd6eec75de2a5cc9c886aeff53a34d67722a76b",
+            "packages/vite-plugin-taro/src/runtime/mini/native/custom-wrapper.ts": "de25ab185def89f8dc533a24cafb5ea5a767394630b34c61cf80d487e141b141",
+            "packages/vite-plugin-taro/src/runtime/mini/native/page.ts": "170beabff1dba041f20eed0413d531a8ee8054789e64537c0b82d21a5ced1104",
+            "packages/vite-plugin-taro/src/runtime/mini/systemjs/LICENSE": "5bb6f4ad047c4a856f9b34ed6666b44ed8eeab517b6525522e272decd4793058",
+            "packages/vite-plugin-taro/src/runtime/mini/systemjs/system-core.js": "ef607153b9df2d441786a2a43e6b602c2e7f11c69cc3db847580d671492e8c79",
+            "packages/vite-plugin-taro/src/runtime/mini/systemjs/system-core.test.ts": "5f7e9e46b68764ea3498e5af09377673720a2cd586ed2cb094fb2e2b93e54ada",
+            "packages/vite-plugin-taro/src/runtime/mini/systemjs/system.d.ts": "22bb0e99cd6864c4cde8e74ecc265bd4620a7fad116298011ed30852cb84ef61",
+            "packages/vite-plugin-taro/src/runtime/mini/template/bind-template-app.ts": "c811dd597223e877fa5d44f889f55328ac180d7fc9bf738443b7204e0ebe3b10",
+            "packages/vite-plugin-taro/src/runtime/mini/template/create-template-host.ts": "aae49631cec6b9b1d415e360fedceed26a55633db39037873cff841110b6cf59",
+            "packages/vite-plugin-taro/src/runtime/mini/template/create-template-page.ts": "5cf1d101806476faac18556f2bc32f2ac6a77535ae7ab877fb266d51dea59819",
+            "packages/vite-plugin-taro/src/runtime/mini/template/prerender-to-data.ts": "0a65719a3adfc31de95ee5957ce0a063972326d7fcc49c4b0f0d7fd6417159ee",
+            "packages/vite-plugin-taro/src/runtime/mini/template/template-host.ts": "7225349cf4722e6102e0398eef784c93ad887b0e5273f88cbf503a18b6b97f28",
+            "packages/vite-plugin-taro/src/runtime/mini/template/template-page-data.d.ts": "ef38049d5d3ddac281017cb099fa9dfd1cfc0e50feef5ca9767145aa20bce55e",
+            "packages/vite-plugin-taro/src/runtime/mini/vpt/create-page-identity.ts": "49d097dfa5696fc3098bc525c321c9f13b9d04e0651474cf282e47d3a57e8971",
+            "packages/vite-plugin-taro/src/runtime/mini/vpt/create-vpt-app.ts": "db46b3e221e66d4fea256062858ab5b4002fe4d553c5d607df2f7c4512afcdb9",
+            "packages/vite-plugin-taro/src/runtime/mini/vpt/get-form-change-event.ts": "48637e983cb34a8614a69a4d3555768d828a239b793d27da198ebaa7d62f1bfd",
+            "packages/vite-plugin-taro/src/runtime/mini/vpt/get-native-html-tag.ts": "6879d4b07c709773adaf3610c2d76ac8f6397546e636dfe1eb580723817c3b87",
+            "packages/vite-plugin-taro/src/runtime/mini/vpt/get-page-query.ts": "cac301f4bf32449b290cb4e9ae68089b81ca2e5c4affbf58dc16f054735a7fe9",
+            "packages/vite-plugin-taro/src/runtime/mini/vpt/mini-component-page.d.ts": "ca1d8b239ccb51aad0a4f73c2d84074b50ca0d5ef6ec4ade99a68c8ee317b4a5",
+            "packages/vite-plugin-taro/src/runtime/mini/vpt/mini-host.d.ts": "ee58bdbc897f537cfbaafcdb7deff15a951515a41f54310d9ad10da70d48d04a",
+            "packages/vite-plugin-taro/src/runtime/mini/vpt/mount-page.ts": "cfe11f73bff1946af68e48e2aedec361ab5c3d2bd026198e18371499f358f4d0",
+            "packages/vite-plugin-taro/src/runtime/mini/vpt/vpt-page-options.d.ts": "937ab3550f36b38e0609a11ae42e762171e44877de932e3fed87b76e8e759f75",
+            "packages/vite-plugin-taro/src/runtime/mini/vpt/vpt-runtime.ts": "08041a0b21cc9f8f145cd068aa2c824992ce710b91e69948554e2aee0b7c03cc",
+            "packages/vite-plugin-taro/src/runtime/placeholders.d.ts": "fd1fa16fefb27de0f0c0fa6cb291760c2e670fcd2a7d353877c1ddcf038913d9",
+            "packages/vite-plugin-taro/src/runtime/test/app-runtime.test.ts": "377982cc2f09e1c27cd6fbd532b5c16493b2be851715297c3c75fab838f8563d",
+            "packages/vite-plugin-taro/src/runtime/test/attribute-delegation.test.ts": "617993bb9811684d2dd5c6cb61b64dbc4a8eb1a406e8682d8d3207ca292af541",
+            "packages/vite-plugin-taro/src/runtime/test/bootstrap-runtime.test.ts": "c6ac25537b1ed1e184154c458dca1182b2921a6406d7124b803e85793644a513",
+            "packages/vite-plugin-taro/src/runtime/test/clone-delegation.test.ts": "656088b504d3e139f6f851c3643323ae4ad2df336711765b7bd1eeb4c4d7ca55",
+            "packages/vite-plugin-taro/src/runtime/test/component-page.test.ts": "95c2986b009d6c9c9294e855c06bd75d2b24dc6ab16f16e46f428accd3c442c0",
+            "packages/vite-plugin-taro/src/runtime/test/create-wx-test-root.ts": "94a5f641a0b24a8a50033680495c96196853c8ceeb7158aad0de2a5ad86b6458",
+            "packages/vite-plugin-taro/src/runtime/test/event-listener-delegation.test.ts": "ec752e2610612b96699932d5ba7d7e31bab7c194a469437073c39a2c843f3807",
+            "packages/vite-plugin-taro/src/runtime/test/event-listener-removal.test.ts": "35fa3482d36dce797dbc1c8da46829f081b96fbfd3e3ccf0d27f9254c6de880d",
+            "packages/vite-plugin-taro/src/runtime/test/event-source-cleanup.test.ts": "b4bf01164b70ef276b6ad63e5556a02947ec32c051ebbf22e7db8a175f50a876",
+            "packages/vite-plugin-taro/src/runtime/test/event-target-data.test.ts": "783ef35a7a7d1417825d153403bb6e4965fcfd77b23c914b5ae68b207ede6999",
+            "packages/vite-plugin-taro/src/runtime/test/get-page-query.test.ts": "648a45ea0d3dccb1ac14587b87d93c6dede3988005bb41497320bad01b5aee47",
+            "packages/vite-plugin-taro/src/runtime/test/h5-runtime.test.ts": "9cced738c35e313964a99399e7f39fb4c92584fb968ce579fdb53cab311561c4",
+            "packages/vite-plugin-taro/src/runtime/test/html-elements.test.ts": "19a05a59cd735b4eb77c643274a7ff823ccf2312ec06f911751a07b8cad77063",
+            "packages/vite-plugin-taro/src/runtime/test/html-runtime.test.ts": "a4e557187fc200f819f51c573611f2f59319ec956847102c456cbee0274441c6",
+            "packages/vite-plugin-taro/src/runtime/test/lazy-event-handlers.test.ts": "81020c1e13faea2fd875fc25b40606cb3392d9eda15bb33dc9f716544209c390",
+            "packages/vite-plugin-taro/src/runtime/test/lazy-style.test.ts": "9ab7c64409f33bbb211f014c95f0f75ca3d19c21db680094274bb887417f80e9",
+            "packages/vite-plugin-taro/src/runtime/test/mutation-observer-fast-path.test.ts": "a1b7f06f6b0ab1d734f9ea370e07737ede8a2192f789fb2f47fd2fb29286405f",
+            "packages/vite-plugin-taro/src/runtime/test/node-event-dispatch.test.ts": "b3e048f1b7aade87deb00c95e997cf2ec5b84c4e1eab699a547dacfadd1b00e1",
+            "packages/vite-plugin-taro/src/runtime/test/node-move-delegation.test.ts": "f3a0c04c2a6698a35e1a2898f0dfbab3b9a0d518c1afdb02d8ca5a41db0b7d08",
+            "packages/vite-plugin-taro/src/runtime/test/page-runtime.test.ts": "dc8822d13dd0a1903ec9afff87f3b7083d3b41b7fce9f7c3abd88923c5935045",
+            "packages/vite-plugin-taro/src/runtime/test/react19-renderer.test.ts": "cc5e053cacfe18c35cea06fca9633690a86a3149bc38834d6a5b9dd06b1ef6ef",
+            "packages/vite-plugin-taro/src/runtime/test/renderer-host.test.ts": "1ea56f449051d319d9bacc9143541f9221795bd2e4086eb7eacb391776c4178e",
+            "packages/vite-plugin-taro/src/runtime/test/runtime-entry-test-utils.ts": "16fe94e9a6f1d7750a74daf859e95c6ebae85699c5de662c4a7273e47a13e2c7",
+            "packages/vite-plugin-taro/src/runtime/test/style-delegation.test.ts": "528e5a057390e9775bc6ff95c7a8e48036933d298f97c51ea974e0495528c334",
+            "packages/vite-plugin-taro/src/runtime/test/taro-facades.test.ts": "e6231679d2cfa45036f82dd62a0f7e185c850bd9216646958a61c88ca3f1ae9d",
+            "packages/vite-plugin-taro/src/runtime/test/template-context-resolution.test.ts": "5bfbd3c8619806fe177c07c88c4ebf27dbacbc7c6798e9be1b961dc8d58843be",
+            "packages/vite-plugin-taro/src/runtime/test/template-host.test.ts": "f01e735c64e23ec9a58cd94c83ebaf3474456846a78af764877e19cc048c2d10",
+            "packages/vite-plugin-taro/src/runtime/test/tt-document.test.ts": "d5416d8af880d29d1ba0a830bdb0ee93627dd91704531c080965bd8ae9cc4f24",
+            "packages/vite-plugin-taro/src/runtime/test/tt-dom-host.test.ts": "6423bdff3ad1a0901947252a15713641c715b27b7161482facf0510f751292b4",
+            "packages/vite-plugin-taro/src/runtime/test/wx-context-policy.test.ts": "514f79a3db7a5e1fe5f99c5b0f3cd40b5e99cb303ea9517e8e0893dad5622cba",
+            "packages/vite-plugin-taro/src/runtime/test/wx-dom-host.test.ts": "14159cf574a383e51991f53ec1569a38ee8ba7376af601555ceccc2e40a0f6f6",
+            "packages/vite-plugin-taro/src/runtime/test/wx-event-storage.test.ts": "ff4c4c830772071abe821f202c64fb284fd4391e72c47f7711ae97a6b61249fd",
+            "packages/vite-plugin-taro/src/runtime/test/wx-event-targets.test.ts": "7987f312a6cb918c2070b1be1338346ec422c8f97cf41e32b2e435393e285993",
+            "packages/vite-plugin-taro/src/runtime/test/wx-style-batching.test.ts": "17caa3b580d0be348c67fe5665033240b1b40d762a25e6587ad7fb4db9be7602",
+            "packages/vite-plugin-taro/src/runtime/tt/create-dom-host.ts": "29a5f1a27d9e2cacb1ba98b093e44ce49fb9f7a4b7f757964966c08707ddc704",
+            "packages/vite-plugin-taro/src/runtime/tt/dev/connect-tt-socket.ts": "3a3d2f34dc3f4a5eb52f1758b1bac016ad457ba66bde125e1183b51c4b065d32",
+            "packages/vite-plugin-taro/src/runtime/tt/dev/devtools-runtime.ts": "fc554c5de64927574ab786c74b6afc4fb83f06000068dde8815d04456920507b",
+            "packages/vite-plugin-taro/src/runtime/tt/dev/interpreter-runtime.ts": "34ff93722f2bc0e6e06db6117caedcf77dc91d800a9b678b49c8a42e7d7a3709",
+            "packages/vite-plugin-taro/src/runtime/tt/dev/tt-hmr-runtime.test.ts": "52b486cdf7716e52ce02dfa92ef88d88f81d07593b014a1cdb3f75b19c9d3c5b",
+            "packages/vite-plugin-taro/src/runtime/tt/renderer-host.ts": "d06a1ebf83fd566786351c99e92d7ad1170591044a12ec2008adcd9479dabd29",
+            "packages/vite-plugin-taro/src/runtime/tt/taro-runtime.test.ts": "e166a7f7218c096eac467933522df250aacc339014848335274c8ed5525ec233",
+            "packages/vite-plugin-taro/src/runtime/tt/taro-runtime.ts": "1ee66c59faa2ace9db911c111eaf2dec99404c13ea1002dd4a5e02a799de014a",
+            "packages/vite-plugin-taro/src/runtime/wx/create-dom-host.ts": "f862abe70d30f594d3737a41ce38300bc4592f71e74a8ca327bf30f4e6ab0de5",
+            "packages/vite-plugin-taro/src/runtime/wx/dev/connect-wx-socket.ts": "cfffc3f3611f40070c211192fa4924ac36e9f321d681e4812833a3a62fc864f9",
+            "packages/vite-plugin-taro/src/runtime/wx/dev/devtools-runtime.ts": "5de77c076bd81904d083312dd732f246fed7a118f51a8592754e8c0eadc081c0",
+            "packages/vite-plugin-taro/src/runtime/wx/dev/interpreter-runtime.ts": "658f70f486887b31bcf7a9e2ceed5da7bae48de8982c2e12e7ddf9be46487113",
+            "packages/vite-plugin-taro/src/runtime/wx/install-dom-templates.ts": "8edf79f10e928b3f4edc9b2068e56a8c7ef4e6976d5480ad664d6f3bb973e345",
+            "packages/vite-plugin-taro/src/runtime/wx/renderer-host.ts": "ce0f10ae0c9d8bc54bc8143029d400080a4139f39866f7178e29b7c0b210a22a",
+            "packages/vite-plugin-taro/src/runtime/wx/wx-template-bindings.ts": "afd69c1c28886eaa0181bab0df730fb0d3adde39ea49bc2fcc86ebd69bf283c3",
+            "packages/vite-plugin-taro/src/runtime/wx/wx-types.ts": "8b713d8e163bedc881b567b032a4287ac9ba7aa5fb35acc71d4f4100150afcac",
+            "packages/vite-plugin-taro/src/runtime/zfb/dev/connect-zfb-socket.ts": "85d2e9c79434d4d31089202ff8ef685a06e0141c141f88dc3390b7cd0c3610f9",
+            "packages/vite-plugin-taro/src/runtime/zfb/dev/devtools-runtime.ts": "89aa1b7c01640b221a1ba83d03d12f33634988d7ccdcf62f17bbf4fc5d46799f",
+            "packages/vite-plugin-taro/src/runtime/zfb/dev/interpreter-runtime.ts": "a2a5b2c3b0b07b5bf37be8d84a6fa9ff70b77b1e4ccd212d64eb3c00dca63c56",
+            "packages/vite-plugin-taro/src/runtime/zfb/dev/zfb-hmr-runtime.test.ts": "5265bfd413da0fe08932720b3bbf9c6ebc5e531a316e3209080769656de94989"
+        },
+        "buildHashes": {
+            "demo/benchmark-demo/dist/dom/app-capsule.js": "bf442df9d91c2f801007b1d8c88f86b3d8d37cdea596d34241ed56245e54118b",
+            "demo/benchmark-demo/dist/dom/app.js": "a3fadf71cdae723a6a29bfa882e9237a055a50b11c805eacb987cbf24e6ed888",
+            "demo/benchmark-demo/dist/dom/app.json": "3e16aa5aef86b7b9498c3a9787aba5fed0977247f6eba4eee4c6d8ebd3edee30",
+            "demo/benchmark-demo/dist/dom/app.wxss": "886d372a63af855a4767eedcd10a5987d69da72eb4be7d19ce4bc8ee1441bbf4",
+            "demo/benchmark-demo/dist/dom/assets/global.wxss": "fe8cea58960defba5925fd38102eb4c2aeaced74493316662b86b416809bbd1f",
+            "demo/benchmark-demo/dist/dom/base.wxml": "0f80b4cfde4ebf0e2e3999f947517de73188bd26af8db7e7c3d7f48440b81136",
+            "demo/benchmark-demo/dist/dom/common/bootstrap.js": "caef96e0ed39c67ee7d30d1fe04e6e869ab53b9bb8aed59c6e7db9f6c12f5717",
+            "demo/benchmark-demo/dist/dom/common/polyfills.js": "3ca3f6fccf4d571c45aa730db322fcaf8fe8615728652a783d9e80fd9646eabb",
+            "demo/benchmark-demo/dist/dom/common/rolldown-runtime.js": "802573252b4e86f0b857c6f91502a4e7d8fe33bdaefea274138d3699d6b9e3aa",
+            "demo/benchmark-demo/dist/dom/common/vendor.js": "bc185195c4296ca25e38c6d88c692e86dbe60ef5340053acc3940f758d38cc42",
+            "demo/benchmark-demo/dist/dom/common/vpt-global.js": "70805373539c0cb87a8727b7c992ef8f4c89547f15f8b37890886fda5c8d581f",
+            "demo/benchmark-demo/dist/dom/common/vpt-transport.js": "f76f49e99610e79a5098467cb9a0ab4e2c42ab301e978b3636e7ae9ac51a3e71",
+            "demo/benchmark-demo/dist/dom/comp.js": "148bebd0281432730953c734ad12a3e86960513e13b0269f4d7f8f69beb7f52d",
+            "demo/benchmark-demo/dist/dom/comp.json": "d159ba1eb49c20caa5d8a3498c4aeafab396bf0358255eb8768a07ea99e3b949",
+            "demo/benchmark-demo/dist/dom/comp.wxml": "904495b6e07f81d74f23d713c7f42a7450189f56879e329e5353e18d08201165",
+            "demo/benchmark-demo/dist/dom/component-capsule.js": "526430fcbcc10e82d16befe3cccc649bc41925b7212fb43d882524c63dfb2a42",
+            "demo/benchmark-demo/dist/dom/custom-wrapper.js": "2a6d3032505f08e0a459e3174dec51d677b590b3e0010ceaca600e7abf166a3a",
+            "demo/benchmark-demo/dist/dom/custom-wrapper.json": "d159ba1eb49c20caa5d8a3498c4aeafab396bf0358255eb8768a07ea99e3b949",
+            "demo/benchmark-demo/dist/dom/custom-wrapper.wxml": "42d93e627be7623cb9d070b302aa6ecb853f8d4cfe1247e6def5cceb0fdffeea",
+            "demo/benchmark-demo/dist/dom/pages/index/index-capsule.js": "36b8c0d818800334114cc6ed2214b4d2b61b6ece0ec7e5faf69225920bfcda46",
+            "demo/benchmark-demo/dist/dom/pages/index/index.js": "70be542f9366a982f82d9a93fb350ed75729c7f7382709b64c028f2e00802a00",
+            "demo/benchmark-demo/dist/dom/pages/index/index.json": "1a2122010427b118a37b725ca9464e2c9363ecd47fc37013e99803040ca6c3ad",
+            "demo/benchmark-demo/dist/dom/pages/index/index.wxml": "3fcd60aa261b6f6044d487f5a69c0aab41accc954ee6789471d4266515f92239",
+            "demo/benchmark-demo/dist/dom/pages/index/index.wxss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "demo/benchmark-demo/dist/dom/project.config.json": "a70c8e77f99d4d52e2a3b513ef176d4a702e357d0f1da1b0eebc397816ca4a6c",
+            "demo/benchmark-demo/dist/dom/project.private.config.json": "b44ff371ed07827f3f7e6ed5e364aabf03fb51272b9f902067aada0fb30c6876",
+            "demo/benchmark-demo/dist/dom/utils.wxs": "00afd35c33e9efba9501f3b6abea1e9ec753408ebcc32c81340e54275849077c",
+            "demo/benchmark-demo/dist/template/app-capsule.js": "bf442df9d91c2f801007b1d8c88f86b3d8d37cdea596d34241ed56245e54118b",
+            "demo/benchmark-demo/dist/template/app.js": "a3fadf71cdae723a6a29bfa882e9237a055a50b11c805eacb987cbf24e6ed888",
+            "demo/benchmark-demo/dist/template/app.json": "7d1a9ec0de4d46d69601239e040e4c6158599514ccbcfbb46a3af2dec29845c6",
+            "demo/benchmark-demo/dist/template/app.wxss": "886d372a63af855a4767eedcd10a5987d69da72eb4be7d19ce4bc8ee1441bbf4",
+            "demo/benchmark-demo/dist/template/assets/global.wxss": "fe8cea58960defba5925fd38102eb4c2aeaced74493316662b86b416809bbd1f",
+            "demo/benchmark-demo/dist/template/base.wxml": "0f80b4cfde4ebf0e2e3999f947517de73188bd26af8db7e7c3d7f48440b81136",
+            "demo/benchmark-demo/dist/template/common/bootstrap.js": "caef96e0ed39c67ee7d30d1fe04e6e869ab53b9bb8aed59c6e7db9f6c12f5717",
+            "demo/benchmark-demo/dist/template/common/polyfills.js": "3ca3f6fccf4d571c45aa730db322fcaf8fe8615728652a783d9e80fd9646eabb",
+            "demo/benchmark-demo/dist/template/common/rolldown-runtime.js": "802573252b4e86f0b857c6f91502a4e7d8fe33bdaefea274138d3699d6b9e3aa",
+            "demo/benchmark-demo/dist/template/common/vendor.js": "55bda4b62e63a8580239ed4116c2d05ea5ba79e6b64272e7044fc05c0a98af6b",
+            "demo/benchmark-demo/dist/template/common/vpt-global.js": "70805373539c0cb87a8727b7c992ef8f4c89547f15f8b37890886fda5c8d581f",
+            "demo/benchmark-demo/dist/template/common/vpt-transport.js": "f76f49e99610e79a5098467cb9a0ab4e2c42ab301e978b3636e7ae9ac51a3e71",
+            "demo/benchmark-demo/dist/template/comp.js": "148bebd0281432730953c734ad12a3e86960513e13b0269f4d7f8f69beb7f52d",
+            "demo/benchmark-demo/dist/template/comp.json": "d159ba1eb49c20caa5d8a3498c4aeafab396bf0358255eb8768a07ea99e3b949",
+            "demo/benchmark-demo/dist/template/comp.wxml": "904495b6e07f81d74f23d713c7f42a7450189f56879e329e5353e18d08201165",
+            "demo/benchmark-demo/dist/template/component-capsule.js": "526430fcbcc10e82d16befe3cccc649bc41925b7212fb43d882524c63dfb2a42",
+            "demo/benchmark-demo/dist/template/custom-wrapper.js": "2a6d3032505f08e0a459e3174dec51d677b590b3e0010ceaca600e7abf166a3a",
+            "demo/benchmark-demo/dist/template/custom-wrapper.json": "d159ba1eb49c20caa5d8a3498c4aeafab396bf0358255eb8768a07ea99e3b949",
+            "demo/benchmark-demo/dist/template/custom-wrapper.wxml": "42d93e627be7623cb9d070b302aa6ecb853f8d4cfe1247e6def5cceb0fdffeea",
+            "demo/benchmark-demo/dist/template/pages/index/index-capsule.js": "71fa6fd36df388b3c4706db633ff89b9bcea25e94cb06f55f860c00642a6415f",
+            "demo/benchmark-demo/dist/template/pages/index/index.js": "70be542f9366a982f82d9a93fb350ed75729c7f7382709b64c028f2e00802a00",
+            "demo/benchmark-demo/dist/template/pages/index/index.json": "1a2122010427b118a37b725ca9464e2c9363ecd47fc37013e99803040ca6c3ad",
+            "demo/benchmark-demo/dist/template/pages/index/index.wxml": "3fcd60aa261b6f6044d487f5a69c0aab41accc954ee6789471d4266515f92239",
+            "demo/benchmark-demo/dist/template/pages/index/index.wxss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "demo/benchmark-demo/dist/template/project.config.json": "149de08a396f8f71d90b54554b14fa6400121421385d17ddf3faa37f87a06ecc",
+            "demo/benchmark-demo/dist/template/project.private.config.json": "b44ff371ed07827f3f7e6ed5e364aabf03fb51272b9f902067aada0fb30c6876",
+            "demo/benchmark-demo/dist/template/utils.wxs": "00afd35c33e9efba9501f3b6abea1e9ec753408ebcc32c81340e54275849077c"
+        },
+        "collectorRevisions": [
+            {
+                "at": "2026-10-22T05:54:47.437Z",
+                "sha256": "2eb9103452d904eecf27d4f6496178ec638e512afabb129d6df5d84df3fddd58"
+            },
+            {
+                "at": "2026-10-22T06:24:18.993Z",
+                "sha256": "22dcf8aa2ca28078fa979691e15ea7d95d35d1d3229cfca682b026e554cf4cff"
+            }
+        ],
+        "finishedAt": "2026-10-22T06:24:19.144Z"
+    },
+    "methodology": {
+        "reference": "https://github.com/krausest/js-framework-benchmark",
+        "metric": "Action handler start to native revision/layout query acknowledgment, milliseconds",
+        "boundary": "State update → React commit → wx.nextTick → identical native revision-marker geometry query callback",
+        "completion": {
+            "schedule": "wx.nextTick",
+            "api": "wx.createSelectorQuery().select(selector).fields(fields, callback).exec()",
+            "selector": ">>> #benchmark-state-{revision}",
+            "fields": {
+                "id": true,
+                "rect": true,
+                "size": true
+            }
+        },
+        "includes": "Data generation, React reconciliation, host mutations, SDK scheduling and native layout-query bridge overhead",
+        "phases": {
+            "commit": "Handler start through React layout effect",
+            "layout": "React layout effect through the common native revision/layout query callback"
+        },
+        "scope": "WeChat DevTools WebView + glass-easel; VPT DOM versus VPT template (the original Taro rendering architecture)",
+        "sampling": {
+            "order": ["dom", "template"],
+            "warmupsPerCasePerBlock": 2,
+            "minimumRepetitionsPerCasePerBlock": 5,
+            "isolation": "Fresh DevTools project window per case per block",
+            "transport": "Localhost HTTP start handshake and completion callback outside the measured interval",
+            "recovery": "Resume verifies identical builds and application sources. Every new context gets two warmups. All completed measurements, including those from interrupted contexts, enter the aggregates. Context interruptions and their observations are recorded."
+        },
+        "aggregation": "Median and nearest-rank p95; geometric mean of template/DOM median ratios; no outlier removal",
+        "validation": "The timed common query verifies current revision ID and positive marker height. Every completed iteration also checks all native row IDs in order, row height, count, and selected class outside the timer.",
+        "limitations": "Results rank these two renderers for keyed workloads in the recorded WeChat DevTools WebView environment. The metric includes SDK query/scheduling latency; device presentation and CPU tracing are separate measurements."
+    },
+    "environments": [
+        {
+            "block": 0,
+            "renderer": "dom",
+            "caseId": "create-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["__webviewId__"]
+            }
+        },
+        {
+            "block": 0,
+            "renderer": "dom",
+            "caseId": "replace-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["__webviewId__"]
+            }
+        },
+        {
+            "block": 0,
+            "renderer": "dom",
+            "caseId": "update-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["__webviewId__"]
+            }
+        },
+        {
+            "block": 0,
+            "renderer": "dom",
+            "caseId": "select-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["__webviewId__"]
+            }
+        },
+        {
+            "block": 0,
+            "renderer": "dom",
+            "caseId": "swap-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["__webviewId__"]
+            }
+        },
+        {
+            "block": 0,
+            "renderer": "dom",
+            "caseId": "remove-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["__webviewId__"]
+            }
+        },
+        {
+            "block": 0,
+            "renderer": "dom",
+            "caseId": "append-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["__webviewId__"]
+            }
+        },
+        {
+            "block": 0,
+            "renderer": "dom",
+            "caseId": "clear-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["__webviewId__"]
+            }
+        },
+        {
+            "block": 0,
+            "renderer": "dom",
+            "caseId": "create-10000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["__webviewId__"]
+            }
+        },
+        {
+            "block": 0,
+            "renderer": "dom",
+            "caseId": "clear-10000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["__webviewId__"]
+            }
+        },
+        {
+            "block": 1,
+            "renderer": "template",
+            "caseId": "create-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["app", "page", "__webviewId__"]
+            }
+        },
+        {
+            "block": 1,
+            "renderer": "template",
+            "caseId": "replace-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["app", "page", "__webviewId__"]
+            }
+        },
+        {
+            "block": 1,
+            "renderer": "template",
+            "caseId": "update-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["app", "page", "__webviewId__"]
+            }
+        },
+        {
+            "block": 1,
+            "renderer": "template",
+            "caseId": "select-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["app", "page", "__webviewId__"]
+            }
+        },
+        {
+            "block": 1,
+            "renderer": "template",
+            "caseId": "swap-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["app", "page", "__webviewId__"]
+            }
+        },
+        {
+            "block": 1,
+            "renderer": "template",
+            "caseId": "remove-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["app", "page", "__webviewId__"]
+            }
+        },
+        {
+            "block": 1,
+            "renderer": "template",
+            "caseId": "append-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["app", "page", "__webviewId__"]
+            }
+        },
+        {
+            "block": 1,
+            "renderer": "template",
+            "caseId": "clear-1000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["app", "page", "__webviewId__"]
+            }
+        },
+        {
+            "block": 1,
+            "renderer": "template",
+            "caseId": "create-10000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["app", "page", "__webviewId__"]
+            }
+        },
+        {
+            "block": 1,
+            "renderer": "template",
+            "caseId": "clear-10000",
+            "session": 0,
+            "environment": {
+                "ready": true,
+                "info": {
+                    "brand": "devtools",
+                    "model": "iPhone 12/13 (Pro)",
+                    "system": "iOS 10.0.1",
+                    "platform": "devtools",
+                    "benchmarkLevel": -1,
+                    "pixelRatio": 3,
+                    "screenWidth": 390,
+                    "screenHeight": 844,
+                    "windowWidth": 390,
+                    "windowHeight": 753,
+                    "statusBarHeight": 47,
+                    "safeArea": {
+                        "top": 47,
+                        "left": 0,
+                        "right": 390,
+                        "bottom": 810,
+                        "width": 390,
+                        "height": 763
+                    },
+                    "language": "zh_CN",
+                    "version": "8.0.5",
+                    "fontSizeSetting": 16,
+                    "SDKVersion": "3.15.2",
+                    "host": {
+                        "env": "WeChat"
+                    },
+                    "enableDebug": false,
+                    "mode": "default",
+                    "deviceOrientation": "portrait",
+                    "bluetoothEnabled": true,
+                    "locationEnabled": true,
+                    "wifiEnabled": true,
+                    "albumAuthorized": true,
+                    "cameraAuthorized": true,
+                    "locationAuthorized": true,
+                    "microphoneAuthorized": true,
+                    "notificationAuthorized": true,
+                    "notificationAlertAuthorized": true,
+                    "notificationBadgeAuthorized": true,
+                    "notificationSoundAuthorized": true,
+                    "phoneCalendarAuthorized": true,
+                    "bluetoothAuthorized": true,
+                    "locationReducedAccuracy": true,
+                    "devicePixelRatio": 3
+                },
+                "renderer": "webview",
+                "dataKeys": ["app", "page", "__webviewId__"]
+            }
+        }
+    ],
+    "interruptedContexts": [],
+    "cases": [
+        {
+            "id": "create-1000",
+            "label": "Create 1,000 rows",
+            "dom": [
+                {
+                    "duration": 322,
+                    "commitDuration": 48,
+                    "layoutDuration": 274,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 281,
+                    "commitDuration": 27,
+                    "layoutDuration": 254,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 279,
+                    "commitDuration": 28,
+                    "layoutDuration": 251,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 306,
+                    "commitDuration": 27,
+                    "layoutDuration": 279,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 306,
+                    "commitDuration": 24,
+                    "layoutDuration": 282,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 296,
+                    "commitDuration": 29,
+                    "layoutDuration": 267,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 276,
+                    "commitDuration": 24,
+                    "layoutDuration": 252,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ],
+            "template": [
+                {
+                    "duration": 1749,
+                    "commitDuration": 42,
+                    "layoutDuration": 1707,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1711,
+                    "commitDuration": 27,
+                    "layoutDuration": 1684,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1478,
+                    "commitDuration": 28,
+                    "layoutDuration": 1450,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1514,
+                    "commitDuration": 25,
+                    "layoutDuration": 1489,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1531,
+                    "commitDuration": 28,
+                    "layoutDuration": 1503,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1489,
+                    "commitDuration": 25,
+                    "layoutDuration": 1464,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1491,
+                    "commitDuration": 24,
+                    "layoutDuration": 1467,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ]
+        },
+        {
+            "id": "replace-1000",
+            "label": "Replace 1,000 rows",
+            "dom": [
+                {
+                    "duration": 346,
+                    "commitDuration": 62,
+                    "layoutDuration": 284,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 327,
+                    "commitDuration": 51,
+                    "layoutDuration": 276,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 350,
+                    "commitDuration": 68,
+                    "layoutDuration": 282,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 323,
+                    "commitDuration": 50,
+                    "layoutDuration": 273,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 328,
+                    "commitDuration": 49,
+                    "layoutDuration": 279,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 333,
+                    "commitDuration": 56,
+                    "layoutDuration": 277,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 326,
+                    "commitDuration": 49,
+                    "layoutDuration": 277,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ],
+            "template": [
+                {
+                    "duration": 2087,
+                    "commitDuration": 69,
+                    "layoutDuration": 2018,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1866,
+                    "commitDuration": 50,
+                    "layoutDuration": 1816,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1805,
+                    "commitDuration": 47,
+                    "layoutDuration": 1758,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1810,
+                    "commitDuration": 46,
+                    "layoutDuration": 1764,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1807,
+                    "commitDuration": 44,
+                    "layoutDuration": 1763,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1792,
+                    "commitDuration": 47,
+                    "layoutDuration": 1745,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1815,
+                    "commitDuration": 46,
+                    "layoutDuration": 1769,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ]
+        },
+        {
+            "id": "update-1000",
+            "label": "Update every 10th row",
+            "dom": [
+                {
+                    "duration": 25,
+                    "commitDuration": 2,
+                    "layoutDuration": 23,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 39,
+                    "commitDuration": 2,
+                    "layoutDuration": 37,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 39,
+                    "commitDuration": 1,
+                    "layoutDuration": 38,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 5,
+                    "commitDuration": 1,
+                    "layoutDuration": 4,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 40,
+                    "commitDuration": 1,
+                    "layoutDuration": 39,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 6,
+                    "commitDuration": 2,
+                    "layoutDuration": 4,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 4,
+                    "commitDuration": 1,
+                    "layoutDuration": 3,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ],
+            "template": [
+                {
+                    "duration": 44,
+                    "commitDuration": 12,
+                    "layoutDuration": 32,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 48,
+                    "commitDuration": 6,
+                    "layoutDuration": 42,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 46,
+                    "commitDuration": 5,
+                    "layoutDuration": 41,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 46,
+                    "commitDuration": 6,
+                    "layoutDuration": 40,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 48,
+                    "commitDuration": 6,
+                    "layoutDuration": 42,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 50,
+                    "commitDuration": 5,
+                    "layoutDuration": 45,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 48,
+                    "commitDuration": 6,
+                    "layoutDuration": 42,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ]
+        },
+        {
+            "id": "select-1000",
+            "label": "Select a row",
+            "dom": [
+                {
+                    "duration": 25,
+                    "commitDuration": 2,
+                    "layoutDuration": 23,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 2,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 2,
+                    "commitDuration": 1,
+                    "layoutDuration": 1,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 1002,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 2,
+                    "commitDuration": 1,
+                    "layoutDuration": 1,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 2002,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 2,
+                    "commitDuration": 1,
+                    "layoutDuration": 1,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 3002,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 2,
+                    "commitDuration": 1,
+                    "layoutDuration": 1,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 4002,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 3,
+                    "commitDuration": 0,
+                    "layoutDuration": 3,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 5002,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 4,
+                    "commitDuration": 1,
+                    "layoutDuration": 3,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 6002,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ],
+            "template": [
+                {
+                    "duration": 15,
+                    "commitDuration": 2,
+                    "layoutDuration": 13,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 2,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 50,
+                    "commitDuration": 2,
+                    "layoutDuration": 48,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 1002,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 51,
+                    "commitDuration": 1,
+                    "layoutDuration": 50,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 2002,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 71,
+                    "commitDuration": 2,
+                    "layoutDuration": 69,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 3002,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 57,
+                    "commitDuration": 2,
+                    "layoutDuration": 55,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 4002,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 61,
+                    "commitDuration": 2,
+                    "layoutDuration": 59,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 5002,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 63,
+                    "commitDuration": 1,
+                    "layoutDuration": 62,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": 6002,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ]
+        },
+        {
+            "id": "swap-1000",
+            "label": "Swap rows 2 and 999",
+            "dom": [
+                {
+                    "duration": 130,
+                    "commitDuration": 60,
+                    "layoutDuration": 70,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 122,
+                    "commitDuration": 57,
+                    "layoutDuration": 65,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 122,
+                    "commitDuration": 56,
+                    "layoutDuration": 66,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 118,
+                    "commitDuration": 54,
+                    "layoutDuration": 64,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 135,
+                    "commitDuration": 69,
+                    "layoutDuration": 66,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 120,
+                    "commitDuration": 54,
+                    "layoutDuration": 66,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 129,
+                    "commitDuration": 64,
+                    "layoutDuration": 65,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ],
+            "template": [
+                {
+                    "duration": 331,
+                    "commitDuration": 36,
+                    "layoutDuration": 295,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 311,
+                    "commitDuration": 33,
+                    "layoutDuration": 278,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 304,
+                    "commitDuration": 32,
+                    "layoutDuration": 272,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 310,
+                    "commitDuration": 32,
+                    "layoutDuration": 278,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 314,
+                    "commitDuration": 32,
+                    "layoutDuration": 282,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 328,
+                    "commitDuration": 33,
+                    "layoutDuration": 295,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 307,
+                    "commitDuration": 33,
+                    "layoutDuration": 274,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 1000,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ]
+        },
+        {
+            "id": "remove-1000",
+            "label": "Remove a row",
+            "dom": [
+                {
+                    "duration": 27,
+                    "commitDuration": 2,
+                    "layoutDuration": 25,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 2,
+                    "commitDuration": 1,
+                    "layoutDuration": 1,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 2,
+                    "commitDuration": 1,
+                    "layoutDuration": 1,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 3,
+                    "commitDuration": 1,
+                    "layoutDuration": 2,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 38,
+                    "commitDuration": 1,
+                    "layoutDuration": 37,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 2,
+                    "commitDuration": 0,
+                    "layoutDuration": 2,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 3,
+                    "commitDuration": 1,
+                    "layoutDuration": 2,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ],
+            "template": [
+                {
+                    "duration": 421,
+                    "commitDuration": 4,
+                    "layoutDuration": 417,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 290,
+                    "commitDuration": 2,
+                    "layoutDuration": 288,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 299,
+                    "commitDuration": 2,
+                    "layoutDuration": 297,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 299,
+                    "commitDuration": 2,
+                    "layoutDuration": 297,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 310,
+                    "commitDuration": 1,
+                    "layoutDuration": 309,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 338,
+                    "commitDuration": 2,
+                    "layoutDuration": 336,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 312,
+                    "commitDuration": 1,
+                    "layoutDuration": 311,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 999,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ]
+        },
+        {
+            "id": "append-1000",
+            "label": "Append 1,000 rows",
+            "dom": [
+                {
+                    "duration": 301,
+                    "commitDuration": 35,
+                    "layoutDuration": 266,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 298,
+                    "commitDuration": 32,
+                    "layoutDuration": 266,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 320,
+                    "commitDuration": 35,
+                    "layoutDuration": 285,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 294,
+                    "commitDuration": 23,
+                    "layoutDuration": 271,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 285,
+                    "commitDuration": 22,
+                    "layoutDuration": 263,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 356,
+                    "commitDuration": 35,
+                    "layoutDuration": 321,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 366,
+                    "commitDuration": 27,
+                    "layoutDuration": 339,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ],
+            "template": [
+                {
+                    "duration": 1900,
+                    "commitDuration": 75,
+                    "layoutDuration": 1825,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 2111,
+                    "commitDuration": 112,
+                    "layoutDuration": 1999,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1813,
+                    "commitDuration": 69,
+                    "layoutDuration": 1744,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 4416,
+                    "commitDuration": 152,
+                    "layoutDuration": 4264,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1928,
+                    "commitDuration": 83,
+                    "layoutDuration": 1845,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 1999,
+                    "commitDuration": 77,
+                    "layoutDuration": 1922,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 3828,
+                    "commitDuration": 158,
+                    "layoutDuration": 3670,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 2000,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ]
+        },
+        {
+            "id": "clear-1000",
+            "label": "Clear 1,000 rows",
+            "dom": [
+                {
+                    "duration": 52,
+                    "commitDuration": 30,
+                    "layoutDuration": 22,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 48,
+                    "commitDuration": 29,
+                    "layoutDuration": 19,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 47,
+                    "commitDuration": 29,
+                    "layoutDuration": 18,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 58,
+                    "commitDuration": 31,
+                    "layoutDuration": 27,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 48,
+                    "commitDuration": 29,
+                    "layoutDuration": 19,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 68,
+                    "commitDuration": 34,
+                    "layoutDuration": 34,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 48,
+                    "commitDuration": 28,
+                    "layoutDuration": 20,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ],
+            "template": [
+                {
+                    "duration": 298,
+                    "commitDuration": 36,
+                    "layoutDuration": 262,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 265,
+                    "commitDuration": 28,
+                    "layoutDuration": 237,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 273,
+                    "commitDuration": 29,
+                    "layoutDuration": 244,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 250,
+                    "commitDuration": 29,
+                    "layoutDuration": 221,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 251,
+                    "commitDuration": 28,
+                    "layoutDuration": 223,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 254,
+                    "commitDuration": 28,
+                    "layoutDuration": 226,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 247,
+                    "commitDuration": 28,
+                    "layoutDuration": 219,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ]
+        },
+        {
+            "id": "create-10000",
+            "label": "Create 10,000 rows",
+            "dom": [
+                {
+                    "duration": 4389,
+                    "commitDuration": 419,
+                    "layoutDuration": 3970,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 4457,
+                    "commitDuration": 416,
+                    "layoutDuration": 4041,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 4483,
+                    "commitDuration": 403,
+                    "layoutDuration": 4080,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 4787,
+                    "commitDuration": 587,
+                    "layoutDuration": 4200,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 4787,
+                    "commitDuration": 477,
+                    "layoutDuration": 4310,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 4889,
+                    "commitDuration": 546,
+                    "layoutDuration": 4343,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 5081,
+                    "commitDuration": 649,
+                    "layoutDuration": 4432,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ],
+            "template": [
+                {
+                    "duration": 74228,
+                    "commitDuration": 3632,
+                    "layoutDuration": 70596,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 68990,
+                    "commitDuration": 3708,
+                    "layoutDuration": 65282,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 72099,
+                    "commitDuration": 3492,
+                    "layoutDuration": 68607,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 74582,
+                    "commitDuration": 3393,
+                    "layoutDuration": 71189,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 72278,
+                    "commitDuration": 3419,
+                    "layoutDuration": 68859,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 73173,
+                    "commitDuration": 3418,
+                    "layoutDuration": 69755,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 75157,
+                    "commitDuration": 4516,
+                    "layoutDuration": 70641,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 10000,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ]
+        },
+        {
+            "id": "clear-10000",
+            "label": "Clear 10,000 rows",
+            "dom": [
+                {
+                    "duration": 3125,
+                    "commitDuration": 2431,
+                    "layoutDuration": 694,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 3342,
+                    "commitDuration": 2554,
+                    "layoutDuration": 788,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 7422,
+                    "commitDuration": 5861,
+                    "layoutDuration": 1561,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 7731,
+                    "commitDuration": 6237,
+                    "layoutDuration": 1494,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 7718,
+                    "commitDuration": 5441,
+                    "layoutDuration": 2277,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 8720,
+                    "commitDuration": 6789,
+                    "layoutDuration": 1931,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 5169,
+                    "commitDuration": 4125,
+                    "layoutDuration": 1044,
+                    "block": 0,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ],
+            "template": [
+                {
+                    "duration": 9961,
+                    "commitDuration": 4116,
+                    "layoutDuration": 5845,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 0,
+                    "warmup": true,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 2,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 6753,
+                    "commitDuration": 2504,
+                    "layoutDuration": 4249,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 1,
+                    "warmup": true,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 4,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 7556,
+                    "commitDuration": 2343,
+                    "layoutDuration": 5213,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 2,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 6,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 7568,
+                    "commitDuration": 2352,
+                    "layoutDuration": 5216,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 3,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 8,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 6735,
+                    "commitDuration": 2336,
+                    "layoutDuration": 4399,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 4,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 10,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 7049,
+                    "commitDuration": 2357,
+                    "layoutDuration": 4692,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 5,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 12,
+                        "verified": true
+                    }
+                },
+                {
+                    "duration": 4903,
+                    "commitDuration": 1777,
+                    "layoutDuration": 3126,
+                    "block": 1,
+                    "session": 0,
+                    "iteration": 6,
+                    "warmup": false,
+                    "verification": {
+                        "count": 0,
+                        "selected": null,
+                        "revision": 14,
+                        "verified": true
+                    }
+                }
+            ]
+        }
+    ],
+    "summary": [
+        {
+            "id": "create-1000",
+            "label": "Create 1,000 rows",
+            "dom": {
+                "count": 5,
+                "median": 296,
+                "p95": 306,
+                "min": 276,
+                "max": 306,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 27,
+                        "p95": 29,
+                        "min": 24,
+                        "max": 29
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 267,
+                        "p95": 282,
+                        "min": 251,
+                        "max": 282
+                    }
+                }
+            },
+            "template": {
+                "count": 5,
+                "median": 1491,
+                "p95": 1531,
+                "min": 1478,
+                "max": 1531,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 25,
+                        "p95": 28,
+                        "min": 24,
+                        "max": 28
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 1467,
+                        "p95": 1503,
+                        "min": 1450,
+                        "max": 1503
+                    }
+                }
+            },
+            "speedup": 5.037162162162162
+        },
+        {
+            "id": "replace-1000",
+            "label": "Replace 1,000 rows",
+            "dom": {
+                "count": 5,
+                "median": 328,
+                "p95": 350,
+                "min": 323,
+                "max": 350,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 50,
+                        "p95": 68,
+                        "min": 49,
+                        "max": 68
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 277,
+                        "p95": 282,
+                        "min": 273,
+                        "max": 282
+                    }
+                }
+            },
+            "template": {
+                "count": 5,
+                "median": 1807,
+                "p95": 1815,
+                "min": 1792,
+                "max": 1815,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 46,
+                        "p95": 47,
+                        "min": 44,
+                        "max": 47
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 1763,
+                        "p95": 1769,
+                        "min": 1745,
+                        "max": 1769
+                    }
+                }
+            },
+            "speedup": 5.509146341463414
+        },
+        {
+            "id": "update-1000",
+            "label": "Update every 10th row",
+            "dom": {
+                "count": 5,
+                "median": 6,
+                "p95": 40,
+                "min": 4,
+                "max": 40,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 1,
+                        "p95": 2,
+                        "min": 1,
+                        "max": 2
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 4,
+                        "p95": 39,
+                        "min": 3,
+                        "max": 39
+                    }
+                }
+            },
+            "template": {
+                "count": 5,
+                "median": 48,
+                "p95": 50,
+                "min": 46,
+                "max": 50,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 6,
+                        "p95": 6,
+                        "min": 5,
+                        "max": 6
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 42,
+                        "p95": 45,
+                        "min": 40,
+                        "max": 45
+                    }
+                }
+            },
+            "speedup": 8
+        },
+        {
+            "id": "select-1000",
+            "label": "Select a row",
+            "dom": {
+                "count": 5,
+                "median": 2,
+                "p95": 4,
+                "min": 2,
+                "max": 4,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 1,
+                        "p95": 1,
+                        "min": 0,
+                        "max": 1
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 1,
+                        "p95": 3,
+                        "min": 1,
+                        "max": 3
+                    }
+                }
+            },
+            "template": {
+                "count": 5,
+                "median": 61,
+                "p95": 71,
+                "min": 51,
+                "max": 71,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 2,
+                        "p95": 2,
+                        "min": 1,
+                        "max": 2
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 59,
+                        "p95": 69,
+                        "min": 50,
+                        "max": 69
+                    }
+                }
+            },
+            "speedup": 30.5
+        },
+        {
+            "id": "swap-1000",
+            "label": "Swap rows 2 and 999",
+            "dom": {
+                "count": 5,
+                "median": 122,
+                "p95": 135,
+                "min": 118,
+                "max": 135,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 56,
+                        "p95": 69,
+                        "min": 54,
+                        "max": 69
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 66,
+                        "p95": 66,
+                        "min": 64,
+                        "max": 66
+                    }
+                }
+            },
+            "template": {
+                "count": 5,
+                "median": 310,
+                "p95": 328,
+                "min": 304,
+                "max": 328,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 32,
+                        "p95": 33,
+                        "min": 32,
+                        "max": 33
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 278,
+                        "p95": 295,
+                        "min": 272,
+                        "max": 295
+                    }
+                }
+            },
+            "speedup": 2.540983606557377
+        },
+        {
+            "id": "remove-1000",
+            "label": "Remove a row",
+            "dom": {
+                "count": 5,
+                "median": 3,
+                "p95": 38,
+                "min": 2,
+                "max": 38,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 1,
+                        "p95": 1,
+                        "min": 0,
+                        "max": 1
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 2,
+                        "p95": 37,
+                        "min": 1,
+                        "max": 37
+                    }
+                }
+            },
+            "template": {
+                "count": 5,
+                "median": 310,
+                "p95": 338,
+                "min": 299,
+                "max": 338,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 2,
+                        "p95": 2,
+                        "min": 1,
+                        "max": 2
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 309,
+                        "p95": 336,
+                        "min": 297,
+                        "max": 336
+                    }
+                }
+            },
+            "speedup": 103.33333333333333
+        },
+        {
+            "id": "append-1000",
+            "label": "Append 1,000 rows",
+            "dom": {
+                "count": 5,
+                "median": 320,
+                "p95": 366,
+                "min": 285,
+                "max": 366,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 27,
+                        "p95": 35,
+                        "min": 22,
+                        "max": 35
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 285,
+                        "p95": 339,
+                        "min": 263,
+                        "max": 339
+                    }
+                }
+            },
+            "template": {
+                "count": 5,
+                "median": 1999,
+                "p95": 4416,
+                "min": 1813,
+                "max": 4416,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 83,
+                        "p95": 158,
+                        "min": 69,
+                        "max": 158
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 1922,
+                        "p95": 4264,
+                        "min": 1744,
+                        "max": 4264
+                    }
+                }
+            },
+            "speedup": 6.246875
+        },
+        {
+            "id": "clear-1000",
+            "label": "Clear 1,000 rows",
+            "dom": {
+                "count": 5,
+                "median": 48,
+                "p95": 68,
+                "min": 47,
+                "max": 68,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 29,
+                        "p95": 34,
+                        "min": 28,
+                        "max": 34
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 20,
+                        "p95": 34,
+                        "min": 18,
+                        "max": 34
+                    }
+                }
+            },
+            "template": {
+                "count": 5,
+                "median": 251,
+                "p95": 273,
+                "min": 247,
+                "max": 273,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 28,
+                        "p95": 29,
+                        "min": 28,
+                        "max": 29
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 223,
+                        "p95": 244,
+                        "min": 219,
+                        "max": 244
+                    }
+                }
+            },
+            "speedup": 5.229166666666667
+        },
+        {
+            "id": "create-10000",
+            "label": "Create 10,000 rows",
+            "dom": {
+                "count": 5,
+                "median": 4787,
+                "p95": 5081,
+                "min": 4483,
+                "max": 5081,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 546,
+                        "p95": 649,
+                        "min": 403,
+                        "max": 649
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 4310,
+                        "p95": 4432,
+                        "min": 4080,
+                        "max": 4432
+                    }
+                }
+            },
+            "template": {
+                "count": 5,
+                "median": 73173,
+                "p95": 75157,
+                "min": 72099,
+                "max": 75157,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 3419,
+                        "p95": 4516,
+                        "min": 3393,
+                        "max": 4516
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 69755,
+                        "p95": 71189,
+                        "min": 68607,
+                        "max": 71189
+                    }
+                }
+            },
+            "speedup": 15.285773971171924
+        },
+        {
+            "id": "clear-10000",
+            "label": "Clear 10,000 rows",
+            "dom": {
+                "count": 5,
+                "median": 7718,
+                "p95": 8720,
+                "min": 5169,
+                "max": 8720,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 5861,
+                        "p95": 6789,
+                        "min": 4125,
+                        "max": 6789
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 1561,
+                        "p95": 2277,
+                        "min": 1044,
+                        "max": 2277
+                    }
+                }
+            },
+            "template": {
+                "count": 5,
+                "median": 7049,
+                "p95": 7568,
+                "min": 4903,
+                "max": 7568,
+                "phases": {
+                    "commit": {
+                        "count": 5,
+                        "median": 2343,
+                        "p95": 2357,
+                        "min": 1777,
+                        "max": 2357
+                    },
+                    "layout": {
+                        "count": 5,
+                        "median": 4692,
+                        "p95": 5216,
+                        "min": 3126,
+                        "max": 5216
+                    }
+                }
+            },
+            "speedup": 0.9133195128271573
+        }
+    ],
+    "geometricMeanSpeedup": 7.778409155981646
+}

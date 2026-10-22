@@ -29,6 +29,19 @@ test('page frames preserve the navigation contract and forwarded slots', async (
                 assert.match(html, /<home-language-switch\b/, 'the homepage must offer an in-place language switch')
                 assert.match(html, /<button\b[^>]*aria-label="Switch to English"/)
                 assert.doesNotMatch(html, /href="\/en(?:\/|")/, 'switching must not navigate to another path')
+                const benchmark = html.indexOf('id="renderer-benchmark-title"')
+                const appLayout = html.indexOf('id="app-view-title"')
+                assert.ok(benchmark > 0 && benchmark < appLayout, 'the measured renderer showcase precedes App layout')
+                assert.equal(html.match(/<article\b[^>]*class="operation-chart\b/g)?.length, 6)
+                assert.deepEqual(
+                    Array.from(html.matchAll(/<h4\b[^>]*\bid="chart-([^"]+)"/g), (match) => match[1]),
+                    ['create-1000', 'replace-1000', 'update-1000', 'append-1000', 'clear-1000', 'create-10000']
+                )
+                assert.match(
+                    html,
+                    /href="https:\/\/github\.com\/sep2\/vite-plugin-taro\/tree\/main\/demo\/benchmark-demo"/
+                )
+                assert.match(html, /最快的全功能/)
             } else {
                 assert.doesNotMatch(html, /<home-language-switch\b/, 'documentation must not offer a language switch')
             }

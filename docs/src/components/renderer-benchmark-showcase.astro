@@ -1,0 +1,349 @@
+---
+import result from '../../../demo/benchmark-demo/results/wechat-devtools.json'
+// biome-ignore lint/correctness/noUnusedImports: Rendered by the Astro template.
+import HomeLink from './home-link.astro'
+
+const labels: Record<string, string> = {
+    'create-1000': '创建 1,000 行',
+    'replace-1000': '替换 1,000 行',
+    'update-1000': '更新每第 10 行',
+    'append-1000': '追加 1,000 行',
+    'clear-1000': '清空 1,000 行',
+    'create-10000': '创建 10,000 行'
+}
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const charts = result.summary
+    .filter(({ id }) => Object.hasOwn(labels, id))
+    .map((item) => ({ ...item, title: labels[item.id], scale: Math.max(item.dom.median, item.template.median) }))
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const multiplier = result.geometricMeanSpeedup.toFixed(1)
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const source = 'https://github.com/sep2/vite-plugin-taro/tree/main/demo/benchmark-demo'
+// biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
+const format = (value: number) => value.toLocaleString('en-US', { maximumFractionDigits: 1 })
+---
+
+<section class="home-section renderer-benchmark" aria-labelledby="renderer-benchmark-title">
+    <div class="benchmark-intro">
+        <div class="benchmark-copy">
+            <span class="benchmark-kicker"><i aria-hidden="true"></i> 原生渲染 · 实测性能</span>
+            <h2 id="renderer-benchmark-title">
+                最快的全功能<br />
+                <span>React 小程序框架</span>
+            </h2>
+            <p class="benchmark-lead">完整的 React 19、原生组件与跨端能力，配上极致的渲染路径。VPT DOM 对比原版 Taro 采用的 setData 渲染架构，让速度与完整体验兼得。</p>
+            <div class="benchmark-links">
+                <HomeLink href="/guides/configuration/#renderer">开启 DOM 渲染</HomeLink>
+                <a class="benchmark-source" href={source} target="_blank" rel="noopener noreferrer">
+                    查看基准源码 <span aria-hidden="true">→</span>
+                </a>
+            </div>
+        </div>
+        <aside class="benchmark-score" aria-label="渲染性能总览">
+            <div class="score-label">
+                <svg class="score-mark" viewBox="0 0 32 24" aria-hidden="true">
+                    <path d="m4 18 6-12m3 12 6-12m3 12 6-12" />
+                </svg>
+                <span>比 Taro 更快，实测为证。</span>
+            </div>
+            <strong>{multiplier}<small>倍</small></strong>
+            <p class="score-comparison">VPT 相对 Taro 递归模板的平均性能达 <span>{multiplier}</span> 倍，已达到原生渲染水平</p>
+        </aside>
+    </div>
+
+    <div class="benchmark-charts">
+        <header class="chart-heading">
+            <div>
+                <h3>少一点等待，多一点流畅</h3>
+            </div>
+            <div class="chart-legend" role="group" aria-label="图表图例">
+                <span><i class="dom-key" aria-hidden="true"></i>VPT DOM</span>
+                <span><i class="template-key" aria-hidden="true"></i>Taro setData</span>
+            </div>
+        </header>
+        <div class="chart-grid">
+            {charts.map((item) => (
+                <article class="operation-chart" aria-labelledby={`chart-${item.id}`}>
+                    <header>
+                        <h4 id={`chart-${item.id}`}>{item.title}</h4>
+                        <span class="speedup">{item.speedup.toFixed(1)}×</span>
+                    </header>
+                    <div class="bar-row">
+                        <span>DOM</span>
+                        <div class="bar-track" aria-hidden="true">
+                            <i class="dom-bar" style={`width: ${item.dom.median / item.scale * 100}%`}></i>
+                        </div>
+                        <b>{format(item.dom.median)} ms</b>
+                    </div>
+                    <div class="bar-row">
+                        <span>setData</span>
+                        <div class="bar-track" aria-hidden="true">
+                            <i class="template-bar" style={`width: ${item.template.median / item.scale * 100}%`}></i>
+                        </div>
+                        <b>{format(item.template.median)} ms</b>
+                    </div>
+                </article>
+            ))}
+        </div>
+    </div>
+</section>
+
+<style>
+    .renderer-benchmark {
+        --bench-dom: #d65b3c;
+        --bench-ink: #a53c25;
+        --bench-template: #899497;
+        --bench-border: color-mix(in srgb, var(--vpt-heading) 13%, transparent);
+        --bench-surface: color-mix(in srgb, var(--vpt-page-bg) 65%, white);
+    }
+    .benchmark-intro {
+        display: grid;
+        grid-template-columns: 1.3fr 1fr;
+        gap: clamp(2rem, 5vw, 6rem);
+        align-items: center;
+        margin-bottom: 3rem;
+    }
+    .benchmark-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        color: var(--vpt-accent);
+        font-size: 0.8rem;
+        font-weight: 750;
+        letter-spacing: 0.14em;
+    }
+    .benchmark-kicker i {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        background: var(--bench-dom);
+        box-shadow: 0 0 0 5px color-mix(in srgb, var(--bench-dom) 12%, transparent);
+    }
+    h2 {
+        margin: 1.2rem 0;
+        color: var(--vpt-heading);
+        font-size: clamp(2.25rem, 4.1vw, 4.1rem);
+        line-height: 1.16;
+        letter-spacing: -0.045em;
+        font-weight: 650;
+        text-wrap: balance;
+    }
+    h2 > span {
+        color: var(--vpt-accent);
+    }
+    .benchmark-lead {
+        max-width: 37rem;
+        color: var(--vpt-muted);
+        line-height: 1.9;
+        font-size: var(--home-font-size-body);
+    }
+    .benchmark-links {
+        display: flex;
+        align-items: center;
+        gap: 1.4rem;
+        flex-wrap: wrap;
+        margin-top: 1.8rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+    .benchmark-source {
+        color: var(--vpt-heading);
+        text-decoration: none;
+    }
+    .benchmark-score {
+        padding-block: 1rem;
+        text-align: left;
+    }
+    .score-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        color: var(--vpt-heading);
+        font-size: 0.9rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        line-height: 1.5;
+    }
+    .score-mark {
+        flex-shrink: 0;
+        width: 1.5rem;
+        height: 1.125rem;
+        fill: none;
+        stroke: var(--bench-dom);
+        stroke-linecap: square;
+        stroke-width: 2.5;
+    }
+    .benchmark-score > strong {
+        display: block;
+        margin: 0.8rem 0 0.75rem;
+        color: var(--bench-dom);
+        font-family: var(--sl-font);
+        font-size: clamp(6rem, 13vw, 11rem);
+        font-weight: 700;
+        font-variant-numeric: lining-nums tabular-nums;
+        letter-spacing: -0.06em;
+        line-height: 1;
+    }
+    .benchmark-score > strong small {
+        margin-left: 0.12em;
+        color: inherit;
+        font-size: 0.32em;
+        font-weight: 500;
+        letter-spacing: normal;
+    }
+    .score-comparison {
+        color: var(--vpt-muted);
+        font-size: 0.8rem;
+        line-height: 1.6;
+    }
+    .benchmark-charts {
+        padding: clamp(1.2rem, 3vw, 2rem);
+        border: 1px solid var(--bench-border);
+        border-radius: 1.3rem;
+        background: var(--bench-surface);
+        box-shadow: 0 16px 48px -32px color-mix(in srgb, var(--vpt-heading) 25%, transparent);
+    }
+    .chart-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    h3 {
+        margin: 0;
+        font-size: 1.25rem;
+        color: var(--vpt-heading);
+        letter-spacing: -0.025em;
+    }
+    .chart-legend {
+        display: flex;
+        gap: 1.2rem;
+        font-size: 0.75rem;
+        color: var(--vpt-heading);
+    }
+    .chart-legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    .chart-legend i {
+        width: 0.65rem;
+        height: 0.65rem;
+        border-radius: 2px;
+    }
+    .dom-key,
+    .dom-bar {
+        background: var(--bench-dom);
+    }
+    .template-key,
+    .template-bar {
+        background: var(--bench-template);
+    }
+    .chart-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1.4rem 2.5rem;
+        margin-top: 1.5rem;
+    }
+    .operation-chart {
+        min-width: 0;
+        padding: 1rem 0 1.2rem;
+        border-top: 1px solid var(--bench-border);
+    }
+    .operation-chart header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.9rem;
+    }
+    h4 {
+        margin: 0;
+        font-size: 0.85rem;
+        color: var(--vpt-heading);
+        font-weight: 650;
+    }
+    .speedup {
+        font-family: ui-monospace, monospace;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--bench-ink);
+        background: color-mix(in srgb, var(--bench-dom) 10%, transparent);
+        border-radius: 1rem;
+        padding: 0.15rem 0.55rem;
+    }
+    .bar-row {
+        display: grid;
+        /* Matching value columns keep both renderer tracks on the same scale. */
+        grid-template-columns: 3.5rem minmax(0, 1fr) 5rem;
+        gap: 0.6rem;
+        align-items: center;
+        margin-top: 0.6rem;
+        font-size: 0.75rem;
+    }
+    .bar-row > span {
+        color: var(--vpt-muted);
+    }
+    .bar-row b {
+        color: var(--vpt-heading);
+        text-align: right;
+        font-family: ui-monospace, monospace;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+    .bar-track {
+        height: 0.8rem;
+        background: color-mix(in srgb, var(--vpt-muted) 7%, transparent);
+        border-radius: 0 0.2rem 0.2rem 0;
+    }
+    .bar-track i {
+        display: block;
+        height: 100%;
+        border-radius: 0 0.2rem 0.2rem 0;
+    }
+    a:focus-visible {
+        outline: 2px solid var(--bench-dom);
+        outline-offset: 5px;
+    }
+    :global([data-theme="dark"]) .renderer-benchmark {
+        --bench-dom: #f39a7f;
+        --bench-ink: #f39a7f;
+        --bench-template: #879397;
+        --bench-surface: color-mix(in srgb, var(--vpt-page-bg) 96%, white);
+    }
+    @media (max-width: 58rem) {
+        .benchmark-intro {
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+        .benchmark-score {
+            width: 100%;
+            max-width: 32rem;
+            justify-self: center;
+        }
+        h2 {
+            font-size: clamp(2rem, 6vw, 3.8rem);
+        }
+    }
+    @media (max-width: 38rem) {
+        .chart-grid {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+        .chart-legend {
+            gap: 1rem;
+        }
+        .benchmark-links {
+            gap: 1rem;
+        }
+        .bar-row {
+            grid-template-columns: 3.5rem minmax(0, 1fr) 4.5rem;
+            gap: 0.4rem;
+        }
+        h2 {
+            font-size: 2rem;
+        }
+    }
+</style>
