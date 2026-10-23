@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => {
         plugins: [
             vpt({
                 target,
+                renderer: 'template',
                 app: 'src/app.tsx',
                 pages: [
                     {
@@ -78,8 +79,8 @@ function createAppJson(target: VptTarget): VptJsonObject {
     switch (target) {
         case 'wx': {
             return {
+                renderer: 'skyline', // 不用 skyline 的话，这里修改成 ‘webview’
                 lazyCodeLoading: 'requiredComponents',
-                renderer: 'skyline',
                 componentFramework: 'glass-easel',
                 glassEaselWebview: true,
                 tabBar: {
