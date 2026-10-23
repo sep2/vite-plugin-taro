@@ -9,7 +9,7 @@ test('declares the independent Page property without mutating stock recursive co
         options: { virtualHost: true },
         methods: { eh: () => {} }
     }
-    // Taro 4.3.0 incorrectly types this hook's native component config as its unrelated MiniLifecycle descriptor.
+    // Taro incorrectly types this hook's native component config as its unrelated MiniLifecycle descriptor.
     const result = Reflect.apply(hooks.call, hooks, [
         'modifyRecursiveComponentConfig',
         config,

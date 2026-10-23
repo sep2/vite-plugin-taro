@@ -97,7 +97,7 @@ class WxTemplate extends UnRecursiveTemplate {
     }
 }
 
-/** Creates the Taro 4.3.0 WX template implementation without loading its CLI platform package. */
+/** Creates the Taro WX template implementation without loading its CLI platform package. */
 export function createWxTemplate(): UnRecursiveTemplate {
     const template = new WxTemplate()
 

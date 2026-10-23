@@ -21,7 +21,7 @@ index 73bb19548c9737b74174a64a261ef08cdccb49b9..c2388f7cee376a5573c1b5cc1201b0f4
  declare function eventHandler(event: MpEvent, currentNode?: TaroElement): any;
  declare function eventHandlerTTDom(ele: any, listener: (event: MpEvent, element: any) => void, event: MpEvent): void;
 diff --git a/dist/dom/event.js b/dist/dom/event.js
-index 8a8aab1e78ca3f5087bf768cf57732ed52e6697f..1b96119960446a19e962a434b1d1de03bb523305 100644
+index b911e7dccf3b830ae5c3a4e231d65781c53d9dfd..8234012abe9d24202a34a960b5a70a9ab0d7eef2 100644
 --- a/dist/dom/event.js
 +++ b/dist/dom/event.js
 @@ -28,14 +28,19 @@ class TaroEvent {
@@ -45,10 +45,10 @@ index 8a8aab1e78ca3f5087bf768cf57732ed52e6697f..1b96119960446a19e962a434b1d1de03
 +            const currentEle = this.getTargetElement(target, false);
 +            // Alipay's targetDataset identifies the bubbling target separately from its wrapper.
 +            const element = this.getTargetElement(target, true);
-             // 索引命中时仍以逻辑 dataset 为准，保留对象值及支付宝两层数据的合并顺序。
-             // 索引未命中只表示无法取得逻辑节点，不能丢弃平台已提供的数据。
-             // 两个来源分别兜底，复用原有 Object.assign 和缓存；不补建索引或遍历节点树。
-@@ -51,13 +56,12 @@ class TaroEvent {
+             // Keep logical data authoritative, falling back per source when an index is unavailable.
+             // Preserve Alipay's merge order: the actual target overrides the wrapper's dataset.
+             target.dataset = Object.assign(Object.assign({}, (currentEle !== null ? currentEle.dataset : target.dataset || EMPTY_OBJ)), (element !== null ? element.dataset : target.targetDataset || EMPTY_OBJ));
+@@ -50,13 +55,12 @@ class TaroEvent {
          }
      }
      get currentTarget() {
@@ -62,10 +62,10 @@ index 8a8aab1e78ca3f5087bf768cf57732ed52e6697f..1b96119960446a19e962a434b1d1de03
 -            const targetElement = doc.getElementById(((_e = (_d = (_c = this.mpEvent) === null || _c === void 0 ? void 0 : _c.target) === null || _d === void 0 ? void 0 : _d.dataset) === null || _e === void 0 ? void 0 : _e.sid) || ((_g = (_f = this.mpEvent) === null || _f === void 0 ? void 0 : _f.target) === null || _g === void 0 ? void 0 : _g.id) || null);
 +            const element = this.getTargetElement(currentTarget, false);
 +            const targetElement = this.getTargetElement(this.mpEvent?.target, false);
-             // 已知逻辑节点相同才沿用 target；未命中时，只有同一原始对象能证明身份相同。
-             // 两个 null 查询结果、空 ID 或相同的未解析 ID 都不能证明两个事件目标相同。
-             // 无平台事件时保留手动构造事件的共享目标；这里只比较已有引用，不新增查询或状态。
-@@ -126,7 +130,7 @@ function getEventCBResult(event) {
+             // Missing indexes do not imply identical targets. Without a logical match,
+             // only the same native object (or absent targets on a manual event) shares the wrapper.
+             if (element !== null ? element === targetElement : !this.mpEvent || this.mpEvent.currentTarget === this.mpEvent.target) {
+@@ -122,7 +126,7 @@ function getEventCBResult(event) {
   * 会绕过外围处理，因此 host 应从这里进入已有事件流程。
   *
   * 可选参数只改变接收节点的取得方式，不增加持久状态或循环，也不代表显著性能提升。

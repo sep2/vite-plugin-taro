@@ -11,14 +11,14 @@ overrides:
   vite: 8.3.4
   # Taro's copied H5 components and the published runtime share the prototype-pollution-fixed Swiper.
   swiper: 12.1.2
-  # Taro 4.3.0 references Rollup only from declarations; VPT's runtime and build pipeline use Rolldown.
-  '@tarojs/runner-utils@4.3.0>rollup': '-'
+  # Taro references Rollup only from declarations; VPT's runtime and build pipeline use Rolldown.
+  '@tarojs/runner-utils@4.3.1>rollup': '-'
   # The runtime build copies H5 APIs and metadata, never the upstream Babel-based compiler entry.
-  '@tarojs/plugin-platform-h5@4.3.0>babel-plugin-transform-taroapi': '-'
+  '@tarojs/plugin-platform-h5@4.3.1>babel-plugin-transform-taroapi': '-'
 
 peerDependencyRules:
   allowedVersions:
-    '@tarojs/taro@4.3.0>@types/react': '^19.0.0'
+    '@tarojs/taro@4.3.1>@types/react': '^19.0.0'
 
 allowBuilds:
   '@biomejs/biome': false
@@ -29,10 +29,10 @@ allowBuilds:
   esbuild: true
 
 patchedDependencies:
-  '@tarojs/plugin-html@4.3.0': patches/generated/@tarojs__plugin-html@4.3.0.patch
-  '@tarojs/plugin-framework-react@4.3.0': patches/generated/@tarojs__plugin-framework-react@4.3.0.patch
-  '@tarojs/react@4.3.0': patches/generated/@tarojs__react@4.3.0.patch
-  '@tarojs/runtime@4.3.0': patches/generated/@tarojs__runtime@4.3.0.patch
+  '@tarojs/plugin-html@4.3.1': patches/generated/@tarojs__plugin-html@4.3.1.patch
+  '@tarojs/plugin-framework-react@4.3.1': patches/generated/@tarojs__plugin-framework-react@4.3.1.patch
+  '@tarojs/react@4.3.1': patches/generated/@tarojs__react@4.3.1.patch
+  '@tarojs/runtime@4.3.1': patches/generated/@tarojs__runtime@4.3.1.patch
   canvas-confetti@1.9.4: patches/generated/canvas-confetti@1.9.4.patch
 
 minimumReleaseAgeExclude:
@@ -53,3 +53,21 @@ minimumReleaseAgeExclude:
   - '@rolldown/binding-win32-x64-msvc@1.2.13'
   - rolldown@1.2.13
   - vite@8.3.4
+  - '@tarojs/api@4.3.1'
+  - '@tarojs/components-react@4.3.1'
+  - '@tarojs/components@4.3.1'
+  - '@tarojs/helper@4.3.1'
+  - '@tarojs/plugin-framework-react@4.3.1'
+  - '@tarojs/plugin-html@4.3.1'
+  - '@tarojs/plugin-platform-alipay@4.3.1'
+  - '@tarojs/plugin-platform-h5@4.3.1'
+  - '@tarojs/plugin-platform-tt@4.3.1'
+  - '@tarojs/plugin-platform-weapp@4.3.1'
+  - '@tarojs/react@4.3.1'
+  - '@tarojs/router@4.3.1'
+  - '@tarojs/runner-utils@4.3.1'
+  - '@tarojs/runtime@4.3.1'
+  - '@tarojs/service@4.3.1'
+  - '@tarojs/shared@4.3.1'
+  - '@tarojs/taro-h5@4.3.1'
+  - '@tarojs/taro@4.3.1'

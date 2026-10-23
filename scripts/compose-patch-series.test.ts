@@ -96,6 +96,18 @@ test('an empty series produces no changes', (t) => {
     assert.equal(composePatchSeries(packageDirectory, []), '')
 })
 
+test('feature filenames are numbered consecutively in manifest order', () => {
+    for (const entry of series) {
+        for (const [index, patch] of entry.patches.entries()) {
+            assert.equal(
+                path.posix.basename(patch).split('-')[0],
+                String(index + 1).padStart(2, '0'),
+                `${entry.package}: ${patch}`
+            )
+        }
+    }
+})
+
 test('the manifest accounts for every source/output patch and matches pnpm registration', () => {
     const workspace = readFileSync(path.join(root, 'pnpm-workspace.yaml'), 'utf8')
     const sources = series.flatMap((entry) => entry.patches)

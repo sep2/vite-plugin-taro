@@ -14,21 +14,10 @@ index 92948ef44a4b92f2adda1c114e95535118d2b79d..c74dbf6314d8a4178a3a60a743d43493
       * 逻辑解绑及按 cleanRef 清理事件索引后调用；this 为原父节点，child.parentNode 已为空。
       * 每次实际移除都会通知，options.doUpdate=false 仅抑制默认模板更新。
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index f2f89f03fda5a678227321a46e79421664dd4cd2..f221446060d86606a7a1eb599158163aa7225909 100644
+index c456ad0ba846e297151ee81865c605a936a5a922..f000eb8bd9e5f377fd08d06d67b0a53dd9f5703e 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
-@@ -138,6 +138,10 @@ class TaroNode extends TaroEventTarget {
-      *   3. insert D before C, D has the different parent of C
-      */
-     insertBefore(newChild, refChild, isReplace) {
-+        if (newChild === refChild) {
-+            this.findIndex(refChild);
-+            return newChild;
-+        }
-         if (newChild.nodeName === DOCUMENT_FRAGMENT) {
-             newChild.childNodes.reduceRight((previousValue, currentValue) => {
-                 this.insertBefore(currentValue, previousValue);
-@@ -145,10 +149,15 @@ class TaroNode extends TaroEventTarget {
+@@ -150,10 +150,15 @@ class TaroNode extends TaroEventTarget {
              }, refChild);
              return newChild;
          }
@@ -48,7 +37,7 @@ index f2f89f03fda5a678227321a46e79421664dd4cd2..f221446060d86606a7a1eb599158163a
          let index = 0;
          // Data structure
          newChild.parentNode = this;
-@@ -163,7 +172,7 @@ class TaroNode extends TaroEventTarget {
+@@ -168,7 +173,7 @@ class TaroNode extends TaroEventTarget {
          }
          // Delegation runs after the logical insertion, including on detached parents.
          // Its default implementation prepares template payloads; native hosts can replace it before any serialization work.
@@ -57,17 +46,7 @@ index f2f89f03fda5a678227321a46e79421664dd4cd2..f221446060d86606a7a1eb599158163a
          this.delegateContextInvalidation();
          MutationObserver.record({
              type: "childList" /* MutationRecordType.CHILD_LIST */,
-@@ -201,6 +210,9 @@ class TaroNode extends TaroEventTarget {
-     replaceChild(newChild, oldChild) {
-         if (oldChild.parentNode !== this)
-             return;
-+        if (newChild === oldChild) {
-+            return oldChild;
-+        }
-         // Insert the newChild
-         this.insertBefore(newChild, oldChild, true);
-         // Destroy the oldChild
-@@ -248,14 +260,19 @@ class TaroNode extends TaroEventTarget {
+@@ -255,14 +260,19 @@ class TaroNode extends TaroEventTarget {
       * index 仅在有 refChild 时表示逻辑插入位置，追加分支中的值不表示末尾索引。
       * isReplace 表示 replaceChild 的插入阶段：refChild 此时仍在树中，随后由原方法
       * 单独移除。原生 host 此处执行插入，旧节点的移除由移除委托接收。

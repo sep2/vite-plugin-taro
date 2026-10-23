@@ -221,6 +221,52 @@ for (const replace of [false, true]) {
     observer.disconnect()
 }
 
+// Invalid anchors must be rejected before detaching nodes, consuming fragments or notifying hosts.
+for (const rooted of [false, true]) {
+    for (const operation of ['detached', 'same-parent', 'cross-parent', 'self', 'fragment', 'empty-fragment']) {
+        const destination = setup(rooted)
+        const source = setup(rooted)
+        const anchor = source.nodes[1]
+        const child = operation === 'same-parent' ? destination.nodes[1]
+            : operation === 'cross-parent' ? source.nodes[0]
+            : operation === 'self' ? anchor
+            : document.createElement(operation.includes('fragment') ? 'document-fragment' : 'view')
+        if (operation === 'fragment') {
+            child.appendChild(document.createElement('view'))
+            child.appendChild(document.createTextNode('fragment child'))
+        }
+        const parent = child.parentNode
+        const children = child.childNodes.slice()
+        const childObserver = new MutationObserver(() => {})
+        childObserver.observe(child, { childList: true })
+        // Capture fragment presentation independently of the two parent journals.
+        const childCalls = []
+        child.delegateChildRemoval = (...args) => { childCalls.push(args) }
+        assert.throws(
+            () => destination.parent.insertBefore(child, anchor),
+            /The node to be replaced is not a child of this node/,
+            operation
+        )
+        for (const tree of [destination, source]) {
+            checkOrder(tree.parent, tree.nodes)
+            assert.deepEqual(tree.calls, [])
+            assert.deepEqual(tree.observer.takeRecords(), [])
+            assert.deepEqual(tree.root.updatePayloads, [])
+            for (const node of tree.nodes) {
+                assert.strictEqual(document.getElementById(node.id), node)
+                assert.strictEqual(document.getElementById(node.firstChild.sid), node.firstChild)
+            }
+            tree.observer.disconnect()
+        }
+        assert.strictEqual(child.parentNode, parent)
+        checkOrder(child, children)
+        assert.strictEqual(document.getElementById(child.sid), child)
+        assert.deepEqual(childCalls, [])
+        assert.deepEqual(childObserver.takeRecords(), [])
+        childObserver.disconnect()
+    }
+}
+
 // Several moves and edits in one batch serialize the final tree, filtering comments at flush time.
 {
     const { root, parent, nodes: [a, b, c, d, e], observer } = setup(true)

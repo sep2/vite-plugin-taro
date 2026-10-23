@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { build } from 'rolldown'
+import taroPackage from 'vite-plugin-taro-runtime/taro/package.json' with { type: 'json' }
 import { resolveTaroRuntime } from '../../utils/packages.ts'
 import { miniTaroRuntimeId } from '../mini/module/module.ts'
 import { createClientTaroPlugin } from './client-taro.ts'
@@ -41,7 +42,7 @@ async function bundleMiniApi(source: string, target: 'wx' | 'zfb' | 'tt'): Promi
                 'process.env.TARO_ENV': JSON.stringify(platform),
                 'process.env.TARO_PLATFORM': '"mini"',
                 'process.env.FRAMEWORK': '"react"',
-                'process.env.TARO_VERSION': '"4.3.0"',
+                'process.env.TARO_VERSION': JSON.stringify(taroPackage.version),
                 'process.env.SUPPORT_TARO_POLYFILL': '"disabled"',
                 ENABLE_ADJACENT_HTML: 'false',
                 ENABLE_CLONE_NODE: 'false',

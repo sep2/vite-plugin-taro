@@ -1,50 +1,47 @@
 [
     {
-        "package": "@tarojs/plugin-html@4.3.0",
-        "output": "patches/generated/@tarojs__plugin-html@4.3.0.patch",
-        "patches": ["patches/series/@tarojs__plugin-html@4.3.0/01-html-elements.patch"]
+        "package": "@tarojs/plugin-html@4.3.1",
+        "output": "patches/generated/@tarojs__plugin-html@4.3.1.patch",
+        "patches": ["patches/series/@tarojs__plugin-html@4.3.1/01-html-elements.patch"]
     },
     {
-        "package": "@tarojs/plugin-framework-react@4.3.0",
-        "output": "patches/generated/@tarojs__plugin-framework-react@4.3.0.patch",
+        "package": "@tarojs/plugin-framework-react@4.3.1",
+        "output": "patches/generated/@tarojs__plugin-framework-react@4.3.1.patch",
         "patches": [
-            "patches/series/@tarojs__plugin-framework-react@4.3.0/01-react19-root-api.patch",
-            "patches/series/@tarojs__plugin-framework-react@4.3.0/02-mini-app-page-rendering.patch",
-            "patches/series/@tarojs__plugin-framework-react@4.3.0/03-h5-router-container.patch",
-            "patches/series/@tarojs__plugin-framework-react@4.3.0/04-page-prerender.patch",
-            "patches/series/@tarojs__plugin-framework-react@4.3.0/05-page-host-context.patch"
+            "patches/series/@tarojs__plugin-framework-react@4.3.1/01-react19-root-api.patch",
+            "patches/series/@tarojs__plugin-framework-react@4.3.1/02-mini-app-page-rendering.patch",
+            "patches/series/@tarojs__plugin-framework-react@4.3.1/03-h5-router-container.patch",
+            "patches/series/@tarojs__plugin-framework-react@4.3.1/04-page-prerender.patch",
+            "patches/series/@tarojs__plugin-framework-react@4.3.1/05-page-host-context.patch"
         ]
     },
     {
-        "package": "@tarojs/react@4.3.0",
-        "output": "patches/generated/@tarojs__react@4.3.0.patch",
+        "package": "@tarojs/react@4.3.1",
+        "output": "patches/generated/@tarojs__react@4.3.1.patch",
         "patches": [
-            "patches/series/@tarojs__react@4.3.0/01-react19-reconciler.patch",
-            "patches/series/@tarojs__react@4.3.0/02-renderer-host.patch",
-            "patches/series/@tarojs__react@4.3.0/03-page-host-context.patch",
-            "patches/series/@tarojs__react@4.3.0/04-event-handler-replacement.patch",
-            "patches/series/@tarojs__react@4.3.0/05-style-update-batching.patch"
+            "patches/series/@tarojs__react@4.3.1/01-react19-reconciler.patch",
+            "patches/series/@tarojs__react@4.3.1/02-renderer-host.patch",
+            "patches/series/@tarojs__react@4.3.1/03-page-host-context.patch",
+            "patches/series/@tarojs__react@4.3.1/04-event-handler-replacement.patch",
+            "patches/series/@tarojs__react@4.3.1/05-style-update-batching.patch"
         ]
     },
     {
-        "package": "@tarojs/runtime@4.3.0",
-        "output": "patches/generated/@tarojs__runtime@4.3.0.patch",
+        "package": "@tarojs/runtime@4.3.1",
+        "output": "patches/generated/@tarojs__runtime@4.3.1.patch",
         "patches": [
-            "patches/series/@tarojs__runtime@4.3.0/01-mini-app-page-rendering.patch",
-            "patches/series/@tarojs__runtime@4.3.0/02-page-lifecycle.patch",
-            "patches/series/@tarojs__runtime@4.3.0/03-delegate-dom.patch",
-            "patches/series/@tarojs__runtime@4.3.0/04-event-listener-removal.patch",
-            "patches/series/@tarojs__runtime@4.3.0/05-event-target-data.patch",
-            "patches/series/@tarojs__runtime@4.3.0/06-style-property-names.patch",
-            "patches/series/@tarojs__runtime@4.3.0/07-clone-delegation.patch",
-            "patches/series/@tarojs__runtime@4.3.0/09-same-parent-moves.patch",
-            "patches/series/@tarojs__runtime@4.3.0/10-mutation-observer-fast-path.patch",
-            "patches/series/@tarojs__runtime@4.3.0/11-template-hydration.patch",
-            "patches/series/@tarojs__runtime@4.3.0/12-template-attribute-state.patch",
-            "patches/series/@tarojs__runtime@4.3.0/13-lazy-style.patch",
-            "patches/series/@tarojs__runtime@4.3.0/14-lazy-event-handlers.patch",
-            "patches/series/@tarojs__runtime@4.3.0/16-direct-event-cleanup.patch",
-            "patches/series/@tarojs__runtime@4.3.0/17-native-event-targets.patch"
+            "patches/series/@tarojs__runtime@4.3.1/01-mini-app-page-rendering.patch",
+            "patches/series/@tarojs__runtime@4.3.1/02-page-lifecycle.patch",
+            "patches/series/@tarojs__runtime@4.3.1/03-delegate-dom.patch",
+            "patches/series/@tarojs__runtime@4.3.1/04-clone-delegation.patch",
+            "patches/series/@tarojs__runtime@4.3.1/05-same-parent-moves.patch",
+            "patches/series/@tarojs__runtime@4.3.1/06-mutation-observer-fast-path.patch",
+            "patches/series/@tarojs__runtime@4.3.1/07-template-hydration.patch",
+            "patches/series/@tarojs__runtime@4.3.1/08-template-attribute-state.patch",
+            "patches/series/@tarojs__runtime@4.3.1/09-lazy-style.patch",
+            "patches/series/@tarojs__runtime@4.3.1/10-lazy-event-handlers.patch",
+            "patches/series/@tarojs__runtime@4.3.1/11-direct-event-cleanup.patch",
+            "patches/series/@tarojs__runtime@4.3.1/12-native-event-targets.patch"
         ]
     },
     {

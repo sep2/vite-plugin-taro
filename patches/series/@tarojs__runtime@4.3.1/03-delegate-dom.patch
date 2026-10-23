@@ -141,7 +141,7 @@ index 78893e78df38fd423937079db101a4fa848a1c73..4b8fac8181991d29ca3f5c06e676243f
      isOnlyClickBinded(): boolean;
  }
 diff --git a/dist/dom/event-target.js b/dist/dom/event-target.js
-index 510424828b3a9a74f363cef1e0982489a708541e..7097fd928166da0cfa820e6c7061e4262612493c 100644
+index 3b3946c14f00d106e785bda1fed9bdf8103b2300..de066ca2492f61f675fd793dc585cf160fd6dfa6 100644
 --- a/dist/dom/event-target.js
 +++ b/dist/dom/event-target.js
 @@ -44,6 +44,11 @@ class TaroEventTarget {
@@ -156,9 +156,9 @@ index 510424828b3a9a74f363cef1e0982489a708541e..7097fd928166da0cfa820e6c7061e426
      }
      removeEventListener(type, handler) {
          type = type.toLowerCase();
-@@ -66,7 +71,20 @@ class TaroEventTarget {
-         });
-         process.env.NODE_ENV !== 'production' && warn(index === -1, `事件: '${type}' 没有注册在 DOM 中，因此不会被移除。`);
+@@ -69,7 +74,20 @@ class TaroEventTarget {
+             return;
+         }
          handlers.splice(index, 1);
 +        // 最后一个处理器移除后再通知解绑；长度判断复用现有数组，为 O(1)。
 +        if (handlers.length === 0) {
@@ -196,10 +196,10 @@ index d06902c2239335adb5df57cc27b84ab3d9eb938b..73bb19548c9737b74174a64a261ef08c
  
  export { TaroEvent, createEvent, eventHandler, eventHandlerTTDom };
 diff --git a/dist/dom/event.js b/dist/dom/event.js
-index f4062db04f2a8216795447f892b80b7b6514f467..25387103c37d6d0cc45a02db052438752e993a67 100644
+index 876296f74a9cae7ec27db843346eb6fa2f26beb8..b911e7dccf3b830ae5c3a4e231d65781c53d9dfd 100644
 --- a/dist/dom/event.js
 +++ b/dist/dom/event.js
-@@ -100,7 +100,27 @@ function getEventCBResult(event) {
+@@ -104,7 +104,27 @@ function getEventCBResult(event) {
      return result;
  }
  // 小程序的事件代理回调函数
@@ -228,7 +228,7 @@ index f4062db04f2a8216795447f892b80b7b6514f467..25387103c37d6d0cc45a02db05243875
      var _a, _b;
      // Note: ohos 上事件没有设置 type、detail 类型 setter 方法，且部分事件（例如 load 等）缺失 target 导致事件错误
      event.type === undefined && Object.defineProperty(event, 'type', {
-@@ -112,8 +132,7 @@ function eventHandler(event) {
+@@ -116,8 +136,7 @@ function eventHandler(event) {
      event.currentTarget = event.currentTarget || event.target || Object.assign({}, event);
      hooks.call('modifyMpEventImpl', event);
      const currentTarget = event.currentTarget;
@@ -331,7 +331,7 @@ index a456e9adeecdaae566fe965b7054e55cf009530e..92948ef44a4b92f2adda1c114e955351
      hasChildNodes(): boolean;
      enqueueUpdate(payload: UpdatePayload): void;
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index cc210f4e56ff90d69a398e2e27382def86f4cb0c..f2f89f03fda5a678227321a46e79421664dd4cd2 100644
+index 0e0f8da396608d5bf9e9543f18f63013f38dd0c0..c456ad0ba846e297151ee81865c605a936a5a922 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
 @@ -6,7 +6,7 @@ import { hydrate } from '../hydrate.js';
@@ -390,7 +390,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..f2f89f03fda5a678227321a46e794216
          }
          // @Todo: appendChild 会多触发一次
          MutationObserver.record({
-@@ -149,55 +161,10 @@ class TaroNode extends TaroEventTarget {
+@@ -154,55 +166,10 @@ class TaroNode extends TaroEventTarget {
              // appendChild
              this.childNodes.push(newChild);
          }
@@ -450,7 +450,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..f2f89f03fda5a678227321a46e794216
          MutationObserver.record({
              type: "childList" /* MutationRecordType.CHILD_LIST */,
              target: this,
-@@ -270,14 +237,80 @@ class TaroNode extends TaroEventTarget {
+@@ -277,14 +244,80 @@ class TaroNode extends TaroEventTarget {
          if (cleanRef !== false) {
              eventSource.removeNodeTree(child);
          }
@@ -555,7 +555,7 @@ index 48f82650a81f4f9db1ca0c6a5018de3b146c76e8..ba35897b128914db5c2fba9b276ac936
      removeProperty(propertyName: string): string;
      getPropertyValue(propertyName: string): any;
 diff --git a/dist/dom/style.js b/dist/dom/style.js
-index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..3f091963448615617b46b5350a5ea822bfdad831 100644
+index 9e2fbe5db8f017253194f7fe1a8ca3443d38edcd..6923a9b660e54fb7f42af0f76847c05df48ff9a3 100644
 --- a/dist/dom/style.js
 +++ b/dist/dom/style.js
 @@ -11,15 +11,6 @@ function recordCss(obj) {

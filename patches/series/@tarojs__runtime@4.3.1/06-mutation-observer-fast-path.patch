@@ -101,7 +101,7 @@ index 968cab19cc6e92cc789797a23bb4b330202a688e..1463d9d9c758024f7292af3f5dd118cd
              this.style.cssText = '';
          }
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index f221446060d86606a7a1eb599158163aa7225909..2b78894030e563d67b368b03b99311ba68fd0eb0 100644
+index f000eb8bd9e5f377fd08d06d67b0a53dd9f5703e..fe8af69963ef1d38c520ecd920021e116d46e600 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
 @@ -106,8 +106,13 @@ class TaroNode extends TaroEventTarget {
@@ -144,7 +144,7 @@ index f221446060d86606a7a1eb599158163aa7225909..2b78894030e563d67b368b03b99311ba
      }
      /**
       * @doc https://developer.mozilla.org/zh-CN/docs/Web/API/Node/insertBefore
-@@ -174,18 +178,20 @@ class TaroNode extends TaroEventTarget {
+@@ -175,18 +179,20 @@ class TaroNode extends TaroEventTarget {
          // Its default implementation prepares template payloads; native hosts can replace it before any serialization work.
          this.delegateChildInsertion(newChild, refChild, index, isReplace, previousIndex);
          this.delegateContextInvalidation();
@@ -187,7 +187,7 @@ index f221446060d86606a7a1eb599158163aa7225909..2b78894030e563d67b368b03b99311ba
              // @Todo: 但其实如果 newChild 的父节点是另一颗子树的节点，应该是要触发的
              MutationObserver.record({
 diff --git a/dist/dom/style.js b/dist/dom/style.js
-index 495dc2ad42a984686d1565e3bde3de61f33f558b..73c4f29e418bb9269334c71ea3402e11313c9a1b 100644
+index 6923a9b660e54fb7f42af0f76847c05df48ff9a3..a8e888d68126bd559c92d528c3351c4854c913b3 100644
 --- a/dist/dom/style.js
 +++ b/dist/dom/style.js
 @@ -4,6 +4,9 @@ import { MutationObserver } from '../dom-external/mutation-observer/index.js';

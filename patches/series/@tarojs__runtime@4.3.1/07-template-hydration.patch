@@ -11,7 +11,7 @@ index c74dbf6314d8a4178a3a60a743d4349382883027..d5ef1df802491475c476a9bfcf94e728
       * 子列表整体更新通知，包括 textContent 完成逐项变更后的最终通知。
       * isClean=true 对应空列表，否则模板默认延迟序列化当前子节点；逻辑树已由调用方修改。
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index 2b78894030e563d67b368b03b99311ba68fd0eb0..7aaa23c845b83cad5b5c3c2c91ada60e08c6bd75 100644
+index fe8af69963ef1d38c520ecd920021e116d46e600..0fd875e3634625db4dbc3d7e3684e162f38baa72 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
 @@ -15,7 +15,6 @@ class TaroNode extends TaroEventTarget {

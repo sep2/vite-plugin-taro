@@ -5,6 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { resolveConfig } from 'vite'
+import taroPackage from 'vite-plugin-taro-runtime/taro/package.json' with { type: 'json' }
 import { h5AppPath } from '../plugins/h5/constant.ts'
 import { resolveTaroRuntime } from '../utils/packages.ts'
 import { projectTempDir } from './project-temp-dir.ts'
@@ -16,8 +17,8 @@ const runtimePackageDistRoot = path.resolve(path.dirname(runtimePackageEntry), '
 const runtimePackageRoot = path.resolve(runtimePackageDistRoot, '..')
 const runtimePackageRequire = createRequire(runtimePackageEntry)
 const compilerSizeLimit = 2_250_000
-// Includes the modular APIs, eager components, router, and declarations formerly shipped in four upstream packages.
-const runtimePackageSizeLimit = 5_000_000
+// Includes modular APIs, eager components, router, declarations and source maps.
+const runtimePackageSizeLimit = 5_050_000
 const runtimeCjsFilePattern = /^index\.cjs\.(?:d\.ts|js(?:\.map)?)$/
 
 const platformJavaScriptFiles: ReadonlyArray<readonly [dependencyId: string, outputPath: string]> = [
@@ -155,6 +156,7 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
     assert.ok(!packageJson.files.includes('src'))
     assert.ok(!runtimeModules.includes('test'), 'runtime test utilities stay outside the published package')
     assert.match(h5AppPath, /\/src\/runtime\/h5\/app\.ts$/)
+    assert.equal(packageJson.dependencies['@tarojs/shared'], taroPackage.version)
     assert.equal(packageJson.dependencies['@tailwindcss/vite'], '4.3.3')
     for (const name of ['helper', 'taro', 'api', 'components', 'router']) {
         assert.equal(packageJson.dependencies[`@tarojs/${name}`], undefined)
@@ -326,13 +328,13 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
     )
     assert.equal(packageJson.dependencies['@tarojs/runtime'], undefined)
     assert.equal(packageJson.dependencies['dingtalk-jsapi'], undefined)
-    assert.equal(packageJson.dependencies['@tarojs/shared'], '4.3.0')
+    assert.equal(packageJson.dependencies['@tarojs/shared'], taroPackage.version)
     for (const name of ['api', 'taro', 'components', 'router', 'taro-h5']) {
         assert.equal(packageJson.dependencies[`@tarojs/${name}`], undefined)
-        assert.equal(packageJson.devDependencies[`@tarojs/${name}`], '4.3.0')
+        assert.equal(packageJson.devDependencies[`@tarojs/${name}`], taroPackage.version)
     }
 
-    assert.equal(packageJson.devDependencies['@tarojs/plugin-html'], '4.3.0')
+    assert.equal(packageJson.devDependencies['@tarojs/plugin-html'], taroPackage.version)
     assert.equal(packageJson.dependencies['@tarojs/plugin-html'], undefined)
     const htmlOutputRoot = path.join(runtimePackageDistRoot, 'plugin-html')
     const htmlFiles = ['html-elements.d.ts', 'html-elements.js', 'runtime.js', 'runtime.js.map']
@@ -388,13 +390,13 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
     assert.equal(packageJson.dependencies['@swc/core'], undefined)
     assert.equal(packageJson.dependencies['lodash-es'], '4.18.1')
     assert.equal(packageJson.dependencies['react-reconciler'], '0.34.0')
-    assert.equal(packageJson.devDependencies['@tarojs/plugin-framework-react'], '4.3.0')
-    assert.equal(packageJson.devDependencies['@tarojs/react'], '4.3.0')
-    assert.equal(packageJson.devDependencies['@tarojs/runtime'], '4.3.0')
-    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-weapp'], '4.3.0')
-    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-alipay'], '4.3.0')
-    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-tt'], '4.3.0')
-    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-h5'], '4.3.0')
+    assert.equal(packageJson.devDependencies['@tarojs/plugin-framework-react'], taroPackage.version)
+    assert.equal(packageJson.devDependencies['@tarojs/react'], taroPackage.version)
+    assert.equal(packageJson.devDependencies['@tarojs/runtime'], taroPackage.version)
+    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-weapp'], taroPackage.version)
+    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-alipay'], taroPackage.version)
+    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-tt'], taroPackage.version)
+    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-h5'], taroPackage.version)
 
     const runtimeOutputRoot = path.join(runtimePackageDistRoot, 'runtime')
     await assertRuntimeDistCopied(path.join(resolveAdapterDependencyRoot('@tarojs/runtime'), 'dist'), runtimeOutputRoot)
@@ -512,5 +514,9 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
             return (await readFile(path.join(runtimePackageDistRoot, relativePath))).byteLength
         })
     )
-    assert.ok(runtimePackageFileSizes.reduce((total, size) => total + size, 0) < runtimePackageSizeLimit)
+    const runtimePackageSize = runtimePackageFileSizes.reduce((total, size) => total + size, 0)
+    assert.ok(
+        runtimePackageSize < runtimePackageSizeLimit,
+        `Runtime distribution is ${runtimePackageSize} bytes; budget is ${runtimePackageSizeLimit}`
+    )
 })

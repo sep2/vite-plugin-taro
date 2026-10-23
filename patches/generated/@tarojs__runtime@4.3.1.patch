@@ -1,5 +1,5 @@
 diff --git a/dist/bom/document.js b/dist/bom/document.js
-index a641a96b78c9978acaf1041160dd7fd74bcbfcdc..2d179b16365ebeaff8f48921cb974a1ad5eb5ed6 100644
+index a641a96b78c9978acaf1041160dd7fd74bcbfcdc..0264d22eafdbb8af124116c01b8252c35a8f6d6d 100644
 --- a/dist/bom/document.js
 +++ b/dist/bom/document.js
 @@ -1,6 +1,7 @@
@@ -32,7 +32,7 @@ index a641a96b78c9978acaf1041160dd7fd74bcbfcdc..2d179b16365ebeaff8f48921cb974a1a
 +     * same React container and keeps the same id, but can now batch app.* updates through its own ctx just as each Page root
 +     * batches page.* updates. Reusing the host itself removes the need for a detached scheduler node.
 +     *
-+     * Taro and the framework locate this container by id; the pinned 4.3.0 runtime has no behavior branching on an APP
++     * Taro and the framework locate this container by id; the runtime has no behavior branching on an APP
 +     * nodeName or APP tagName. App snapshots hydrate the container's children rather than the container record itself, so
 +     * ROOT is never emitted as a native layout node. The observable change is limited to unsupported code directly
 +     * inspecting #app.nodeName/tagName or using this support fork with upstream templates. H5 loads the untouched
@@ -498,7 +498,7 @@ index 78893e78df38fd423937079db101a4fa848a1c73..38342f6e9312998212b17c3b3ed1bea9
      isOnlyClickBinded(): boolean;
  }
 diff --git a/dist/dom/event-target.js b/dist/dom/event-target.js
-index 510424828b3a9a74f363cef1e0982489a708541e..7414d12c4679afa560338e6cd62995a9fdab7aba 100644
+index 3b3946c14f00d106e785bda1fed9bdf8103b2300..7414d12c4679afa560338e6cd62995a9fdab7aba 100644
 --- a/dist/dom/event-target.js
 +++ b/dist/dom/event-target.js
 @@ -1,8 +1,15 @@
@@ -540,13 +540,9 @@ index 510424828b3a9a74f363cef1e0982489a708541e..7414d12c4679afa560338e6cd62995a9
          if (!isArray(handlers)) {
              return;
          }
-@@ -65,16 +77,32 @@ class TaroEventTarget {
-                 return true;
-         });
-         process.env.NODE_ENV !== 'production' && warn(index === -1, `事件: '${type}' 没有注册在 DOM 中，因此不会被移除。`);
-+        if (index === -1) {
-+            return;
-+        }
+@@ -69,15 +81,28 @@ class TaroEventTarget {
+             return;
+         }
          handlers.splice(index, 1);
 +        // 最后一个处理器移除后再通知解绑；长度判断复用现有数组，为 O(1)。
 +        if (handlers.length === 0) {
@@ -602,10 +598,10 @@ index d06902c2239335adb5df57cc27b84ab3d9eb938b..c2388f7cee376a5573c1b5cc1201b0f4
  
  export { TaroEvent, createEvent, eventHandler, eventHandlerTTDom };
 diff --git a/dist/dom/event.js b/dist/dom/event.js
-index f4062db04f2a8216795447f892b80b7b6514f467..1b96119960446a19e962a434b1d1de03bb523305 100644
+index 876296f74a9cae7ec27db843346eb6fa2f26beb8..8234012abe9d24202a34a960b5a70a9ab0d7eef2 100644
 --- a/dist/dom/event.js
 +++ b/dist/dom/event.js
-@@ -28,15 +28,23 @@ class TaroEvent {
+@@ -28,14 +28,19 @@ class TaroEvent {
      preventDefault() {
          this.defaultPrevented = true;
      }
@@ -623,18 +619,13 @@ index f4062db04f2a8216795447f892b80b7b6514f467..1b96119960446a19e962a434b1d1de03
 -            const currentEle = env.document.getElementById(((_b = target.dataset) === null || _b === void 0 ? void 0 : _b.sid) || target.id || null);
 -            // Note：优先判断冒泡场景alipay的targetDataset的sid, 不然冒泡场景target属性吐出不对，其余拿取当前绑定id
 -            const element = env.document.getElementById(((_c = target.targetDataset) === null || _c === void 0 ? void 0 : _c.sid) || ((_d = target.dataset) === null || _d === void 0 ? void 0 : _d.sid) || target.id || null);
--            target.dataset = Object.assign(Object.assign({}, (currentEle !== null ? currentEle.dataset : EMPTY_OBJ)), (element !== null ? element.dataset : EMPTY_OBJ));
 +            const currentEle = this.getTargetElement(target, false);
 +            // Alipay's targetDataset identifies the bubbling target separately from its wrapper.
 +            const element = this.getTargetElement(target, true);
-+            // 索引命中时仍以逻辑 dataset 为准，保留对象值及支付宝两层数据的合并顺序。
-+            // 索引未命中只表示无法取得逻辑节点，不能丢弃平台已提供的数据。
-+            // 两个来源分别兜底，复用原有 Object.assign 和缓存；不补建索引或遍历节点树。
-+            target.dataset = Object.assign(Object.assign({}, (currentEle !== null ? currentEle.dataset : target.dataset || EMPTY_OBJ)), (element !== null ? element.dataset : target.targetDataset || EMPTY_OBJ));
-             for (const key in (_e = this.mpEvent) === null || _e === void 0 ? void 0 : _e.detail) {
-                 target[key] = this.mpEvent.detail[key];
-             }
-@@ -48,18 +56,22 @@ class TaroEvent {
+             // Keep logical data authoritative, falling back per source when an index is unavailable.
+             // Preserve Alipay's merge order: the actual target overrides the wrapper's dataset.
+             target.dataset = Object.assign(Object.assign({}, (currentEle !== null ? currentEle.dataset : target.dataset || EMPTY_OBJ)), (element !== null ? element.dataset : target.targetDataset || EMPTY_OBJ));
+@@ -50,13 +55,12 @@ class TaroEvent {
          }
      }
      get currentTarget() {
@@ -646,24 +637,12 @@ index f4062db04f2a8216795447f892b80b7b6514f467..1b96119960446a19e962a434b1d1de03
              const currentTarget = Object.create(((_a = this.mpEvent) === null || _a === void 0 ? void 0 : _a.currentTarget) || null);
 -            const element = doc.getElementById(((_b = currentTarget.dataset) === null || _b === void 0 ? void 0 : _b.sid) || currentTarget.id || null);
 -            const targetElement = doc.getElementById(((_e = (_d = (_c = this.mpEvent) === null || _c === void 0 ? void 0 : _c.target) === null || _d === void 0 ? void 0 : _d.dataset) === null || _e === void 0 ? void 0 : _e.sid) || ((_g = (_f = this.mpEvent) === null || _f === void 0 ? void 0 : _f.target) === null || _g === void 0 ? void 0 : _g.id) || null);
--            if (element === null || (element && element === targetElement)) {
 +            const element = this.getTargetElement(currentTarget, false);
 +            const targetElement = this.getTargetElement(this.mpEvent?.target, false);
-+            // 已知逻辑节点相同才沿用 target；未命中时，只有同一原始对象能证明身份相同。
-+            // 两个 null 查询结果、空 ID 或相同的未解析 ID 都不能证明两个事件目标相同。
-+            // 无平台事件时保留手动构造事件的共享目标；这里只比较已有引用，不新增查询或状态。
-+            if (element !== null ? element === targetElement : !this.mpEvent || this.mpEvent.currentTarget === this.mpEvent.target) {
-                 this.cacheCurrentTarget = this.target;
-                 return this.target;
-             }
--            currentTarget.dataset = element.dataset;
-+            // 保留已知逻辑 dataset 的引用；未命中时使用当前接收目标自己的平台 dataset。
-+            // detail 合并和惰性缓存继续复用下方流程，不把接收目标替换成触发目标。
-+            currentTarget.dataset = element !== null ? element.dataset : currentTarget.dataset || EMPTY_OBJ;
-             for (const key in (_h = this.mpEvent) === null || _h === void 0 ? void 0 : _h.detail) {
-                 currentTarget[key] = this.mpEvent.detail[key];
-             }
-@@ -100,7 +112,27 @@ function getEventCBResult(event) {
+             // Missing indexes do not imply identical targets. Without a logical match,
+             // only the same native object (or absent targets on a manual event) shares the wrapper.
+             if (element !== null ? element === targetElement : !this.mpEvent || this.mpEvent.currentTarget === this.mpEvent.target) {
+@@ -104,7 +108,27 @@ function getEventCBResult(event) {
      return result;
  }
  // 小程序的事件代理回调函数
@@ -692,7 +671,7 @@ index f4062db04f2a8216795447f892b80b7b6514f467..1b96119960446a19e962a434b1d1de03
      var _a, _b;
      // Note: ohos 上事件没有设置 type、detail 类型 setter 方法，且部分事件（例如 load 等）缺失 target 导致事件错误
      event.type === undefined && Object.defineProperty(event, 'type', {
-@@ -112,8 +144,7 @@ function eventHandler(event) {
+@@ -116,8 +140,7 @@ function eventHandler(event) {
      event.currentTarget = event.currentTarget || event.target || Object.assign({}, event);
      hooks.call('modifyMpEventImpl', event);
      const currentTarget = event.currentTarget;
@@ -797,7 +776,7 @@ index a456e9adeecdaae566fe965b7054e55cf009530e..d5ef1df802491475c476a9bfcf94e728
      hasChildNodes(): boolean;
      enqueueUpdate(payload: UpdatePayload): void;
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index cc210f4e56ff90d69a398e2e27382def86f4cb0c..7aaa23c845b83cad5b5c3c2c91ada60e08c6bd75 100644
+index 0e0f8da396608d5bf9e9543f18f63013f38dd0c0..0fd875e3634625db4dbc3d7e3684e162f38baa72 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
 @@ -6,7 +6,7 @@ import { hydrate } from '../hydrate.js';
@@ -898,18 +877,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..7aaa23c845b83cad5b5c3c2c91ada60e
      }
      /**
       * @doc https://developer.mozilla.org/zh-CN/docs/Web/API/Node/insertBefore
-@@ -126,6 +141,10 @@ class TaroNode extends TaroEventTarget {
-      *   3. insert D before C, D has the different parent of C
-      */
-     insertBefore(newChild, refChild, isReplace) {
-+        if (newChild === refChild) {
-+            this.findIndex(refChild);
-+            return newChild;
-+        }
-         if (newChild.nodeName === DOCUMENT_FRAGMENT) {
-             newChild.childNodes.reduceRight((previousValue, currentValue) => {
-                 this.insertBefore(currentValue, previousValue);
-@@ -133,10 +152,15 @@ class TaroNode extends TaroEventTarget {
+@@ -138,10 +153,15 @@ class TaroNode extends TaroEventTarget {
              }, refChild);
              return newChild;
          }
@@ -929,7 +897,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..7aaa23c845b83cad5b5c3c2c91ada60e
          let index = 0;
          // Data structure
          newChild.parentNode = this;
-@@ -149,67 +173,24 @@ class TaroNode extends TaroEventTarget {
+@@ -154,67 +174,24 @@ class TaroNode extends TaroEventTarget {
              // appendChild
              this.childNodes.push(newChild);
          }
@@ -1014,17 +982,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..7aaa23c845b83cad5b5c3c2c91ada60e
          return newChild;
      }
      /**
-@@ -234,6 +215,9 @@ class TaroNode extends TaroEventTarget {
-     replaceChild(newChild, oldChild) {
-         if (oldChild.parentNode !== this)
-             return;
-+        if (newChild === oldChild) {
-+            return oldChild;
-+        }
-         // Insert the newChild
-         this.insertBefore(newChild, oldChild, true);
-         // Destroy the oldChild
-@@ -251,7 +235,7 @@ class TaroNode extends TaroEventTarget {
+@@ -258,7 +235,7 @@ class TaroNode extends TaroEventTarget {
       */
      removeChild(child, options = {}) {
          const { cleanRef, doUpdate } = options;
@@ -1033,7 +991,7 @@ index cc210f4e56ff90d69a398e2e27382def86f4cb0c..7aaa23c845b83cad5b5c3c2c91ada60e
              // appendChild/replaceChild/insertBefore 不应该触发
              // @Todo: 但其实如果 newChild 的父节点是另一颗子树的节点，应该是要触发的
              MutationObserver.record({
-@@ -270,14 +254,85 @@ class TaroNode extends TaroEventTarget {
+@@ -277,14 +254,85 @@ class TaroNode extends TaroEventTarget {
          if (cleanRef !== false) {
              eventSource.removeNodeTree(child);
          }
@@ -1164,7 +1122,7 @@ index 48f82650a81f4f9db1ca0c6a5018de3b146c76e8..ba35897b128914db5c2fba9b276ac936
      removeProperty(propertyName: string): string;
      getPropertyValue(propertyName: string): any;
 diff --git a/dist/dom/style.js b/dist/dom/style.js
-index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..73c4f29e418bb9269334c71ea3402e11313c9a1b 100644
+index 9e2fbe5db8f017253194f7fe1a8ca3443d38edcd..a8e888d68126bd559c92d528c3351c4854c913b3 100644
 --- a/dist/dom/style.js
 +++ b/dist/dom/style.js
 @@ -4,6 +4,9 @@ import { MutationObserver } from '../dom-external/mutation-observer/index.js';
@@ -1239,26 +1197,6 @@ index b16cb8b3dfa24b5201cb2de8029fa667b9d6ce9b..73c4f29e418bb9269334c71ea3402e11
      }
      setProperty(propertyName, value) {
          if (propertyName[0] === '-') {
-@@ -135,7 +148,8 @@ class Style {
-         }
-     }
-     removeProperty(propertyName) {
--        propertyName = isCssVariable(propertyName) ? propertyName : toCamelCase(propertyName);
-+        // Prefer stored keys while preserving dashed access to registered camelCase vendor setters.
-+        propertyName = isCssVariable(propertyName) || this._usedStyleProp.has(propertyName) ? propertyName : toCamelCase(propertyName);
-         if (!this._usedStyleProp.has(propertyName)) {
-             return '';
-         }
-@@ -144,7 +158,8 @@ class Style {
-         return value;
-     }
-     getPropertyValue(propertyName) {
--        propertyName = isCssVariable(propertyName) ? propertyName : toCamelCase(propertyName);
-+        // CSS variables retain their spelling; other names resolve through a stored key or camelCase.
-+        propertyName = isCssVariable(propertyName) || this._usedStyleProp.has(propertyName) ? propertyName : toCamelCase(propertyName);
-         const value = this[propertyName];
-         if (!value) {
-             return '';
 diff --git a/dist/dom/text.d.ts b/dist/dom/text.d.ts
 index ce7b2a99c5981d5291096a1f3885d8890850d02e..d4581c749c3f306be82f92573ba3721fe80c560b 100644
 --- a/dist/dom/text.d.ts
