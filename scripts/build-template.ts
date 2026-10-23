@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs'
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -12,6 +12,13 @@ const target = process.argv[2]
 if (target !== 'wx' && target !== 'zfb' && target !== 'tt' && target !== 'h5') {
     throw new Error('Usage: node scripts/build-template.ts <wx|zfb|tt|h5>')
 }
+
+// The workspace plugin imports the runtime package's generated platform modules.
+execFileSync(process.execPath, [path.join(repoRoot, 'packages/taro-runtime/scripts/build.ts')], {
+    cwd: repoRoot,
+    stdio: 'inherit',
+    timeout: 25_000
+})
 
 const temporaryRoot = path.join(pluginRoot, 'tmp')
 mkdirSync(temporaryRoot, { recursive: true })
@@ -32,7 +39,10 @@ try {
         stdio: 'pipe',
         timeout: 25_000
     })
-    copyFileSync(path.join(creatorRoot, '.env.local'), path.join(project, '.env.local'))
+    const localEnv = path.join(creatorRoot, '.env.local')
+    if (existsSync(localEnv)) {
+        copyFileSync(localEnv, path.join(project, '.env.local'))
+    }
     // Keep Tailwind's automatic source discovery inside the generated application.
     execFileSync('git', ['init', '--quiet', project], { cwd: repoRoot, stdio: 'pipe', timeout: 25_000 })
     for (const name of ['react', 'react-dom', 'vite', 'rolldown', 'vite-plugin-taro']) {

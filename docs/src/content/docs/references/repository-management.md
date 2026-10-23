@@ -53,9 +53,9 @@ pnpm build:template:tt
 pnpm build:template:h5
 ```
 
-每个命令从默认模板生成临时项目，使用工作区依赖构建，并将产物保留在仓库根目录的 `dist/wx`、`dist/zfb`、`dist/tt` 或 `dist/h5`。构建完成后清理临时项目。
+每个命令先构建运行时适配包，再从默认模板生成临时项目，使用工作区依赖构建，并将产物保留在仓库根目录的 `dist/wx`、`dist/zfb`、`dist/tt` 或 `dist/h5`。构建完成后清理临时项目。
 
-在 `packages/create-vite-taro/.env.local` 中配置 `VITE_VPT_WECHAT_APP_ID`、`VITE_VPT_ALIPAY_APP_ID` 和 `VITE_VPT_TIKTOK_APP_ID`。构建脚本将此文件复制到临时项目，由 Vite 读取对应平台的 AppID。小程序开发者工具可直接打开对应的根目录 `dist/<target>`。
+默认使用生成项目的环境配置。需要指定 AppID 时，可在 `packages/create-vite-taro/.env.local` 中配置 `VITE_VPT_WECHAT_APP_ID`、`VITE_VPT_ALIPAY_APP_ID` 和 `VITE_VPT_TIKTOK_APP_ID`。此文件存在时，构建脚本将其复制到临时项目，由 Vite 读取对应平台的 AppID。小程序开发者工具可直接打开对应的根目录 `dist/<target>`。
 
 ### 示例应用
 
