@@ -1,5 +1,21 @@
 # create-vite-taro
 
+## 0.8.1
+
+### 变更
+
+- d2cc2a4e：默认模板显式声明 `renderer: 'template'`，并补充微信 Skyline / WebView 渲染配置提示。
+
+### 升级说明
+
+从 `0.8.0` 升级到 `0.8.1`，使用同版插件的新模板创建项目：
+
+```sh
+npm create vite-taro@0.8.1 my-app
+```
+
+现有项目通过 `pnpm add -D --save-exact vite-plugin-taro@0.8.1` 升级插件；模板继续使用模板渲染与微信 Skyline 配置。
+
 ## 0.8.0
 
 ### 新增与改进
