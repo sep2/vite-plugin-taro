@@ -1,5 +1,5 @@
 name: Bug 报告
-description: 报告 vpt 的问题。
+description: 报告 VPT 的问题。
 body:
     - type: markdown
       attributes:
