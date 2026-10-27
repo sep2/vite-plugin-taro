@@ -409,12 +409,14 @@ function createProjectHarness(root: string, outDir: string): DevToolsProjectHarn
             return { path: result.currentPage.path }
         },
         readElement: async (selector, action) => {
-            const result = await runTool('automation_element_action', outDir, {
-                selector: selector,
-                action: action
-            })
+            // Controlled glass-easel inputs expose their React value as a native attribute.
+            const parameters: ToolParameters =
+                action === 'value'
+                    ? { selector: selector, action: 'attribute', name: 'value' }
+                    : { selector: selector, action: action }
+            const result = await runTool('automation_element_action', outDir, parameters)
             if (typeof result !== 'string') {
-                throw new Error(`Expected element result for ${selector}:${action}`)
+                throw new Error(`Expected string for ${selector}:${action}, received ${JSON.stringify(result)}`)
             }
             return result
         },
@@ -464,7 +466,7 @@ async function buildPlugin(): Promise<void> {
 }
 
 async function prepareFixture(root: string): Promise<void> {
-    await mkdir(root, { recursive: true })
+    await mkdir(path.join(root, 'scripts'), { recursive: true })
     // Reset every writable source byte, but retain the fixed directory and last complete output so an already-authorized
     // DevTools window never loses its project identity between quick cases.
     await rm(path.join(root, 'src'), { recursive: true, force: true })
@@ -472,7 +474,11 @@ async function prepareFixture(root: string): Promise<void> {
         cp(path.join(fixtureRoot, 'src'), path.join(root, 'src'), { recursive: true }),
         cp(path.join(fixtureRoot, 'package.json'), path.join(root, 'package.json')),
         cp(path.join(fixtureRoot, 'tsconfig.json'), path.join(root, 'tsconfig.json')),
-        cp(path.join(fixtureRoot, 'vite.config.ts'), path.join(root, 'vite.config.ts'))
+        cp(path.join(fixtureRoot, 'vite.config.ts'), path.join(root, 'vite.config.ts')),
+        cp(
+            path.join(scriptsRoot, 'page-initialization-probe-source.ts'),
+            path.join(root, 'scripts/page-initialization-probe-source.ts')
+        )
     ])
     const nodeModules = path.join(root, 'node_modules')
     if (!existsSync(nodeModules)) {
@@ -496,6 +502,7 @@ async function startDevelopmentServer(root: string, port: number | undefined): P
         cwd: root,
         env: {
             ...process.env,
+            VPT_HMR_PAGE_INITIALIZATION_PROBE: '1',
             VITE_VPT_TARGET: 'wx',
             VITE_VPT_WECHAT_APP_ID: appId
         }
@@ -533,6 +540,7 @@ async function startBuildWatcher(root: string): Promise<ServerProcess> {
         cwd: root,
         env: {
             ...process.env,
+            VPT_HMR_PAGE_INITIALIZATION_PROBE: '1',
             VITE_VPT_TARGET: 'wx',
             VITE_VPT_WECHAT_APP_ID: appId
         }

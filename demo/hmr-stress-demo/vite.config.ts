@@ -1,9 +1,10 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
-import vpt, { type VptHmrOptions, type VptJsonObject, type VptTarget } from 'vite-plugin-taro'
+import vpt, { type VptHmrOptions, type VptJsonObject } from 'vite-plugin-taro'
+import { pageInitializationProbeSource } from './scripts/page-initialization-probe-source.ts'
 
-type MiniTarget = Exclude<VptTarget, 'h5'>
+type MiniTarget = 'wx' | 'zfb'
 
 const appTitle = 'HMR stress lab'
 const mirrorTitle = 'HMR mirror stack'
@@ -47,6 +48,16 @@ export default defineConfig(({ mode }) => {
                 projectPrivateConfigJson: createProjectPrivateConfigJson(target),
                 sitemapJson: { rules: [{ action: 'allow', page: '*' }] }
             }),
+            target === 'wx' &&
+                process.env.VPT_HMR_PAGE_INITIALIZATION_PROBE === '1' && {
+                    name: 'hmr-stress:page-initialization',
+                    transform: {
+                        filter: { id: /[/\\]runtime[/\\]mini[/\\]native[/\\]page\.ts(?:\?.*)?$/ },
+                        handler(source) {
+                            return source.replace('registerPage(pageConfig)', pageInitializationProbeSource)
+                        }
+                    }
+                },
             {
                 name: 'hmr-stress:runtime-readiness',
                 async buildStart() {

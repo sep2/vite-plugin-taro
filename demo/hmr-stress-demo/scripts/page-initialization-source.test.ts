@@ -14,7 +14,7 @@ test('native Page initialization query is a complete single-line function', () =
         JSON.stringify({
             renderer: 'webview',
             glassEasel: false,
-            prerendered: false,
+            dataFactoryRan: false,
             appNodeName: 'vpt_fragment'
         })
     )
@@ -31,7 +31,7 @@ test('native Page initialization query survives the platform command shim intact
     assert.equal(result.stdout.trim(), pageInitializationSource)
 })
 
-test('native Page initialization query observes the current glass-easel prerender instance', () => {
+test('native Page initialization query observes the current glass-easel data-factory result', () => {
     const result: unknown = runInNewContext(`(${pageInitializationSource})()`, {
         getCurrentPages: () => [
             { renderer: 'skyline', data: { app: { nn: 'hidden' } } },
@@ -39,7 +39,7 @@ test('native Page initialization query observes the current glass-easel prerende
                 renderer: 'webview',
                 groupUpdates: () => {},
                 $taroPath: '/pages/mirror/index?$vptPage=2',
-                data: { app: { nn: 'vpt_fragment' } }
+                data: { app: { nn: 'vpt_fragment' }, __hmrDataFactoryRan: true }
             }
         ]
     })
@@ -48,19 +48,19 @@ test('native Page initialization query observes the current glass-easel prerende
         JSON.stringify({
             renderer: 'webview',
             glassEasel: true,
-            prerendered: true,
+            dataFactoryRan: true,
             appNodeName: 'vpt_fragment'
         })
     )
 })
 
-test('a normal glass-easel route does not claim prerender initialization', () => {
+test('a normal glass-easel Page identity is independent of data-factory execution', () => {
     const result: unknown = runInNewContext(`(${pageInitializationSource})()`, {
         getCurrentPages: () => [
             {
                 renderer: 'webview',
                 groupUpdates: () => {},
-                $taroPath: '/pages/index/index?price=888',
+                $taroPath: '/pages/index/index?$vptPage=1',
                 data: {}
             }
         ]
@@ -70,7 +70,7 @@ test('a normal glass-easel route does not claim prerender initialization', () =>
         JSON.stringify({
             renderer: 'webview',
             glassEasel: true,
-            prerendered: false
+            dataFactoryRan: false
         })
     )
 })

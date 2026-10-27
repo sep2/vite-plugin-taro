@@ -6,7 +6,7 @@ export const pageInitializationSource = [
     'return {',
     'renderer: page.renderer,',
     "glassEasel: typeof page.groupUpdates === 'function',",
-    "prerendered: typeof page.$taroPath === 'string' && page.$taroPath.includes('$vptPage='),",
+    'dataFactoryRan: page.data.__hmrDataFactoryRan === true,',
     'appNodeName: page.data.app?.nn',
     '};',
     '}'

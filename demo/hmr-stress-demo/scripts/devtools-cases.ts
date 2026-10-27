@@ -401,7 +401,7 @@ async function assertPageInitialization(harness: DevToolsHarness): Promise<void>
     assert.deepEqual(await harness.readPageInitialization(), {
         renderer: 'webview',
         glassEasel: true,
-        prerendered: process.env.VPT_HMR_PRERENDER === '1',
+        dataFactoryRan: process.env.VPT_HMR_PRERENDER === '1',
         appNodeName: 'vpt_fragment'
     })
     await assertAppProjectionBaseline(harness)
