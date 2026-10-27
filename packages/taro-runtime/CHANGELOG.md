@@ -1,5 +1,27 @@
 # vite-plugin-taro-runtime
 
+## 0.8.2
+
+### 变更
+
+- 51521ea7：更新 H5 依赖 Swiper 至 `12.2.0`、ics 至 `^3.12.1`、universal-router 至 `^9.2.1`；React 与 React DOM 的 peer 依赖范围更新为 `^19.3.1`。
+
+### 升级说明
+
+从 `0.8.1` 升级到 `0.8.2`：运行时随 `vite-plugin-taro@0.8.2` 自动升级。应用同步更新 React 和 React DOM：
+
+```sh
+pnpm add 'react@^19.3.1' 'react-dom@^19.3.1'
+```
+
+应用中如直接声明了运行时依赖，请同步执行：
+
+```sh
+pnpm add --save-exact vite-plugin-taro-runtime@0.8.2
+```
+
+插件与运行时统一使用 `0.8.2`，完成依赖升级后重新构建应用。
+
 ## 0.8.1
 
 ### 变更

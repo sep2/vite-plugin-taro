@@ -1,5 +1,26 @@
 # vite-plugin-taro
 
+## 0.8.2
+
+### 新增与改进
+
+- 06e2281b：新增跨端 `virtual:taro/shared` 入口，提供与 Taro 运行时共享状态的 `@tarojs/shared` 工具函数和类型。
+- 2f77e288：新增 `react` 配置，透传内置 `@vitejs/plugin-react` 选项，支持启用 React Compiler。
+- 51521ea7：更新 Vite 至 `8.3.5`、Rolldown 至 `1.2.15`、core-js 至 `3.51.0`，React 与 React DOM 的 peer 依赖范围更新为 `^19.3.1`。
+
+### 升级说明
+
+从 `0.8.1` 升级到 `0.8.2`，同步更新应用的 React 和构建依赖：
+
+```sh
+pnpm add 'react@^19.3.1' 'react-dom@^19.3.1'
+pnpm add -D --save-exact vite-plugin-taro@0.8.2 vite@8.3.5 rolldown@1.2.15
+```
+
+微信、支付宝、抖音与 H5 项目完成依赖升级后重新构建应用；运行时随插件自动升级到 `0.8.2`。已有组件、页面和渲染配置保持兼容。
+
+需要启用 React Compiler 的项目，安装 `pnpm add -D 'oxc-transform-react@^0.152.0'`，并在现有 `vpt({ ... })` 中设置 `react: { compiler: true }`。其他 React 插件选项也通过此 `react` 配置传入。
+
 ## 0.8.1
 
 ### 变更

@@ -1,5 +1,21 @@
 # create-vite-taro
 
+## 0.8.2
+
+### 变更
+
+- 51521ea7：默认模板更新 React 与 React DOM 至 `^19.3.1`、Vite 至 `8.3.5`、Rolldown 至 `1.2.15`，并同步 Node.js 类型依赖。
+
+### 升级说明
+
+从 `0.8.1` 升级到 `0.8.2`，使用同版插件的新模板创建项目：
+
+```sh
+npm create vite-taro@0.8.2 my-app
+```
+
+新项目自动使用同版插件与运行时。已有项目按 `vite-plugin-taro@0.8.2` 的升级说明同步 React、Vite 和 Rolldown 依赖。
+
 ## 0.8.1
 
 ### 变更
