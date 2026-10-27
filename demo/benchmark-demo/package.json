@@ -11,15 +11,15 @@
         "test": "node --test scripts/*.test.ts"
     },
     "dependencies": {
-        "react": "^19.3.0",
-        "react-dom": "^19.3.0",
+        "react": "^19.3.1",
+        "react-dom": "^19.3.1",
         "vite-plugin-taro": "workspace:*"
     },
     "devDependencies": {
-        "@types/node": "^26.6.3",
+        "@types/node": "^26.6.5",
         "@types/react": "^19.3.0",
         "typescript": "^7.0.2",
-        "vite": "8.3.4",
+        "vite": "8.3.5",
         "vite-plugin-taro-runtime": "workspace:*"
     }
 }

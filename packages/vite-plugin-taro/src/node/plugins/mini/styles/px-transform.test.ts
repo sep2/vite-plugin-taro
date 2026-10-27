@@ -11,13 +11,13 @@ import { createMiniTransformer } from './create-mini-transformer.ts'
 import { minifyMiniStylesheet } from './minify-mini-stylesheet.ts'
 import { createMiniStylePlugin } from './plugins.ts'
 
-test('converts Mini CSS px with the fixed 750 design width but leaves capitalized px unscaled', async () => {
-    const source = '.sizes { width: 100px; padding: 1rem; border-bottom-width: 1Px; }'
+test('converts Mini CSS units with the fixed 750 design width', async () => {
+    const source = '.sizes { width: 100px; padding: 1rem; border-bottom-width: 1px; }'
     const transformed = await createMiniTransformer().transformStylesheet(source)
 
-    assert.match(transformed, /\.sizes \{ width: 100rpx; padding: 32rpx; border-bottom-width: 1Px; \}/)
+    assert.match(transformed, /\.sizes \{ width: 100rpx; padding: 32rpx; border-bottom-width: 1rpx; \}/)
     const minified = await minifyMiniStylesheet(transformed, { filename: 'global.wxss', minify: true })
-    assert.match(minified, /\.sizes\{width:100rpx;padding:32rpx;border-bottom-width:1px\}/)
+    assert.match(minified, /\.sizes\{width:100rpx;padding:32rpx;border-bottom-width:1rpx\}/)
 })
 
 for (const target of ['wx', 'h5'] as const) {
@@ -29,7 +29,7 @@ for (const target of ['wx', 'h5'] as const) {
             await writeFile(entry, "import './app.css'\n")
             await writeFile(
                 path.join(root, 'app.css'),
-                '.sizes { width: 100px; height: 100rpx; padding: 1rem; border-bottom-width: 1Px; }'
+                '.sizes { width: 100px; height: 100rpx; padding: 1rem; border-bottom-width: 1px; }'
             )
 
             const result = await build({
@@ -78,8 +78,8 @@ for (const target of ['wx', 'h5'] as const) {
             assert.match(
                 String(stylesheet.source),
                 target === 'wx'
-                    ? /\.sizes \{ width: 200rpx; height: 100rpx; padding: 32rpx; border-bottom-width: 1Px; \}/
-                    : /\.sizes \{ width: 26\.66667vw; height: 26\.66667vw; padding: 1rem; border-bottom-width: 1Px; \}/
+                    ? /\.sizes \{ width: 200rpx; height: 100rpx; padding: 32rpx; border-bottom-width: 2rpx; \}/
+                    : /\.sizes \{ width: 26\.66667vw; height: 26\.66667vw; padding: 1rem; border-bottom-width: 0\.26667vw; \}/
             )
         } finally {
             await rm(root, { recursive: true, force: true })
@@ -87,15 +87,12 @@ for (const target of ['wx', 'h5'] as const) {
     })
 }
 
-test('Tailwind v4 requires a length hint for an unscaled arbitrary border width', async () => {
+test('converts Tailwind arbitrary pixel border widths to rpx', async () => {
     const compiler = await compile('@tailwind utilities;', { base: process.cwd(), onDependency() {} })
-    const css = compiler.build(['border-b-[1Px]', 'border-b-[length:1Px]', 'border-b-[length:1px]'])
+    const css = compiler.build(['border-b-[1px]', 'border-b-[length:1px]'])
     const transformed = await createMiniTransformer().transformStylesheet(css)
 
-    assert.match(transformed, /border-bottom-color: 1Px;/)
-    assert.match(transformed, /border-bottom-width: 1Px;/)
     assert.match(transformed, /border-bottom-width: 1rpx;/)
     const minified = await minifyMiniStylesheet(transformed, { filename: 'global.wxss', minify: true })
-    assert.match(minified, /border-bottom-width:1px/)
     assert.match(minified, /border-bottom-width:1rpx/)
 })

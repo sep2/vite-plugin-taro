@@ -93,7 +93,7 @@ function runBuild(root: string, args: string[]) {
     return spawnSync(process.execPath, [path.join(root, 'scripts/build-template.ts'), ...args], {
         // Resolve repository paths from the script, independently of the caller's working directory.
         cwd: temporaryRoot,
-        env: { ...process.env, npm_config_user_agent: 'pnpm/12.10.1', VITE_VPT_TARGET: 'invalid' },
+        env: { ...process.env, npm_config_user_agent: 'pnpm/12.15.0', VITE_VPT_TARGET: 'invalid' },
         encoding: 'utf8',
         timeout: 25_000
     })

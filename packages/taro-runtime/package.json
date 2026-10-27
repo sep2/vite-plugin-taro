@@ -161,7 +161,7 @@
         "hammerjs": "^2.0.8",
         "history": "^5.3.0",
         "hls.js": "^1.7.3",
-        "ics": "^3.7.2",
+        "ics": "^3.12.1",
         "is-mobile": "^4.0.0",
         "jsonp-retry": "^1.0.3",
         "lodash-es": "4.18.1",
@@ -169,14 +169,14 @@
         "query-string": "^9.5.1",
         "react-reconciler": "0.34.0",
         "resolve-pathname": "^3.0.0",
-        "swiper": "12.1.2",
+        "swiper": "12.2.0",
         "tslib": "^2.8.1",
-        "universal-router": "^9.2.0",
+        "universal-router": "^9.2.1",
         "whatwg-fetch": "^3.6.20"
     },
     "peerDependencies": {
-        "react": "^19.3.0",
-        "react-dom": "^19.3.0"
+        "react": "^19.3.1",
+        "react-dom": "^19.3.1"
     },
     "devDependencies": {
         "@tarojs/api": "4.3.1",
@@ -192,7 +192,7 @@
         "@tarojs/runtime": "4.3.1",
         "@tarojs/taro": "4.3.1",
         "@tarojs/taro-h5": "4.3.1",
-        "@types/node": "^26.6.3",
+        "@types/node": "^26.6.5",
         "@types/react": "^19.3.0",
         "typescript": "^7.0.2"
     },

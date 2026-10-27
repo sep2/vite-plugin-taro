@@ -243,11 +243,15 @@ export default defineConfig({
 
 小程序（微信、支付宝、抖音）默认按 750px 设计稿转换应用 CSS：`100px → 100rpx`、`1rem → 32rpx`。已有的 `rpx` 保持不变；原生组件的样式不参与转换。
 
-需要固定的 CSS 像素时，用大写单位 `Px`，如 `border-bottom: 1Px solid`。Tailwind v4 中对应写法是 `border-b-[length:1Px]`；使用小写 `px` 则会被转换。
-
 ### 动态行内样式
 
-行内样式不经过 CSS 转换。小程序中可以使用 `Taro.pxTransform()`，默认 `100 → '100rpx'`：
+行内样式不经过 CSS 转换。需要固定的 CSS 像素时，在 `style` 中使用带 `px` 单位的字符串：
+
+```tsx
+<View style={{ width: '100px', borderBottom: '1px solid #ddd' }} />
+```
+
+需要按设计稿换算尺寸时，小程序中可以使用 `Taro.pxTransform()`，默认 `100 → '100rpx'`：
 
 ```tsx
 import Taro from 'virtual:taro/api'

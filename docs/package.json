@@ -12,9 +12,9 @@
         "astro": "astro"
     },
     "dependencies": {
-        "@astrojs/markdown-remark": "^7.3.1",
-        "@astrojs/starlight": "^0.42.4",
-        "astro": "^7.3.5",
+        "@astrojs/markdown-remark": "^7.3.4",
+        "@astrojs/starlight": "^0.42.7",
+        "astro": "^7.4.2",
         "canvas-confetti": "^1.9.4",
         "mdast-util-mdx-jsx": "^3.2.0",
         "remark-mdx": "^3.1.1",
@@ -22,7 +22,7 @@
         "remark-stringify": "^11.0.0",
         "sharp": "^0.35.5",
         "unified": "^11.0.5",
-        "unist-util-visit": "^5.1.0"
+        "unist-util-visit": "^5.2.0"
     },
     "devDependencies": {
         "@types/canvas-confetti": "^1.9.0",
