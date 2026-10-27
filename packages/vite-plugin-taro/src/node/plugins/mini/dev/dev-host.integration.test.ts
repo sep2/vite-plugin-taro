@@ -809,8 +809,19 @@ test('keeps last valid Page CSS and publishes contiguous JavaScript patches thro
     assert.ok(errors.every((message) => !message.includes('HMR publish failed')))
 })
 
-test('coalesces one full-file save into one wx patch', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory')
+test('coalesces one full-file save into one wx patch with custom React filters', async (context) => {
+    const fixture = await startDevFixture(
+        createLogger('silent'),
+        '127.0.0.1',
+        {
+            ...createOptions(),
+            react: {
+                include: /\/pages\/.*\.tsx$/,
+                exclude: [/\/node_modules\//, /\.worker\.tsx$/]
+            }
+        },
+        'memory'
+    )
     context.after(fixture.close)
 
     await waitForFile(fixture.infoPath, (source) => source.includes('buildId'), maximumWaitAttempts)
@@ -830,6 +841,7 @@ test('coalesces one full-file save into one wx patch', async (context) => {
     const sequences = [...stablePatches.matchAll(/\{seq: (\d+)/g)].map((match) => Number(match[1]))
 
     assert.deepEqual(sequences, [1])
+    assert.match(stablePatches, /\$RefreshReg\$/)
     assert.doesNotMatch(stablePatches, /window\.\$RefreshReg\$/)
 })
 

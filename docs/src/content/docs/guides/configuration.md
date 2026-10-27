@@ -250,6 +250,48 @@ sitemapJson: {
 }
 ```
 
+## `react`
+
+可选。将配置原样传给 VPT 内置的 `@vitejs/plugin-react`。
+
+### React Compiler
+
+在应用目录安装编译器。版本范围请以项目实际安装的 `@vitejs/plugin-react` 的 `peerDependencies.oxc-transform-react` 为准。
+可参考[上游依赖声明](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/package.json)，查看时请选择与安装版本对应的 tag。以下命令中的 `^0.152.0` 仅为示例：
+
+```sh
+pnpm add -D 'oxc-transform-react@^0.152.0'
+```
+
+在现有 `vpt({ ... })` 配置中启用：
+
+```ts
+react: {
+    compiler: true
+}
+```
+
+若希望只编译显式标记的组件，使用注解模式：
+
+```ts
+react: {
+    compiler: {
+        compilationMode: 'annotation'
+    }
+}
+```
+
+然后在组件函数开头添加 `'use memo'`：
+
+```tsx
+import { View } from 'virtual:taro/components'
+
+export function Greeting() {
+    'use memo'
+
+    return <View>Hello</View>
+}
+```
 
 ## `polyfills`
 

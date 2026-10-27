@@ -15,7 +15,7 @@ export default function vpt(options: VptOptions): PluginOption[] {
         createDepsPlugin(),
         createConditionalDirectivePlugin(options.target),
         createClientTaroPlugin(options.target),
-        ...react(),
+        ...react(options.react),
         ...(options.target === 'wx' ? createWxMiniPlugins(options) : []),
         ...(options.target === 'zfb' ? createZfbMiniPlugins(options) : []),
         ...(options.target === 'tt' ? createTtMiniPlugins(options) : []),

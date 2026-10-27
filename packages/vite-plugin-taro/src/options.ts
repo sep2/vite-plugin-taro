@@ -1,3 +1,5 @@
+import type { Options as ReactOptions } from '@vitejs/plugin-react'
+
 /** One immutable JSON value accepted by generated target configuration files. */
 export type VptJsonValue = string | number | boolean | null | VptJsonObject | readonly VptJsonValue[]
 
@@ -67,6 +69,12 @@ export interface VptOptions {
      * ZFB uses templates; H5 uses the browser.
      */
     renderer?: 'template' | 'dom'
+
+    /**
+     * Options forwarded to the @vitejs/plugin-react instance registered by VPT for every target.
+     * Omission uses the React plugin's defaults. Configure that instance here rather than registering a separate react().
+     */
+    react?: ReactOptions
 
     /**
      * Source module that default-exports the root React application component.
