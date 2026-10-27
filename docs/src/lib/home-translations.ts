@@ -19,8 +19,8 @@ export const homeTranslations = {
     '原生渲染 · 实测性能': 'Native rendering · Measured performance',
     最快的全功能: 'The fastest full-featured',
     'React 小程序框架': 'React Mini Program framework',
-    '完整的 React 19、原生组件与跨端能力，配上极致的渲染路径。VPT DOM 对比原版 Taro 采用的 setData 渲染架构，让速度与完整体验兼得。':
-        'Full React 19, native components, and cross-platform capabilities, with a highly optimized rendering path. VPT DOM takes on the setData architecture used by original Taro, bringing speed and a complete framework together.',
+    '完整的 React 19（支持 React Compiler）、原生组件与跨端能力，配上极致的渲染路径。VPT DOM 对比原版 Taro 采用的 setData 渲染架构，让速度与完整体验兼得。':
+        'Full React 19 (with React Compiler support), native components, and cross-platform capabilities, with a highly optimized rendering path. VPT DOM takes on the setData architecture used by original Taro, bringing speed and a complete framework together.',
     '开启 DOM 渲染': 'Enable DOM rendering',
     查看基准源码: 'Explore the benchmark',
     渲染性能总览: 'Rendering performance overview',
