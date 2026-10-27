@@ -71,6 +71,19 @@ async function execute(chunk: OutputChunk): Promise<unknown> {
     return module.probe()
 }
 
+test('physical shared facade preserves upstream named exports and identities', async () => {
+    const facade: Readonly<Record<string, unknown>> = await import(
+        pathToFileURL(resolveVptRuntime('client/taro/shared')).href
+    )
+    const upstream: Readonly<Record<string, unknown>> = await import('@tarojs/shared')
+    const names = Object.keys(upstream).filter((name) => name !== 'default')
+
+    assert.deepEqual(Object.keys(facade).toSorted(), names.toSorted())
+    for (const name of names) {
+        assert.equal(facade[name], upstream[name])
+    }
+})
+
 for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
     test(`provides tree-shakable shared utilities for ${target}`, async () => {
         const chunk = await bundleApi(
