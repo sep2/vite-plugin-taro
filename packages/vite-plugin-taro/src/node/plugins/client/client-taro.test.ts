@@ -5,6 +5,7 @@ import { test } from 'node:test'
 import { pathToFileURL } from 'node:url'
 import { build, type OutputChunk } from 'rolldown'
 import { parseSync } from 'rolldown/utils'
+import { normalizePath } from 'vite'
 import type { VptTarget } from '../../../options.ts'
 import { packageRequire, resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import { createClientTaroPlugin } from './client-taro.ts'
@@ -68,6 +69,26 @@ async function execute(chunk: OutputChunk): Promise<unknown> {
         `data:text/javascript;base64,${Buffer.from(chunk.code).toString('base64')}`
     )
     return module.probe()
+}
+
+for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
+    test(`provides tree-shakable shared utilities for ${target}`, async () => {
+        const chunk = await bundleApi(
+            `
+                import { toCamelCase, toDashed } from 'virtual:taro/shared'
+                export const probe = () => [toCamelCase('shared-value'), toDashed('sharedValue')]
+            `,
+            target
+        )
+        assert.deepEqual(await execute(chunk), ['sharedValue', 'shared-value'])
+        assert.doesNotMatch(chunk.code, /initNativeApi|virtual:taro\/shared/)
+        const moduleIds = chunk.moduleIds.map(normalizePath)
+        assert.ok(moduleIds.some((id) => id.includes('/@tarojs/shared/dist/')))
+        assert.equal(
+            moduleIds.some((id) => id.endsWith('/index.cjs.js')),
+            false
+        )
+    })
 }
 
 test('static lifecycle exports match the pinned upstream React API inventory', () => {

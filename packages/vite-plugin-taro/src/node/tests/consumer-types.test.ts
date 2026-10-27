@@ -69,6 +69,7 @@ async function createConsumerFiles(root: string): Promise<Record<string, string>
         [`${root}/consumer.ts`]: `
             import Taro from 'virtual:taro/api'
             import type { MapProps } from 'virtual:taro/components'
+            import { box, toCamelCase, type Box } from 'virtual:taro/shared'
             import type { SpaRouterConfig } from 'vite-plugin-taro-runtime/router/types/router'
 
             // @ts-expect-error Upstream build dependencies must not leak into this consumer.
@@ -90,6 +91,13 @@ async function createConsumerFiles(root: string): Promise<Record<string, string>
             // @ts-expect-error Runtime options have no arbitrary methods.
             Taro.options.notARealOption()
 
+            const boxed: Box<string> = box(toCamelCase('shared-value'))
+            const value: string = boxed.v
+            // @ts-expect-error Shared utilities must retain their parameter types.
+            toCamelCase(123)
+            // @ts-expect-error Shared generic types must retain their value types.
+            const invalidBox: Box<number> = boxed
+
             const mode: SpaRouterConfig['router']['mode'] = 'hash'
             // @ts-expect-error Router config must retain the published compiler configuration types.
             const invalidMode: SpaRouterConfig['router']['mode'] = 'invalid'
@@ -97,7 +105,7 @@ async function createConsumerFiles(root: string): Promise<Record<string, string>
     }
 }
 
-test('preserves API and router types without upstream Taro packages or Vite aliases', async () => {
+test('preserves API, shared, and router types through published declarations', async () => {
     const root = normalizePath(path.join(projectTempDir, `vpt-consumer-types-${randomUUID()}`))
     const files = await createConsumerFiles(root)
     const virtualFs = createVirtualFileSystem(files)

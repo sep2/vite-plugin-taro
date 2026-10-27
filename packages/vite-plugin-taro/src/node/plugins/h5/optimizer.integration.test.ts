@@ -39,6 +39,8 @@ async function bundleOptimizedNavigator(root: string): Promise<string> {
             export { default as upstreamBackendApi } from '@tarojs/plugin-platform-h5/dist/runtime/apis'
             export { TaroNavigatorCore } from 'vite-plugin-taro-runtime/components/dist/components'
             export { TaroNavigatorCore as upstreamNavigator } from '@tarojs/components/dist/components'
+            export { Events, hooks } from ${JSON.stringify(resolveVptRuntime('client/taro/shared'))}
+            export { Events as RuntimeEvents, hooks as runtimeHooks } from 'vite-plugin-taro-runtime/runtime/h5'
             export { options } from 'vite-plugin-taro-runtime/runtime/h5'
             export { options as upstreamOptions } from '@tarojs/runtime'
             export { createHashHistory } from 'vite-plugin-taro-runtime/router'
@@ -126,6 +128,8 @@ function assertOptimizedNavigation(code: string): void {
             assert.equal(harness.applicationApi.eventCenter, harness.backendApi.eventCenter)
             assert.equal('useLaunch' in harness.backendApi, false)
             assert.equal(harness.TaroNavigatorCore, harness.upstreamNavigator)
+            assert.equal(harness.Events, harness.RuntimeEvents)
+            assert.equal(harness.hooks, harness.runtimeHooks)
             assert.equal(harness.options, harness.upstreamOptions)
             assert.equal(harness.createHashHistory, harness.upstreamHistory)
             assert.equal(harness.createReactApp, harness.upstreamReactApp)

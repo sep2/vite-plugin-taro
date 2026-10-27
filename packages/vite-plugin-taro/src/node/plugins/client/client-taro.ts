@@ -19,6 +19,7 @@ export function createClientTaroPlugin(target: VptTarget): Plugin {
         [clientTaroApiId, apiPath],
         ['@tarojs/taro', apiPath],
         ['virtual:taro/components', resolveVptRuntime('client/taro/component')],
+        ['virtual:taro/shared', resolveVptRuntime('client/taro/shared')],
         [clientTaroNativeId, resolveVptRuntime('client/taro/native')]
     ])
 

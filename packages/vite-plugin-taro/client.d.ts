@@ -8,6 +8,10 @@ declare module 'virtual:taro/components' {
     export * from 'vite-plugin-taro-runtime/components'
 }
 
+declare module 'virtual:taro/shared' {
+    export * from '@tarojs/shared'
+}
+
 declare module 'virtual:taro/native' {
     type NativeModule = typeof import('vite-plugin-taro/types/native')
 

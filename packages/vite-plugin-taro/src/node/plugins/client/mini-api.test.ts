@@ -67,8 +67,12 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
             `
             import Taro, { initPxTransform, pxTransform } from 'virtual:taro/api'
             import Upstream from '@tarojs/taro'
+            import { Events, hooks } from 'virtual:taro/shared'
+            import { Events as RuntimeEvents, hooks as runtimeHooks } from '@tarojs/runtime'
             import backend from 'vite-plugin-taro-runtime/taro'
             export function probe() {
+                assert.equal(Events, RuntimeEvents)
+                assert.equal(hooks, runtimeHooks)
                 assert.equal(Taro, Upstream)
                 assert.equal(Taro, backend)
                 assert.equal(Taro.pxTransform, pxTransform)

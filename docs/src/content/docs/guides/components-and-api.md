@@ -141,6 +141,18 @@ export default function AccountCard() {
 - [`NativeSlot`](/references/components/#nativeslot)：为编译后的原生组件声明插槽。
 - [`Slot`](/references/components/#slot)：向自定义组件的指定插槽传入内容。
 
+## 使用共享工具
+
+从 `virtual:taro/shared` 导入 `@tarojs/shared` 的工具函数和类型，适用于 WX、支付宝、抖音和 H5：
+
+```ts
+import { toCamelCase, type Box } from 'virtual:taro/shared'
+
+const value: Box<string> = { v: toCamelCase('background-color') }
+```
+
+该入口使用 VPT 自带的 `@tarojs/shared` 依赖，并与 Taro 运行时共享 `hooks` 等状态。应用无需单独安装该包或配置别名；类型由 `vite-plugin-taro/client` 提供。
+
 ## 使用 API
 
 Taro API 包括内置功能和对小程序能力的封装，统一挂载在 `Taro` 命名空间下。VPT 从 `virtual:taro/api` 提供这些接口：
