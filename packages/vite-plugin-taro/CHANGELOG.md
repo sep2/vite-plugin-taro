@@ -1,5 +1,21 @@
 # vite-plugin-taro
 
+## 0.8.3
+
+### 修复
+
+- cf8d3603：配套运行时更新至 `0.8.3`，修复小程序开发模式中 React 元素被直接误传为宿主属性时的 Fiber 引用泄漏（[#42](https://github.com/sep2/vite-plugin-taro/issues/42)）。
+
+### 升级说明
+
+从 `0.8.2` 升级到 `0.8.3`：
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.8.3
+```
+
+运行时随插件自动升级到 `0.8.3`。微信、支付宝、抖音项目重启开发服务器以加载新运行时；React 19、组件 props、children 与状态保留 HMR 保持兼容。
+
 ## 0.8.2
 
 ### 新增与改进

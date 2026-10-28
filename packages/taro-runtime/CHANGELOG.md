@@ -1,5 +1,22 @@
 # vite-plugin-taro-runtime
 
+## 0.8.3
+
+### 修复
+
+- cf8d3603：开发模式以 O(1) 检查过滤直接误传为宿主属性的 React 元素，阻止 Fiber 引用进入初始渲染和增量更新的原生数据（[#42](https://github.com/sep2/vite-plugin-taro/issues/42)）。
+- cf8d3603：属性从普通值变为 React 元素时清除旧值，并在首次出现时提示属性名。检查保留 React 19 状态保留 HMR，生产构建保持原有逻辑。
+
+### 升级说明
+
+从 `0.8.2` 升级到 `0.8.3`：运行时随 `vite-plugin-taro@0.8.3` 自动升级。应用中如直接声明了运行时依赖，请同步执行：
+
+```sh
+pnpm add --save-exact vite-plugin-taro-runtime@0.8.3
+```
+
+插件与运行时统一使用 `0.8.3`，完成升级后重启开发服务器。开发态出现属性警告时，将用于渲染的 React 元素作为 children 传入，避免通过属性展开传给原生节点。
+
 ## 0.8.2
 
 ### 变更

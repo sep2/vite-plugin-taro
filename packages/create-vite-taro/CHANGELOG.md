@@ -1,5 +1,21 @@
 # create-vite-taro
 
+## 0.8.3
+
+### 变更
+
+本包无面向用户的变更。
+
+### 升级说明
+
+从 `0.8.2` 升级到 `0.8.3`，使用同版插件创建新项目：
+
+```sh
+npm create vite-taro@0.8.3 my-app
+```
+
+新项目自动使用同版插件与运行时。已有项目通过 `pnpm add -D --save-exact vite-plugin-taro@0.8.3` 升级。
+
 ## 0.8.2
 
 ### 变更
