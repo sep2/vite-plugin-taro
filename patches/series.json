@@ -23,7 +23,8 @@
             "patches/series/@tarojs__react@4.3.1/02-renderer-host.patch",
             "patches/series/@tarojs__react@4.3.1/03-page-host-context.patch",
             "patches/series/@tarojs__react@4.3.1/04-event-handler-replacement.patch",
-            "patches/series/@tarojs__react@4.3.1/05-style-update-batching.patch"
+            "patches/series/@tarojs__react@4.3.1/05-style-update-batching.patch",
+            "patches/series/@tarojs__react@4.3.1/06-development-element-attributes.patch"
         ]
     },
     {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
+import { createElement } from 'react'
 import { build } from 'rolldown'
 import { normalizePath, resolveConfig } from 'vite'
 import type { RendererHost } from 'vite-plugin-taro-runtime/react'
@@ -14,12 +15,16 @@ class Element {
     readonly attributes = new Map<string, unknown>()
     // Logical style assignments exercise the renderer's synchronous host boundary.
     readonly style: Record<string, unknown> = {}
+    // Count native writes to ensure omitted elements never add redundant host work.
+    readonly writes: string[] = []
 
     setAttribute(name: string, value: unknown): void {
+        this.writes.push(`set:${name}`)
         this.attributes.set(name, value)
     }
 
     removeAttribute(name: string): void {
+        this.writes.push(`remove:${name}`)
         this.attributes.delete(name)
     }
 }
@@ -62,7 +67,7 @@ for (const mode of ['development', 'production']) {
                     },
                     async load(id) {
                         if (normalizePath(id) === normalizePath(rendererPath)) {
-                            return `${await readFile(rendererPath, 'utf8')}\nexport { hostConfig };`
+                            return `${await readFile(rendererPath, 'utf8')}\nexport { hostConfig, setProperty };`
                         }
                         if (id === rendererHostId) {
                             return 'export default globalThis.rendererHost'
@@ -112,11 +117,18 @@ for (const mode of ['development', 'production']) {
                 calls.push({ name: 'commit', args: [container] })
             }
         }
-        const exports: { hostConfig?: HostConfig; getPageRootType?: (id: string) => string } = {}
+        const exports: {
+            hostConfig?: HostConfig
+            getPageRootType?: (id: string) => string
+            setProperty?: (dom: Element, name: string, value: unknown, oldValue: unknown) => void
+        } = {}
+        // Capture diagnostics without logging React elements or their owner graphs.
+        const warnings: unknown[][] = []
         runInNewContext(chunk.code, {
             exports,
             rendererHost: host,
             global: {},
+            console: { ...console, info() {}, warn: (...args: unknown[]) => warnings.push(args) },
             // These probes call host operations directly and must not schedule React or native work.
             setTimeout() {
                 assert.fail('Host-operation probes must be synchronous')
@@ -125,8 +137,13 @@ for (const mode of ['development', 'production']) {
                 assert.fail('Host-operation probes must not own timers')
             }
         })
-        const { hostConfig, getPageRootType } = exports
-        assert.ok(hostConfig && getPageRootType)
+        const { hostConfig, getPageRootType, setProperty } = exports
+        assert.ok(hostConfig && getPageRootType && setProperty)
+        checkReactElementAttributes(hostConfig, warnings, mode)
+        if (mode === 'production') {
+            assert.doesNotMatch(setProperty.toString(), /isValidElement|console\.warn|React element ignored/)
+            assert.doesNotMatch(chunk.code, /React element ignored for host attribute/)
+        }
         const container = { name: 'first root' }
         const context = { name: 'first context' }
         const otherContainer = { name: 'second root' }
@@ -237,4 +254,83 @@ for (const mode of ['development', 'production']) {
             { color: 'green', width: '' }
         ])
     })
+}
+
+function checkReactElementAttributes(host: HostConfig, warnings: unknown[][], mode: string): void {
+    const development = mode === 'development'
+    const node = new Element()
+    const first = createElement('text', null, 'first')
+    const second = createElement('text', null, 'second')
+    // Property traps prove that the hot path only reads the React tag, never props, owners or nested data.
+    const reads: PropertyKey[] = []
+    const opaque = new Proxy(
+        {},
+        {
+            get(_target, key) {
+                reads.push(key)
+                assert.equal(key, '$$typeof')
+                return undefined
+            },
+            ownKeys() {
+                assert.fail('Host attributes must not be traversed')
+            }
+        }
+    )
+    const values = [
+        'text',
+        0,
+        false,
+        opaque,
+        { nested: { value: 1 } },
+        [1, 2],
+        { _owner: 'business data' },
+        { $$typeof: 'business data' },
+        { $$typeof: Symbol('react.transitional.element') }
+    ]
+    for (const value of values) {
+        host.finalizeInitialChildren(node, 'view', { payload: value })
+        assert.strictEqual(node.attributes.get('payload'), value)
+    }
+    assert.deepEqual(reads, development ? ['$$typeof'] : [])
+    assert.equal(warnings.length, 0)
+
+    node.writes.length = 0
+    host.finalizeInitialChildren(node, 'view', { value: first, children: first, ref: first, key: first })
+    assert.deepEqual(node.writes, development ? [] : ['set:value'])
+    assert.strictEqual(node.attributes.get('value'), development ? undefined : first)
+    assert.equal(warnings.length, development ? 1 : 0)
+
+    host.commitUpdate(node, 'view', { value: first }, { value: second })
+    assert.deepEqual(node.writes, development ? [] : ['set:value', 'set:value'])
+    assert.strictEqual(node.attributes.get('value'), development ? undefined : second)
+    assert.equal(warnings.length, development ? 1 : 0, 'consecutive elements do not repeat diagnostics')
+
+    host.commitUpdate(node, 'view', { value: second }, { value: 'restored' })
+    assert.equal(node.attributes.get('value'), 'restored')
+    for (const previous of ['restored', 0, false, '']) {
+        host.commitUpdate(node, 'view', {}, { value: previous })
+        node.writes.length = 0
+        host.commitUpdate(node, 'view', { value: previous }, { value: first })
+        assert.deepEqual(node.writes, [development ? 'remove:value' : 'set:value'])
+        assert.strictEqual(node.attributes.get('value'), development ? undefined : first)
+    }
+    assert.equal(warnings.length, development ? 5 : 0)
+    for (const warning of warnings) {
+        assert.equal(warning.length, 1)
+        assert.equal(typeof warning[0], 'string')
+        assert.match(String(warning[0]), /React element ignored for host attribute "value"/)
+    }
+
+    host.commitUpdate(node, 'view', { value: first }, {})
+    assert.equal(node.attributes.has('value'), false)
+    host.commitUpdate(node, 'view', {}, { value: second })
+    host.commitUpdate(node, 'view', { value: second }, { value: null })
+    assert.equal(node.attributes.has('value'), false)
+    host.commitUpdate(node, 'view', {}, { value: undefined, callback: () => {} })
+    assert.equal(node.attributes.has('value'), false)
+    assert.equal(node.attributes.has('callback'), false)
+
+    host.finalizeInitialChildren(node, 'view', { className: 'previous' })
+    host.commitUpdate(node, 'view', { className: 'previous' }, { className: first })
+    assert.strictEqual(node.attributes.get('class'), development ? undefined : first)
 }

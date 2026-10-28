@@ -1,0 +1,30 @@
+diff --git a/dist/react.esm.js b/dist/react.esm.js
+index 3ba8a59db9b2d4564f3290d54436cf834f3aa467..9d97586ce78fd8c2aad8db43cb86c7cb433bf2b5 100644
+--- a/dist/react.esm.js
++++ b/dist/react.esm.js
+@@ -1,7 +1,7 @@
+ import { PLATFORM_TYPE, isObject, isEnableTTDom, isString, isFunction, toCamelCase, UNITLESS_PROPERTIES_SET, isNumber, capitalize, internalComponents, isUndefined, noop, isBoolean, hooks, ensure } from '@tarojs/shared';
+ import { setInnerHTML, convertNumber2PX, eventHandlerTTDom } from '@tarojs/runtime';
+ import host from '\0vpt:renderer-host';
+-import { version } from 'react';
++import { isValidElement, version } from 'react';
+ import Reconciler from 'react-reconciler';
+ import {
+     ConcurrentRoot,
+@@ -577,6 +577,16 @@ function setProperty(dom, name, value, oldValue) {
+         if (process.env.TARO_ENV === 'tt' && isEnableTTDom() && !IS_DATASET_OR_ARIA.test(name)) {
+             name = toCamelCase(name);
+         }
++        // React elements belong in children, not host data. Keep the O(1) check entirely development-only.
++        if (process.env.NODE_ENV !== 'production' && isValidElement(value)) {
++            if (!isValidElement(oldValue)) {
++                console.warn(`[VPT] React element ignored for host attribute "${name}". Render it as a child instead.`);
++                if (oldValue != null) {
++                    dom.removeAttribute(name);
++                }
++            }
++            return;
++        }
+         if (value == null) {
+             dom.removeAttribute(name);
+         }

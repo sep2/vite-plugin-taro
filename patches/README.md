@@ -1,6 +1,6 @@
 # Dependency patch series
 
-pnpm applies one combined patch to each package version. We maintain **24 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output. Feature filenames are numbered consecutively from `01` in each package’s application order.
+pnpm applies one combined patch to each package version. We maintain **25 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output. Feature filenames are numbered consecutively from `01` in each package’s application order.
 
 ## Feature inventory
 
@@ -17,6 +17,7 @@ pnpm applies one combined patch to each package version. We maintain **24 featur
 | | `03-page-host-context` | Delegate Page-root type and child host-context selection to required host callbacks. |
 | | `04-event-handler-replacement` | Add replacement React callbacks before removing their predecessors, preserving continuous native subscriptions and logical handler order. |
 | | `05-style-update-batching` | Expose a synchronous style-prop boundary so the WX DOM host serializes and forwards the final logical style once. |
+| | `06-development-element-attributes` | Omit direct React-element host attributes during development, preserving React 19 Fast Refresh and production output. |
 | `@tarojs/runtime@4.3.1` | `01-mini-app-page-rendering` | Construct the App host as a scheduler, derive initial reset paths from the root prefix, and stop App serialization at the Page outlet. |
 | | `02-page-lifecycle` | Support object-or-factory Page data and caller-owned Page mounting with Taro lifecycle ordering and teardown. |
 | | `03-delegate-dom` | Delegate DOM presentation and context lookup/invalidation to the selected host, and create replacement text through ownerDocument. Taro retains logical state, event identities and mutation records; template defaults retain payload preparation and epoch-based context caching. |
@@ -116,6 +117,12 @@ Template refs, layout/passive effects and class mount callbacks may run during t
 Native DOM root updates attach the Page root and flush its queued update callbacks. Template roots serialize and deliver native `setData` batches through Taro's scheduler.
 
 Mount-completion delivery is O(1); Taro retains one load barrier per live native Page. Framework mount deduplication is O(Q + P) for Q queued and P rendered Pages; unmount retains upstream O(P) behavior. Initial serialization is O(A + N) for the App and destination Page hosts, in addition to React rendering cost. Native bridge updates retain Taro's existing mutation queue and asynchronous scheduler; no extra full `page.cn` payload is added.
+
+## Development host attributes
+
+`06-development-element-attributes` checks ordinary host-attribute values with React's `isValidElement` before writing them. Development rendering omits direct React elements, preventing their owner Fibers from entering initial hydration or incremental native payloads. A valid-to-element transition clears the previous attribute. A warning names the attribute when it first receives an element; consecutive element values neither warn again nor mutate the host. Component props, React children, events, styles and ordinary object/array attributes retain their existing paths.
+
+The check is O(1), performs no recursive traversal or cloning, and allocates no bookkeeping state. Nested values are not inspected. The entire branch is guarded by `process.env.NODE_ENV !== 'production'`, so production builds erase its checks and warnings. React 19, its development reconciler and Fast Refresh remain unchanged.
 
 ## Compose and install
 

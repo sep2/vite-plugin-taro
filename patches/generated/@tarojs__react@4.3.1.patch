@@ -37,7 +37,7 @@ index 7f5ed89b2448d03dc2658ca2be2c016f12387daa..dd745e0b88386c4fb1cb390bbf791bd4
      internalInstanceKey: string;
  };
 diff --git a/dist/react.esm.js b/dist/react.esm.js
-index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf834f3aa467 100644
+index ad8a51f02788c6e0354579956625da33a00e14a2..9d97586ce78fd8c2aad8db43cb86c7cb433bf2b5 100644
 --- a/dist/react.esm.js
 +++ b/dist/react.esm.js
 @@ -1,7 +1,15 @@
@@ -45,7 +45,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf83
 -import { setInnerHTML, FormElement, convertNumber2PX, eventHandlerTTDom, document } from '@tarojs/runtime';
 +import { setInnerHTML, convertNumber2PX, eventHandlerTTDom } from '@tarojs/runtime';
 +import host from '\0vpt:renderer-host';
-+import { version } from 'react';
++import { isValidElement, version } from 'react';
  import Reconciler from 'react-reconciler';
 -import { DefaultEventPriority as DefaultEventPriority$1 } from 'react-reconciler/constants';
 +import {
@@ -134,14 +134,14 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf83
          else {
 -            if (/harmony.*cpp/.test(process.env.TARO_ENV || '')) {
 -                return dom.setAttribute('_style4cpp', value);
--            }
--            const style = dom.style;
--            if (isString(value)) {
--                style.cssText = value;
 +            if (isString(oldValue)) {
 +                style.cssText = '';
 +                oldValue = null;
              }
+-            const style = dom.style;
+-            if (isString(value)) {
+-                style.cssText = value;
+-            }
 -            else {
 -                if (isString(oldValue)) {
 -                    style.cssText = '';
@@ -207,7 +207,24 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf83
      else if (isEventName(name)) {
          setEvent(dom, name, value, oldValue);
      }
-@@ -600,7 +607,51 @@ function styleObjectToCss(style) {
+@@ -570,6 +577,16 @@ function setProperty(dom, name, value, oldValue) {
+         if (process.env.TARO_ENV === 'tt' && isEnableTTDom() && !IS_DATASET_OR_ARIA.test(name)) {
+             name = toCamelCase(name);
+         }
++        // React elements belong in children, not host data. Keep the O(1) check entirely development-only.
++        if (process.env.NODE_ENV !== 'production' && isValidElement(value)) {
++            if (!isValidElement(oldValue)) {
++                console.warn(`[VPT] React element ignored for host attribute "${name}". Render it as a child instead.`);
++                if (oldValue != null) {
++                    dom.removeAttribute(name);
++                }
++            }
++            return;
++        }
+         if (value == null) {
+             dom.removeAttribute(name);
+         }
+@@ -600,7 +617,51 @@ function styleObjectToCss(style) {
  }
  
  /* eslint-disable @typescript-eslint/indent */
@@ -259,7 +276,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf83
      // below keys order by {React ReactFiberHostConfig.custom.js}, convenient for comparing each other.
      // -------------------
      // required by @types/react-reconciler
-@@ -611,15 +662,18 @@ const hostConfig = {
+@@ -611,15 +672,18 @@ const hostConfig = {
      getRootHostContext() {
          return {};
      },
@@ -284,7 +301,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf83
          precacheFiberNode(internalInstanceHandle, element);
          updateFiberProps(element, props);
          return element;
-@@ -629,7 +683,7 @@ const hostConfig = {
+@@ -629,7 +693,7 @@ const hostConfig = {
      },
      finalizeInitialChildren(dom, type, props) {
          let newProps = props;
@@ -293,7 +310,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf83
              const [defaultName, defaultKey] = ['switch', 'checkbox', 'radio'].includes(type) ? ['checked', 'defaultChecked'] : ['value', 'defaultValue'];
              if (props.hasOwnProperty(defaultKey)) {
                  newProps = Object.assign(Object.assign({}, newProps), { [defaultName]: props[defaultKey] });
-@@ -642,14 +696,11 @@ const hostConfig = {
+@@ -642,14 +706,11 @@ const hostConfig = {
          }
          return false;
      },
@@ -310,7 +327,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf83
          precacheFiberNode(internalInstanceHandle, textNode);
          return textNode;
      },
-@@ -667,9 +718,6 @@ const hostConfig = {
+@@ -667,9 +728,6 @@ const hostConfig = {
      preparePortalMount: noop,
      prepareScopeUpdate: noop,
      getInstanceFromScope: () => null,
@@ -320,7 +337,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf83
      detachDeletedInstance: noop,
      // -------------------
      //      Microtasks
-@@ -699,7 +747,8 @@ const hostConfig = {
+@@ -699,7 +757,8 @@ const hostConfig = {
          textInst.nodeValue = newText;
      },
      commitMount: noop,
@@ -330,7 +347,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf83
          if (!updatePayload)
              return;
          // payload 只包含 children 的时候，不应该再继续触发后续的属性比较和更新的逻辑了
-@@ -745,10 +794,21 @@ const hostConfig = {
+@@ -745,10 +804,21 @@ const hostConfig = {
      }
  };
  const TaroReconciler = Reconciler(hostConfig);
@@ -353,7 +370,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf83
          rendererPackageName: 'taro-react'
      });
      if (!foundDevTools) {
-@@ -796,7 +856,7 @@ function needsStateRestore() {
+@@ -796,7 +866,7 @@ function needsStateRestore() {
  function finishEventHandler() {
      const controlledComponentsHavePendingUpdates = needsStateRestore();
      if (controlledComponentsHavePendingUpdates) {
@@ -362,7 +379,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf83
          restoreStateIfNeeded();
      }
  }
-@@ -832,80 +892,55 @@ function restoreStateOfTarget(item) {
+@@ -832,80 +902,55 @@ function restoreStateOfTarget(item) {
      }
  }
  
@@ -477,7 +494,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf83
              node.dispatchEvent(e);
          });
      });
-@@ -946,22 +981,10 @@ function unmountComponentAtNode(dom) {
+@@ -946,22 +991,10 @@ function unmountComponentAtNode(dom) {
      if (!root)
          return false;
      unstable_batchedUpdates(() => {
@@ -501,7 +518,7 @@ index ad8a51f02788c6e0354579956625da33a00e14a2..3ba8a59db9b2d4564f3290d54436cf83
  const portalType = isFunction(Symbol) && Symbol.for
      ? Symbol.for('react.portal')
      : 0xeaca;
-@@ -974,17 +997,20 @@ function createPortal(children, containerInfo, key) {
+@@ -974,17 +1007,20 @@ function createPortal(children, containerInfo, key) {
          implementation: null
      };
  }
