@@ -32,7 +32,7 @@ Continue with the [Quick Start guide](https://vpt.js.org/guides/quick-start/).
 
 ### Hot Reload in Mini Program DevTools
 
-<video src="https://github.com/user-attachments/assets/c8289e1e-d8ad-429f-a0d9-a40656b4962a" controls autoplay muted loop playsinline width="100%"></video>
+https://github.com/user-attachments/assets/c8289e1e-d8ad-429f-a0d9-a40656b4962a
 
 - **Vite 8 + React 19** Build one codebase for WeChat, Alipay, and TikTok Mini Programs, as well as Web.
 - **Hot reload** Preserve App data, the active page, React component state, and input state while editing.
@@ -49,11 +49,11 @@ See the [Loan Genius Demo](https://github.com/sep2/vite-plugin-taro/blob/main/de
 
 See the [Skyline Shared-Element Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/skyline-share-element-demo) for native page transitions.
 
-<video src="https://github.com/user-attachments/assets/bd23538a-da13-431b-a182-85aadeb66194" controls autoplay muted loop playsinline width="320"></video>
+https://github.com/user-attachments/assets/bd23538a-da13-431b-a182-85aadeb66194
 
 Explore the [starter template](https://github.com/sep2/vite-plugin-taro/tree/main/packages/create-vite-taro/templates/default), featuring custom React tabs and synchronous first-frame prerendering for flicker-free page switching.
 
-<video src="https://github.com/user-attachments/assets/aa2da4bb-fe60-4d3b-9a94-8df17a4e73ae" controls autoplay muted loop playsinline width="320"></video>
+https://github.com/user-attachments/assets/aa2da4bb-fe60-4d3b-9a94-8df17a4e73ae
 
 ## Sponsor
 

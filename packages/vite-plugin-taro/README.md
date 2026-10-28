@@ -33,7 +33,7 @@ pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
 
 ### 已支持小程序开发者工具的热更新
 
-<video src="https://github.com/user-attachments/assets/c8289e1e-d8ad-429f-a0d9-a40656b4962a" controls autoplay muted loop playsinline width="100%"></video>
+https://github.com/user-attachments/assets/c8289e1e-d8ad-429f-a0d9-a40656b4962a
 
 - **Vite 8 + React 19** 基于 Vite 生态，一份代码覆盖微信小程序、支付宝小程序、抖音小程序与 Web。
 - **热更新** 编辑代码时保留 App 数据、当前页面、React 组件状态与输入状态。
@@ -50,11 +50,11 @@ pnpm --config.minimum-release-age=0 create vite-taro@latest my-app
 
 查看 [Skyline 共享元素 Demo](https://github.com/sep2/vite-plugin-taro/tree/main/demo/skyline-share-element-demo)，体验原生页面转场动画。
 
-<video src="https://github.com/user-attachments/assets/bd23538a-da13-431b-a182-85aadeb66194" controls autoplay muted loop playsinline width="320"></video>
+https://github.com/user-attachments/assets/bd23538a-da13-431b-a182-85aadeb66194
 
 查看[默认模板](https://github.com/sep2/vite-plugin-taro/tree/main/packages/create-vite-taro/templates/default)，使用 React 自定义 Tabs 与首帧同步预渲染，切换页面不闪屏。
 
-<video src="https://github.com/user-attachments/assets/aa2da4bb-fe60-4d3b-9a94-8df17a4e73ae" controls autoplay muted loop playsinline width="320"></video>
+https://github.com/user-attachments/assets/aa2da4bb-fe60-4d3b-9a94-8df17a4e73ae
 
 
 ## 赞助
