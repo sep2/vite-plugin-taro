@@ -56,12 +56,11 @@ export function preparePublishedFixture(
     renderer: PublishedRenderer,
     probe: { readonly id: string; readonly text: string }
 ): PublishedFixture {
-    const target = '                target,\n'
     const config = replaceOnce(
         sources.config,
-        target,
-        `${target}                renderer: '${renderer}',\n`,
-        'renderer configuration target'
+        "                renderer: 'template',\n",
+        `                renderer: '${renderer}',\n`,
+        'renderer configuration'
     )
     const page = installTextProbe(sources.page, probe)
     if (renderer === 'template') {

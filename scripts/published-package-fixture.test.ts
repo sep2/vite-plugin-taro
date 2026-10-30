@@ -27,18 +27,18 @@ test('published checks select both renderers or one explicit renderer', () => {
     assert.throws(() => getPublishedRenderers(['dom']))
 })
 
-test('template fixtures retain native counter contracts and install the visible text probe', () => {
+test('template fixtures preserve renderer configuration and install the visible text probe', () => {
     const fixture = preparePublishedFixture(sources, 'template', probe)
-    assert.match(fixture.config, /renderer: 'template'/)
+    assert.equal(fixture.config, sources.config)
     assert.match(fixture.page, /<Text id="published-hmr-probe"/)
     assert.equal(fixture.counter, sources.counter)
     assert.equal(fixture.nativeCounter, sources.nativeCounter)
     assert.doesNotMatch(fixture.page, /published-native-counter/)
 })
 
-test('DOM fixtures identify the native component with a standard element id', () => {
+test('DOM fixtures replace the scaffold renderer and identify the native component with a standard element id', () => {
     const fixture = preparePublishedFixture(sources, 'dom', probe)
-    assert.match(fixture.config, /renderer: 'dom'/)
+    assert.equal(fixture.config, sources.config.replace("renderer: 'template'", "renderer: 'dom'"))
     assert.ok(fixture.page.includes(`id="${nativeCounterProbeId}"`))
     assert.match(fixture.counter, /id\?: string\n {4}count: number/)
     assert.match(fixture.nativeCounter, /id\?: string\n {4}count: number/)
@@ -55,13 +55,19 @@ test('renderer fixtures are independent of preparation order', () => {
 })
 
 test('scaffold contract changes fail before an invalid renderer test can run', () => {
+    assert.throws(() => preparePublishedFixture({ ...sources, config: '' }, 'dom', probe), /renderer configuration/)
     assert.throws(
-        () => preparePublishedFixture({ ...sources, config: '' }, 'dom', probe),
-        /renderer configuration target/
+        () =>
+            preparePublishedFixture(
+                { ...sources, config: sources.config.replace("                renderer: 'template',\n", '') },
+                'dom',
+                probe
+            ),
+        /renderer configuration/
     )
     assert.throws(
         () => preparePublishedFixture({ ...sources, config: sources.config.repeat(2) }, 'dom', probe),
-        /renderer configuration target/
+        /renderer configuration/
     )
     assert.throws(() => preparePublishedFixture({ ...sources, page: '' }, 'template', probe), /source occurrence/)
     assert.throws(
