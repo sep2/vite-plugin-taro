@@ -19,7 +19,7 @@ const steps = [
     {
         number: '03',
         title: 'Ship to every target',
-        description: 'Build for WeChat, Alipay, TikTok or the web from the same source.',
+        description: 'Build for WeChat, Alipay, Taobao, TikTok or the web from the same source.',
         file: 'npm run build:wx'
     }
 ] as const

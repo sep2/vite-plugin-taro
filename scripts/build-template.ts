@@ -9,8 +9,8 @@ const creatorRoot = path.join(repoRoot, 'packages/create-vite-taro')
 const pluginRoot = path.join(repoRoot, 'packages/vite-plugin-taro')
 const packageRequire = createRequire(path.join(pluginRoot, 'package.json'))
 const target = process.argv[2]
-if (target !== 'wx' && target !== 'zfb' && target !== 'tt' && target !== 'h5') {
-    throw new Error('Usage: node scripts/build-template.ts <wx|zfb|tt|h5>')
+if (target !== 'wx' && target !== 'zfb' && target !== 'tb' && target !== 'tt' && target !== 'h5') {
+    throw new Error('Usage: node scripts/build-template.ts <wx|zfb|tb|tt|h5>')
 }
 
 // The workspace plugin imports the runtime package's generated platform modules.

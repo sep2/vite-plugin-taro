@@ -46,7 +46,7 @@ function px(value: number): string {
 }
 
 const isWechatTarget = import.meta.env.VITE_VPT_TARGET === 'wx'
-const isAlipayTarget = import.meta.env.VITE_VPT_TARGET === 'zfb'
+const isAlipayTarget = import.meta.env.VITE_VPT_TARGET === 'zfb' || import.meta.env.VITE_VPT_TARGET === 'tb'
 const isTtTarget = import.meta.env.VITE_VPT_TARGET === 'tt'
 
 function getAlipayNavigationBarMetrics(systemInfo: AlipaySystemInfo): NavigationBarMetrics {

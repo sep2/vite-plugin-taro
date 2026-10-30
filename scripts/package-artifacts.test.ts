@@ -117,6 +117,13 @@ test('public packages preserve their published entrypoints and scaffold dependen
         assert.deepEqual(manifest.exports, pluginPackage.publishConfig.exports)
         assert.equal(manifest.dependencies['vite-plugin-taro-runtime'], runtimePackage.version)
         assert.ok(readPackedFile(root, pluginPackage, 'dist/index.js').length > 0)
+        assert.match(readPackedFile(root, pluginPackage, 'dist/options.d.ts'), /'tb'/)
+        for (const mode of ['devtools', 'interpreter']) {
+            assert.match(
+                readPackedFile(root, pluginPackage, `dist/runtime/tb/dev/${mode}-runtime.js`),
+                /connectTbSocket/
+            )
+        }
         assert.ok(readPackedFile(root, runtimePackage, 'dist/runtime/index.js').length > 0)
         assert.ok(readPackedFile(root, pluginPackage, 'README.md').length > 0)
     })
@@ -170,6 +177,14 @@ test('public packages preserve their published entrypoints and scaffold dependen
         assert.match(env, /^VITE_VPT_TIKTOK_APP_ID=testAppId$/m)
         const config = readFileSync(path.join(projectPath, 'vite.config.ts'), 'utf8')
         assert.match(config, /env\.VITE_VPT_TIKTOK_APP_ID\b/)
+        assert.match(config, /env\.VITE_VPT_TAOBAO_APP_ID\b/)
+        const templateEnv = readFileSync(path.join(generatorRoot, 'templates/default/_env.local'), 'utf8')
+        assert.match(templateEnv, /^VITE_VPT_TAOBAO_APP_ID=/m)
+        // Scaffolding generates only the WeChat App ID; all other template environment values are preserved.
+        assert.equal(
+            env.replace(/^VITE_VPT_WECHAT_APP_ID=.*$/m, ''),
+            templateEnv.replace(/^VITE_VPT_WECHAT_APP_ID=.*$/m, '')
+        )
         assert.match(config, /pages: \[/)
         assert.deepEqual(
             Array.from(
@@ -194,6 +209,8 @@ test('public packages preserve their published entrypoints and scaffold dependen
         const project = JSON.parse(readFileSync(path.join(projectPath, 'package.json'), 'utf8'))
         assert.equal(project.name, 'complete-app')
         assert.equal(project.devDependencies['vite-plugin-taro'], `^${creatorPackage.version}`)
+        assert.equal(project.scripts['dev:tb'], 'cross-env VITE_VPT_TARGET=tb vite')
+        assert.equal(project.scripts['build:tb'], 'cross-env VITE_VPT_TARGET=tb vite build')
         assert.equal(project.scripts['dev:tt'], 'cross-env VITE_VPT_TARGET=tt vite')
         assert.equal(project.scripts['build:tt'], 'cross-env VITE_VPT_TARGET=tt vite build')
     })
@@ -216,6 +233,7 @@ test('public packages preserve their published entrypoints and scaffold dependen
                 const project: {
                     private: boolean
                     version: string
+                    scripts: Record<string, string>
                     devDependencies: Record<string, string>
                     overrides: Record<string, string>
                 } = JSON.parse(readFileSync(path.join(projectPath, 'package.json'), 'utf8'))
@@ -227,7 +245,9 @@ test('public packages preserve their published entrypoints and scaffold dependen
                 assert.equal(project.overrides.rolldown, '$rolldown')
                 assert.ok(output.includes(`  ${packageManager ?? 'npm'} install\n`))
                 const run = packageManager === 'pnpm' || packageManager === 'yarn' ? '' : 'run '
-                assert.ok(output.includes(`  ${packageManager ?? 'npm'} ${run}dev:tt\n`))
+                for (const script of Object.keys(project.scripts).filter((name) => name.startsWith('dev:'))) {
+                    assert.ok(output.includes(`  ${packageManager ?? 'npm'} ${run}${script}\n`), script)
+                }
                 assert.equal(existsSync(path.join(projectPath, 'pnpm-workspace.yaml')), packageManager === 'pnpm')
                 if (packageManager === 'pnpm') {
                     // Check the emitted policy without launching pnpm's platform-specific command shim.

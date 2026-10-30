@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = fileURLToPath(new URL('../', import.meta.url))
 const temporaryRoot = path.join(repoRoot, 'packages/vite-plugin-taro/tmp')
-const targets = ['wx', 'zfb', 'tt', 'h5'] as const
+const targets = ['wx', 'zfb', 'tb', 'tt', 'h5'] as const
 const dependencies = ['react', 'react-dom', 'vite', 'rolldown', 'vite-plugin-taro']
 const templateEnv = 'VITE_VPT_WECHAT_APP_ID=wx0000000000000000\nVITE_VPT_TIKTOK_APP_ID=testAppId\n'
 const localEnv = 'VITE_VPT_WECHAT_APP_ID=wx1234567890abcdef\nVITE_VPT_TIKTOK_APP_ID=localAppId\n'
@@ -134,7 +134,7 @@ for (const args of [[], ['invalid']]) {
         const root = createFixture(t)
         const result = runBuild(root, args)
         assert.equal(result.status, 1)
-        assert.match(result.stderr, /Usage: node scripts\/build-template.ts <wx\|zfb\|tt\|h5>/)
+        assert.match(result.stderr, /Usage: node scripts\/build-template.ts <wx\|zfb\|tb\|tt\|h5>/)
         assert.equal(existsSync(path.join(root, 'packages/taro-runtime/dist')), false)
         assert.equal(existsSync(path.join(root, 'packages/vite-plugin-taro/tmp')), false)
         assert.equal(existsSync(path.join(root, 'dist')), false)

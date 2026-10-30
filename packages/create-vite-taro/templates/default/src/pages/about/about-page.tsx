@@ -3,7 +3,7 @@ import { NavigationBar } from '../../components/navigation-bar/navigation-bar.ts
 import { TabBar } from '../../components/tab-bar/tab-bar.tsx'
 import { tabPages } from '../../tab-pages.ts'
 
-const platforms = ['WeChat', 'Alipay', 'TikTok', 'Web'] as const
+const platforms = ['WeChat', 'Alipay', 'Taobao', 'TikTok', 'Web'] as const
 
 export default function AboutPage() {
     return (
@@ -20,7 +20,7 @@ export default function AboutPage() {
 
                     <View className="mt-9 rounded-3xl bg-primary p-7 text-white shadow-xl sm:p-9">
                         <Text className="brand-serif block text-3xl font-semibold text-white">
-                            One project. Four places.
+                            One project. Five platforms.
                         </Text>
                         <Text className="mt-3 block text-sm leading-6 text-on-primary-muted">
                             Share the interface and tailor the details to each platform as you go.

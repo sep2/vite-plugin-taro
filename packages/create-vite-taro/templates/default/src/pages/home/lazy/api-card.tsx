@@ -11,7 +11,7 @@ export default function ApiCard() {
                     Make this starter yours.
                 </span>
                 <span className="mt-3 block text-sm leading-6 text-on-primary-muted">
-                    Add pages, connect your data and ship the same experience to WeChat and H5.
+                    Add pages, connect your data and ship the same experience to Mini Programs and the web.
                 </span>
             </div>
             <button

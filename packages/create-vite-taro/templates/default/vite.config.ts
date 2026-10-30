@@ -57,7 +57,8 @@ function createPageJson(target: VptTarget): VptJsonObject {
                 navigationBarTextStyle: 'black'
             }
         }
-        case 'zfb': {
+        case 'zfb':
+        case 'tb': {
             return {
                 transparentTitle: 'always',
                 titlePenetrate: 'YES'
@@ -104,9 +105,11 @@ function createAppJson(target: VptTarget): VptJsonObject {
                 }
             }
         }
-        case 'zfb': {
+        case 'zfb':
+        case 'tb': {
             return {
                 lazyCodeLoading: 'renderedComponents',
+                subPackageBuildType: 'shared',
                 useDynamicPlugins: true,
                 tabBar: {
                     customize: true,
@@ -172,7 +175,8 @@ function createProjectConfigJson(target: VptTarget, appId: string | undefined): 
                 }
             }
         }
-        case 'zfb': {
+        case 'zfb':
+        case 'tb': {
             return {
                 appid: appId,
                 miniprogramRoot: './',
@@ -225,7 +229,8 @@ function createProjectPrivateConfigJson(target: VptTarget): VptJsonObject {
                 }
             }
         }
-        case 'zfb': {
+        case 'zfb':
+        case 'tb': {
             return {
                 ignoreHttpDomainCheck: true,
                 ignoreCertificateDomainCheck: true,
@@ -252,6 +257,9 @@ function getAppId(env: Record<string, string>, target: VptTarget): string {
         case 'zfb': {
             return env.VITE_VPT_ALIPAY_APP_ID ?? ''
         }
+        case 'tb': {
+            return env.VITE_VPT_TAOBAO_APP_ID ?? ''
+        }
         case 'tt': {
             return env.VITE_VPT_TIKTOK_APP_ID ?? ''
         }
@@ -266,11 +274,11 @@ function getTarget(env: Record<string, string>): VptTarget {
 
     const target = env[targetEnvName]
 
-    if (target === 'wx' || target === 'zfb' || target === 'tt' || target === 'h5') {
+    if (target === 'wx' || target === 'zfb' || target === 'tb' || target === 'tt' || target === 'h5') {
         return target
     }
 
-    throw new Error(`${targetEnvName} must be "wx", "zfb", "tt", or "h5".`)
+    throw new Error(`${targetEnvName} must be "wx", "zfb", "tb", "tt", or "h5".`)
 }
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))

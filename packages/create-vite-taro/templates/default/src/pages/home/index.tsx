@@ -10,13 +10,14 @@ const featureCards = [
     {
         number: '01',
         title: 'Vite-speed feedback',
-        description: 'Save a React component and see the smallest possible update in WeChat DevTools or the browser.',
+        description:
+            'Save a React component and see the smallest possible update in Mini Program DevTools or the browser.',
         tiltClass: 'rotate-[-0.35deg]'
     },
     {
         number: '02',
         title: 'One React tree',
-        description: 'Share components, hooks and application state between WeChat Mini Program and H5.',
+        description: 'Share components, hooks and application state across Mini Programs and the web.',
         tiltClass: 'translate-y-1 rotate-[0.25deg]'
     },
     {
@@ -49,8 +50,8 @@ function HomePage() {
                             Build naturally. Ship everywhere.
                         </Text>
                         <Text className="mt-4 block w-full max-w-xl text-sm leading-7 text-muted sm:text-base">
-                            A botanical little starter for building polished WeChat Mini Programs and Web apps with one
-                            modern React codebase.
+                            A botanical little starter for building polished Mini Programs and Web apps with one modern
+                            React codebase.
                         </Text>
 
                         <View className="mt-7 flex flex-row flex-wrap items-center justify-center gap-3">

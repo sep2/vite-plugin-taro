@@ -1,133 +1,34 @@
 # VPT
 
-基于 Vite 8、React 19、Taro 4、TypeScript 和 Tailwind CSS v4，一套代码运行于微信、支付宝、抖音小程序和 Web。
+基于 Vite 8、React 19、Taro、TypeScript 和 Tailwind CSS，一套代码运行于微信、支付宝、淘宝、抖音小程序和 Web。
 
-- [文档](https://vpt.js.org)
-- [GitHub](https://github.com/sep2/vite-plugin-taro)
-
-## AI 开发
-
-把下面的提示词交给编程助手，让它先读取 VPT 文档，再开发并验证功能：
-
-```text
-请先阅读 https://vpt.js.org/llms.txt，再根据我的需求开发这个 VPT 项目。
-```
-
-测试微信小程序时，可安装微信官方的[开发者工具 Skills](https://developers.weixin.qq.com/miniprogram/dev/devtools/Skills.html)，让 AI 操作模拟器、读取日志、截图和预览。
+[文档](https://vpt.js.org) · [GitHub](https://github.com/sep2/vite-plugin-taro)
 
 ## 快速开始
 
-安装依赖：
-
 ```sh
-npm install
+pnpm install
 ```
 
-### 微信小程序
+开发小程序前，在 `.env.local` 中填写对应平台的 App ID，然后选择开发命令：
 
-1. 在 `.env.local` 中填写微信 App ID：
+| 平台 | 开发 | 构建 | 构建目录 |
+| --- | --- | --- | --- |
+| 微信 | `pnpm dev:wx` | `pnpm build:wx` | `dist/wx` |
+| 支付宝 | `pnpm dev:zfb` | `pnpm build:zfb` | `dist/zfb` |
+| 淘宝 | `pnpm dev:tb` | `pnpm build:tb` | `dist/tb` |
+| 抖音 | `pnpm dev:tt` | `pnpm build:tt` | `dist/tt` |
+| Web | `pnpm dev:h5` | `pnpm build:h5` | `dist/h5` |
 
-    ```dotenv
-    VITE_VPT_WECHAT_APP_ID=wx1234567890abcdef
-    ```
+监听文件变化并自动重新构建生产版本：`pnpm build:wx --watch`。
 
-2. 启动开发构建：
-
-    ```sh
-    npm run dev:wx
-    ```
-
-3. 用微信开发者工具导入 `dist/wx`，不要导入项目根目录。
-
-开发期间保持命令运行。模板已开启热更新、关闭本地开发的 URL 校验，并默认关闭开发者工具中暂不支持热更新的 Skyline。
-
-### 支付宝小程序
-
-1. 在 `.env.local` 中填写支付宝 App ID：
-
-    ```dotenv
-    VITE_VPT_ALIPAY_APP_ID=2021000000000000
-    ```
-
-2. 启动开发构建：
-
-    ```sh
-    npm run dev:zfb
-    ```
-
-3. 用支付宝小程序开发者工具导入 `dist/zfb`，不要导入项目根目录。
-
-### 抖音小程序
-
-1. 在 `.env.local` 中填写抖音 App ID：
-
-    ```dotenv
-    VITE_VPT_TIKTOK_APP_ID=testAppId
-    ```
-
-2. 启动开发构建：
-
-    ```sh
-    npm run dev:tt
-    ```
-
-3. 用抖音开发者工具导入 `dist/tt`，不要导入项目根目录。
-
-### Web
-
-```sh
-npm run dev:h5
-```
-
-打开 Vite 输出的地址，通常是 <http://localhost:5173>。
+其他命令：`pnpm typecheck` 检查类型，`pnpm preview:h5` 预览 Web 生产构建。
 
 ## 开发
 
-模板包含 Home、Explore、About 三个真实 Tab 页面，默认页面是 `src/pages/home/index.tsx`。路由、标签和图标名称统一定义在 `src/tab-pages.ts`。
+- `src/pages/home/index.tsx`：首页，从这里开始修改。
+- `vite.config.ts`：页面注册、构建目标与平台配置。
+- `src/tab-pages.ts`：Tab 路由、标签和图标名称。
+- `src/app.css`：全局样式与 Tailwind 主题，保留 `@source "./";` 并使用完整类名。
 
-每个页面负责自己的全屏布局和 `TabBar`，`src/app.tsx` 负责应用生命周期和全局样式，直接返回 `children`。通过 `Taro.switchTab()` 切换 Tab 时，已访问页面的 React 状态会保留。
-
-`vite.config.ts` 显式声明页面并启用 `prerender: true`，原生 Tab 路由由 `tabPages` 生成。微信使用 `tabBar.custom: true`，由页面中的 React 标签栏负责渲染；`tabBar.list` 保留原生 `switchTab()` 所需的路由声明。支付宝使用 `tabBar.customize: true` 和 `tabBar.items`，VPT 自动生成隐藏的原生标签栏占位组件。
-
-VPT 通过虚拟模块提供 Taro 组件和 API：
-
-```tsx
-import Taro from 'virtual:taro/api'
-import { Button, Text, View } from 'virtual:taro/components'
-```
-
-不要直接安装或导入 `@tarojs/*`。在 `vite.config.ts` 中添加页面，并按当前目标修改应用与开发工具项目配置。
-
-模板包含条件编译、微信原生组件、支付宝、抖音与 Web 共用的 Taro 组件、懒加载、自定义导航栏、React 标签栏、Tailwind CSS、CSS Modules 和全局样式示例；不需要的示例可直接删除。
-
-### 样式
-
-全局样式和 Tailwind 主题位于 `src/app.css`。保留 Tailwind 导入和 `@source "./";`，并在源码中写完整类名，不要拼接类名。组件独立样式使用 `*.module.css`。
-
-### 热更新
-
-小程序端热更新通常会保留 App 数据、当前页面、兼容的 React Hook 状态和原生输入值。修改 Vite 配置、组件或 Hook 结构不兼容，或更新无法安全应用时，会整页重载。详见[热更新指南](https://vpt.js.org/guides/hot-module-replacement/)。
-
-## 命令
-
-| 命令 | 用途 | 输出 |
-| --- | --- | --- |
-| `npm run dev:wx` | 开发微信小程序 | `dist/wx` |
-| `npm run dev:zfb` | 开发支付宝小程序 | `dist/zfb` |
-| `npm run dev:tt` | 开发抖音小程序 | `dist/tt` |
-| `npm run dev:h5` | 开发 Web | — |
-| `npm run build:wx` | 构建微信小程序 | `dist/wx` |
-| `npm run build:zfb` | 构建支付宝小程序 | `dist/zfb` |
-| `npm run build:tt` | 构建抖音小程序 | `dist/tt` |
-| `npm run build:h5` | 构建 Web | `dist/h5` |
-| `npm run preview:h5` | 预览 Web 生产构建 | — |
-| `npm run typecheck` | TypeScript 类型检查 | — |
-
-## 常见问题
-
-- **开发者工具无法打开项目：** 确认导入的是当前目标的 `dist/...`，且 `.env.local` 中对应的 App ID 可用。
-- **热更新失败：** 关闭对应开发者工具，停止开发命令，删除当前目标的输出目录，重新运行 `dev:...`，再导入生成目录。
-- **Tailwind 类未生效：** 保留 `src/app.css` 中的 `@source "./";`，并使用完整类名。
-- **pnpm 忽略依赖构建脚本：** 运行 `pnpm approve-builds`，批准所需脚本后重新安装。
-
-继续阅读[快速开始指南](https://vpt.js.org/guides/quick-start/)或[完整文档](https://vpt.js.org)。
+通过 `virtual:taro/api` 和 `virtual:taro/components` 使用 Taro API 与组件。更多用法见[快速开始指南](https://vpt.js.org/guides/quick-start/)。

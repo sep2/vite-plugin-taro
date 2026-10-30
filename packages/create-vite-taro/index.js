@@ -6,6 +6,7 @@ import process from 'node:process'
 import readline from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
 import generatorPackage from './package.json' with { type: 'json' }
+import templatePackage from './templates/default/package.json' with { type: 'json' }
 
 const packageRoot = path.dirname(fileURLToPath(import.meta.url))
 const defaultProjectName = 'vite-taro-app'
@@ -51,12 +52,14 @@ const cdCommand = displayProjectPath === '.' ? undefined : `cd ${quotePath(displ
 
 console.log(`\nCreated ${projectName} in ${projectPath}\n`)
 console.log('Next steps:')
-if (cdCommand) console.log(`  ${cdCommand}`)
+if (cdCommand) {
+    console.log(`  ${cdCommand}`)
+}
 console.log(`  ${packageManager} install`)
-console.log(`  ${getScriptCommand(packageManager, 'dev:wx')}`)
-console.log(`  ${getScriptCommand(packageManager, 'dev:zfb')}`)
-console.log(`  ${getScriptCommand(packageManager, 'dev:tt')}`)
-console.log(`  ${getScriptCommand(packageManager, 'dev:h5')}`)
+const developmentScripts = Object.keys(templatePackage.scripts).filter((script) => script.startsWith('dev:'))
+for (const script of developmentScripts) {
+    console.log(`  ${getScriptCommand(packageManager, script)}`)
+}
 
 function parseArgs(args) {
     const options = {

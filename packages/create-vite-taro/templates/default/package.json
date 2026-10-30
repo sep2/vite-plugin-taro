@@ -6,10 +6,12 @@
     "scripts": {
         "dev:wx": "cross-env VITE_VPT_TARGET=wx vite",
         "dev:zfb": "cross-env VITE_VPT_TARGET=zfb vite",
+        "dev:tb": "cross-env VITE_VPT_TARGET=tb vite",
         "dev:tt": "cross-env VITE_VPT_TARGET=tt vite",
         "dev:h5": "cross-env VITE_VPT_TARGET=h5 vite",
         "build:wx": "cross-env VITE_VPT_TARGET=wx vite build",
         "build:zfb": "cross-env VITE_VPT_TARGET=zfb vite build",
+        "build:tb": "cross-env VITE_VPT_TARGET=tb vite build",
         "build:tt": "cross-env VITE_VPT_TARGET=tt vite build",
         "build:h5": "cross-env VITE_VPT_TARGET=h5 vite build",
         "preview:h5": "cross-env VITE_VPT_TARGET=h5 vite preview --outDir dist/h5",

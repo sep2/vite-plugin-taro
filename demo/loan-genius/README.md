@@ -2,7 +2,7 @@
 
 简体中文 | [English](README.en.md)
 
-基于 VPT 的房贷计算器示例，一套源码支持微信、支付宝、抖音小程序和 Web。
+基于 VPT 的房贷计算器示例，一套源码支持微信、支付宝、淘宝、抖音小程序和 Web。
 
 此项目迁移自 [wuba/Taro-Mortgage-Calculator](https://github.com/wuba/Taro-Mortgage-Calculator)。
 
@@ -29,6 +29,7 @@ pnpm build:plugin
 ```dotenv
 VITE_VPT_WECHAT_APP_ID=your_wechat_app_id
 VITE_VPT_ALIPAY_APP_ID=your_alipay_app_id
+VITE_VPT_TAOBAO_APP_ID=your_taobao_app_id
 VITE_VPT_TIKTOK_APP_ID=your_tiktok_app_id
 ```
 
@@ -36,13 +37,13 @@ VITE_VPT_TIKTOK_APP_ID=your_tiktok_app_id
 
 按目标选择命令，脚本会自动设置 `VITE_VPT_TARGET`：
 
-| 目标 | 开发模式 | 生产构建 | 构建目录 |
-| --- | --- | --- | --- |
-| 微信 | `pnpm dev:loan-genius:wx` | `pnpm build:loan-genius:wx` | `demo/loan-genius/dist/wx` |
+| 目标   | 开发模式                   | 生产构建                     | 构建目录                    |
+| ------ | -------------------------- | ---------------------------- | --------------------------- |
+| 微信   | `pnpm dev:loan-genius:wx`  | `pnpm build:loan-genius:wx`  | `demo/loan-genius/dist/wx`  |
 | 支付宝 | `pnpm dev:loan-genius:zfb` | `pnpm build:loan-genius:zfb` | `demo/loan-genius/dist/zfb` |
-| 抖音 | `pnpm dev:loan-genius:tt` | `pnpm build:loan-genius:tt` | `demo/loan-genius/dist/tt` |
-| Web | `pnpm dev:loan-genius:h5` | `pnpm build:loan-genius:h5` | `demo/loan-genius/dist/h5` |
-
+| 淘宝   | `pnpm dev:loan-genius:tb`  | `pnpm build:loan-genius:tb`  | `demo/loan-genius/dist/tb`  |
+| 抖音   | `pnpm dev:loan-genius:tt`  | `pnpm build:loan-genius:tt`  | `demo/loan-genius/dist/tt`  |
+| Web    | `pnpm dev:loan-genius:h5`  | `pnpm build:loan-genius:h5`  | `demo/loan-genius/dist/h5`  |
 - 小程序：等待初始构建完成，在对应开发者工具中导入构建目录，不要导入源码目录。
 - Web：访问终端显示的地址；构建后用 `pnpm preview:loan-genius:h5` 预览。
 - 开发时保持命令运行。各平台工具版本与热更新配置见[开发热更新指南](https://vpt.js.org/guides/hot-module-replacement/)。

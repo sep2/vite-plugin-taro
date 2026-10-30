@@ -1,7 +1,7 @@
 import Taro from 'virtual:taro/api'
 
 const isWechatTarget = import.meta.env.VITE_VPT_TARGET === 'wx'
-const isAlipayTarget = import.meta.env.VITE_VPT_TARGET === 'zfb'
+const isAlipayTarget = import.meta.env.VITE_VPT_TARGET === 'zfb' || import.meta.env.VITE_VPT_TARGET === 'tb'
 const isTtTarget = import.meta.env.VITE_VPT_TARGET === 'tt'
 
 interface NavigationBarMetrics {
@@ -19,7 +19,7 @@ interface MenuButtonMetrics {
     width: number
 }
 
-/** Alipay fields narrowed from Taro's shared system-info result type. */
+/** Alipay and Taobao fields narrowed from Taro's shared system-info result type. */
 type AlipaySystemInfo = ReturnType<typeof Taro.getSystemInfoSync> & {
     statusBarHeight: number
     titleBarHeight: number

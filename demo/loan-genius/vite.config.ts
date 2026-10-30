@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
     const target = getTarget(env)
     const wechatAppId = env.VITE_VPT_WECHAT_APP_ID
     const alipayAppId = env.VITE_VPT_ALIPAY_APP_ID
+    const taobaoAppId = env.VITE_VPT_TAOBAO_APP_ID
     const ttAppId = env.VITE_VPT_TIKTOK_APP_ID
 
     return {
@@ -41,7 +42,7 @@ export default defineConfig(({ mode }) => {
                     }
                 ],
                 appJson: createAppJson(target),
-                projectConfigJson: createProjectConfigJson({ target, wechatAppId, alipayAppId, ttAppId }),
+                projectConfigJson: createProjectConfigJson({ target, wechatAppId, alipayAppId, taobaoAppId, ttAppId }),
                 projectPrivateConfigJson: createProjectPrivateConfigJson(target),
                 sitemapJson: { rules: [{ action: 'allow', page: '*' }] },
                 hmr: {
@@ -77,11 +78,11 @@ function getTarget(env: Record<string, string>): VptTarget {
 
     const target = env[targetEnvName]
 
-    if (target === 'wx' || target === 'zfb' || target === 'tt' || target === 'h5') {
+    if (target === 'wx' || target === 'zfb' || target === 'tb' || target === 'tt' || target === 'h5') {
         return target
     }
 
-    throw new Error(`${targetEnvName} must be "wx", "zfb", "tt", or "h5".`)
+    throw new Error(`${targetEnvName} must be "wx", "zfb", "tb", "tt", or "h5".`)
 }
 
 function createPageJson(target: VptTarget): VptJsonObject {
@@ -109,9 +110,11 @@ function createAppJson(target: VptTarget): VptJsonObject {
                 }
             }
         }
-        case 'zfb': {
+        case 'zfb':
+        case 'tb': {
             return {
                 lazyCodeLoading: 'renderedComponents',
+                subPackageBuildType: 'shared',
                 useDynamicPlugins: true,
                 window: {
                     transparentTitle: 'always',
@@ -136,11 +139,13 @@ function createProjectConfigJson({
     target,
     wechatAppId,
     alipayAppId,
+    taobaoAppId,
     ttAppId
 }: {
     target: VptTarget
     wechatAppId: string
     alipayAppId: string
+    taobaoAppId: string
     ttAppId: string
 }): VptJsonObject {
     switch (target) {
@@ -171,9 +176,10 @@ function createProjectConfigJson({
                 }
             }
         }
-        case 'zfb': {
+        case 'zfb':
+        case 'tb': {
             return {
-                appid: alipayAppId,
+                appid: target === 'tb' ? taobaoAppId : alipayAppId,
                 miniprogramRoot: './',
                 format: 2,
                 compileOptions: {
@@ -223,7 +229,8 @@ function createProjectPrivateConfigJson(target: VptTarget): VptJsonObject {
                 }
             }
         }
-        case 'zfb': {
+        case 'zfb':
+        case 'tb': {
             return {
                 ignoreHttpDomainCheck: true,
                 ignoreCertificateDomainCheck: true,
