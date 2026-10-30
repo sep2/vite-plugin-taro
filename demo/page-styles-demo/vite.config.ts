@@ -1,10 +1,10 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
-import type { VptJsonObject, VptTarget } from 'vite-plugin-taro'
+import type { VptJsonObject } from 'vite-plugin-taro'
 import vpt from 'vite-plugin-taro'
 
-type MiniTarget = Exclude<VptTarget, 'h5'>
+type MiniTarget = 'wx' | 'zfb' | 'tt'
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 const appTitle = 'Page styles demo'
