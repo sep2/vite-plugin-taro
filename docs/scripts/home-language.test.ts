@@ -15,7 +15,7 @@ test('every homepage translation switches in both directions without ambiguity',
     }
 })
 
-test('homepage platform lists include TikTok in both languages', () => {
+test('homepage platform lists include Taobao and TikTok in both languages', () => {
     const platformLists = Object.entries(homeTranslations).filter(
         ([chinese, english]) =>
             (chinese.includes('微信') && chinese.includes('支付宝')) ||
@@ -24,7 +24,9 @@ test('homepage platform lists include TikTok in both languages', () => {
     assert.ok(platformLists.length > 0)
 
     for (const [chinese, english] of platformLists) {
+        assert.ok(chinese.includes('淘宝'), chinese)
         assert.ok(chinese.includes('抖音'), chinese)
+        assert.ok(english.includes('Taobao'), english)
         assert.ok(english.includes('TikTok'), english)
     }
 })

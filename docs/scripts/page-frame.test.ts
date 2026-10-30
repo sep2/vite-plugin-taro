@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { dev } from 'astro'
+import { homeTranslations } from '../src/lib/home-translations.ts'
 
 /** Render the real overrides to keep both menus usable before JavaScript loads or when it is disabled. */
 test('page frames preserve the navigation contract and forwarded slots', async (context) => {
@@ -42,6 +43,11 @@ test('page frames preserve the navigation contract and forwarded slots', async (
                     /href="https:\/\/github\.com\/sep2\/vite-plugin-taro\/tree\/main\/demo\/benchmark-demo"/
                 )
                 assert.match(html, /最快的全功能/)
+                for (const copy of Object.keys(homeTranslations)) {
+                    if (copy.includes('微信') && copy.includes('支付宝')) {
+                        assert.ok(html.includes(copy), `the homepage must render its translated platform copy: ${copy}`)
+                    }
+                }
             } else {
                 assert.doesNotMatch(html, /<home-language-switch\b/, 'documentation must not offer a language switch')
             }

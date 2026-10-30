@@ -1,10 +1,10 @@
 /** Exact homepage copy, including accessible labels and the interactive demo text. */
 export const homeTranslations = {
-    'VPT - 用现代化前端工具链开发微信、支付宝与抖音小程序':
-        'VPT - Modern tooling for WeChat, Alipay, and TikTok Mini Programs',
-    '使用 Vite 8、React 19 和 Taro 4 构建微信、支付宝、抖音小程序与 Web 应用。':
-        'Build WeChat, Alipay, TikTok Mini Programs, and Web apps with Vite 8, React 19, and Taro 4.',
-    '— 微信 · 支付宝 · 抖音 · Web —': '— WeChat · Alipay · TikTok · Web —',
+    'VPT - 用现代化前端工具链开发微信、支付宝、淘宝与抖音小程序':
+        'VPT - Modern tooling for WeChat, Alipay, Taobao, and TikTok Mini Programs',
+    '使用 Vite 8、React 19 和 Taro 4 构建微信、支付宝、淘宝、抖音小程序与 Web 应用。':
+        'Build WeChat, Alipay, Taobao, TikTok Mini Programs, and Web apps with Vite 8, React 19, and Taro 4.',
+    '— 微信 · 支付宝 · 淘宝 · 抖音 · Web —': '— WeChat · Alipay · Taobao · TikTok · Web —',
     '极致的渲染性能 · 开发者工具热更新': 'Exceptional rendering performance · DevTools hot updates',
     快速开始: 'Get started',
     '查看 GitHub': 'View on GitHub',
@@ -124,8 +124,8 @@ export const homeTranslations = {
     简体中文: 'English',
     '只决定何时加载，不再关心放在哪个包': 'Choose when to load, not where to package',
     '动态导入，自动分包': 'Dynamic imports. Automatic splitting.',
-    '像 Web 应用一样组织源码。VPT 沿着模块图识别同步启动链与按需边界，再自动生成符合微信、支付宝与抖音限制的主包和分包。':
-        'Organize source code like a Web app. VPT follows the module graph to identify startup dependencies and lazy-loading boundaries, then generates packages that meet WeChat, Alipay, and TikTok limits.',
+    '像 Web 应用一样组织源码。VPT 沿着模块图识别同步启动链与按需边界，再自动生成符合微信、支付宝、淘宝与抖音限制的主包和分包。':
+        'Organize source code like a Web app. VPT follows the module graph to identify startup dependencies and lazy-loading boundaries, then generates packages that meet WeChat, Alipay, Taobao, and TikTok limits.',
     零手写配置: 'Zero manual configuration',
     '无需维护 subPackages': 'No subPackages to maintain',
     依赖自动分包: 'Dependencies split automatically',
@@ -171,8 +171,8 @@ export const homeTranslations = {
     拆包合并: 'Split & merge',
     'Tailwind CSS v4 · 样式热更新': 'Tailwind CSS v4 · Style hot updates',
     'Tailwind，直达小程序': 'Tailwind, straight to Mini Programs',
-    '编写一次 Tailwind className，VPT 自动适配微信、支付宝、抖音小程序与 Web；各平台热更新要求见样式指南。':
-        'Write Tailwind className once. VPT adapts it for WeChat, Alipay, TikTok, and the Web. See the styling guide for platform-specific hot update requirements.',
+    '让 AI 编写 Tailwind className，VPT 自动适配微信、支付宝、淘宝、抖音小程序与 Web。':
+        'Let AI write Tailwind className. VPT adapts it for WeChat, Alipay, Taobao, TikTok, and the Web.',
     '使用 Tailwind CSS 编写的 React 组件': 'React component styled with Tailwind CSS',
     早上好: 'Good morning',
     今日步数: 'Steps today',
@@ -191,8 +191,8 @@ export const homeTranslations = {
     查看样式指南: 'Read the styling guide',
     '编译时连接 · 零运行时封装': 'Connected at compile time · No runtime wrappers',
     'React 与原生组件，双向直连': 'React and native components, connected',
-    '用 TypeScript 声明属性与事件。VPT 自动注册、复制并分配原生资源，让 React 数据与微信、支付宝、抖音小程序的原生事件自然往返。':
-        'Declare props and events in TypeScript. VPT registers, copies, and distributes native assets, connecting React data with native events in WeChat, Alipay, and TikTok.',
+    '用 TypeScript 声明属性与事件。VPT 自动注册、复制并分配原生资源，让 React 数据与微信、支付宝、淘宝、抖音小程序的原生事件自然往返。':
+        'Declare props and events in TypeScript. VPT registers, copies, and distributes native assets, connecting React data with native events in WeChat, Alipay, Taobao, and TikTok.',
     'React 与微信原生计数器的双向通信演示': 'Two-way communication between React and a WeChat native counter',
     微信小程序: 'WeChat Mini Program',
     微信原生组件: 'WeChat native component',
@@ -207,20 +207,20 @@ export const homeTranslations = {
     '以 React 19 运行 App、页面和组件，直接使用 Hooks、Suspense 与 React.lazy()。':
         'Run your App, pages, and components on React 19, with Hooks, Suspense, and React.lazy().',
     小程序开发热更新: 'Mini Program hot updates',
-    '基于 Vite 模块图和 React Refresh，为微信、支付宝与抖音小程序提供状态保留热更新；各平台模式与验证范围见热更新指南。':
-        'The Vite module graph and React Refresh power state-preserving hot updates for WeChat, Alipay, and TikTok Mini Programs. See the HMR guide for platform modes and validation scope.',
+    '基于 Vite 模块图和 React Refresh，为微信、支付宝、淘宝与抖音小程序提供状态保留热更新；各平台模式与验证范围见热更新指南。':
+        'The Vite module graph and React Refresh power state-preserving hot updates for WeChat, Alipay, Taobao, and TikTok Mini Programs. See the HMR guide for platform modes and validation scope.',
     状态保留: 'State preserved',
     '动态 import() 探索加载边界，自动规划主包与分包，应用层不再关心单包 2M 限制。':
         'Dynamic import() defines loading boundaries. VPT plans the main package and subpackages, handling the 2 MB limit for you.',
     动态加载: 'Lazy loading',
     'Web 标准 API': 'Web Standard APIs',
-    '继续使用熟悉的 Web 标准，在一份 React 源码中连接微信、支付宝、抖音小程序和 Web。':
-        'Keep familiar Web standards APIs. Reach WeChat, Alipay, TikTok, and the Web from one React codebase.',
+    '继续使用熟悉的 Web 标准，在一份 React 源码中连接微信、支付宝、淘宝、抖音小程序和 Web。':
+        'Keep familiar Web standards APIs. Reach WeChat, Alipay, Taobao, TikTok, and the Web from one React codebase.',
     跨端组件: 'Cross-platform',
     '统一 API': 'Unified APIs',
     小程序原生组件: 'Native Mini Program components',
-    '微信、支付宝与抖音原生组件均可和 React 双向调用，并自然参与全自动分包，无需维护额外的胶水层。':
-        'WeChat, Alipay, and TikTok native components communicate with React in both directions and participate in automatic splitting, without extra glue code.',
+    '微信、支付宝、淘宝与抖音原生组件均可和 React 双向调用，并自然参与全自动分包，无需维护额外的胶水层。':
+        'WeChat, Alipay, Taobao, and TikTok native components communicate with React in both directions and participate in automatic splitting, without extra glue code.',
     双向通信: 'Two-way communication',
     自动分包: 'Auto splitting',
     'Skyline 渲染模式': 'Skyline rendering',
@@ -228,8 +228,8 @@ export const homeTranslations = {
         'Enable Skyline globally or per page for smoother, more consistent rendering of complex interactions.',
     按页启用: 'Per-page control',
     流畅渲染: 'Smooth rendering',
-    '默认模板开箱即用，候选类和样式输出自动适配微信、支付宝、抖音小程序与 Web。':
-        'Ready in the default template. Class candidates and generated styles are adapted for WeChat, Alipay, TikTok, and the Web.',
+    '默认模板开箱即用，候选类和样式输出自动适配微信、支付宝、淘宝、抖音小程序与 Web。':
+        'Ready in the default template. Class candidates and generated styles are adapted for WeChat, Alipay, Taobao, TikTok, and the Web.',
     零配置: 'Zero configuration',
     跨端样式: 'Cross-platform styles',
     '100% 测试覆盖': '100% test coverage',
@@ -239,8 +239,8 @@ export const homeTranslations = {
     回归保障: 'Regression tests',
     从开发体验到生产交付: 'From development to production',
     为现代小程序开发而生: 'Built for modern Mini Programs',
-    '熟悉的 React 开发方式，一份源码覆盖微信、支付宝、抖音小程序与 Web，不再被传统工具链拖慢。':
-        'Familiar React development. One codebase for WeChat, Alipay, TikTok, and the Web, without the drag of legacy tooling.',
+    '熟悉的 React 开发方式，一份源码覆盖微信、支付宝、淘宝、抖音小程序与 Web，不再被传统工具链拖慢。':
+        'Familiar React development. One codebase for WeChat, Alipay, Taobao, TikTok, and the Web, without the drag of legacy tooling.',
     查看文档: 'Read the docs',
     '使用 AI': 'Build with AI',
     项目资源: 'Project resources',
