@@ -434,6 +434,7 @@ export const nextValue = next.default({})
 
 for (const [target, createContract] of [
     ['zfb', createZfbMiniContract],
+    ['tb', createZfbMiniContract],
     ['tt', createTtMiniContract]
 ] as const) {
     for (const mode of ['devtools', 'interpreter'] as const) {

@@ -8,8 +8,8 @@ import { miniTaroRuntimeId } from '../mini/module/module.ts'
 import { createClientTaroPlugin } from './client-taro.ts'
 
 /** Bundles the real Mini facade, shared CommonJS backend, platform adapter, and React hooks. */
-async function bundleMiniApi(source: string, target: 'wx' | 'zfb' | 'tt'): Promise<string> {
-    const platform = { wx: 'weapp', zfb: 'alipay', tt: 'tt' }[target]
+async function bundleMiniApi(source: string, target: 'wx' | 'zfb' | 'tb' | 'tt'): Promise<string> {
+    const platform = { wx: 'weapp', zfb: 'alipay', tb: 'alipay', tt: 'tt' }[target]
     const aliases: ReadonlyMap<string, string> = new Map([
         ['@tarojs/runtime', miniTaroRuntimeId],
         ['@tarojs/api', resolveTaroRuntime('api')]
@@ -61,7 +61,7 @@ async function bundleMiniApi(source: string, target: 'wx' | 'zfb' | 'tt'): Promi
     return chunk.code
 }
 
-for (const target of ['wx', 'zfb', 'tt'] as const) {
+for (const target of ['wx', 'zfb', 'tb', 'tt'] as const) {
     test(`converts dynamic inline sizes through the real ${target} Taro facade`, async () => {
         const code = await bundleMiniApi(
             `
@@ -112,7 +112,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
         runInNewContext(
             `globalThis.global = globalThis;\n${code}
             assert.equal(typeof fixture.probe, 'function')
-            assert.equal(fixture.options.miniGlobal, ${{ wx: 'wx', zfb: 'my', tt: 'tt' }[target]})
+            assert.equal(fixture.options.miniGlobal, ${{ wx: 'wx', zfb: 'my', tb: 'my', tt: 'tt' }[target]})
         `,
             {
                 assert,
@@ -160,7 +160,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
                 assert.equal(navigation.errMsg, 'navigateTo:ok')
                 Taro.navigateTo = () => Promise.resolve({ errMsg: 'replacement-navigation' })
                 assert.equal((await navigateTo({ url: '/ignored' })).errMsg, 'replacement-navigation')
-                assert.equal(Taro.getEnv(), ${JSON.stringify({ wx: 'WEAPP', zfb: 'ALIPAY', tt: 'TT' }[target])})
+                assert.equal(Taro.getEnv(), ${JSON.stringify({ wx: 'WEAPP', zfb: 'ALIPAY', tb: 'ALIPAY', tt: 'TT' }[target])})
                 Taro.addInterceptor(chain => {
                     assert.equal(chain.requestParams.url, '/fixture')
                     // This request-local option verifies both exported functions share the same interceptor chain.
@@ -190,10 +190,13 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
                 headers?: { probe: string }
                 success(result: object): void
             }) {
-                assert.equal(target !== 'zfb' ? options.header?.probe : options.headers?.probe, 'yes')
+                assert.equal(
+                    !(target === 'zfb' || target === 'tb') ? options.header?.probe : options.headers?.probe,
+                    'yes'
+                )
                 calls.push('request')
                 options.success(
-                    target !== 'zfb'
+                    !(target === 'zfb' || target === 'tb')
                         ? { statusCode: 200, header: { probe: 'received' } }
                         : { status: 200, headers: { probe: 'received' } }
                 )
@@ -201,7 +204,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
             },
             showToast(options: { title?: string; content?: string; success(result: { errMsg: string }): void }) {
                 assert.equal(this, native)
-                assert.equal(target !== 'zfb' ? options.title : options.content, 'hello')
+                assert.equal(!(target === 'zfb' || target === 'tb') ? options.title : options.content, 'hello')
                 calls.push('toast')
                 options.success({ errMsg: 'showToast:ok' })
             },
@@ -220,7 +223,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
             getStorageSync(key: string | { key: string }) {
                 assert.equal(this, native)
                 assert.equal(typeof key === 'string' ? key : key.key, 'key')
-                return target !== 'zfb' ? 'stored' : { data: 'stored' }
+                return !(target === 'zfb' || target === 'tb') ? 'stored' : { data: 'stored' }
             }
         }
         await runInNewContext(`globalThis.global = globalThis;\n${code}\nfixture.probe()`, {

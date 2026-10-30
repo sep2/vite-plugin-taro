@@ -11,7 +11,7 @@ const placeholderFiles = {
     'customize-tab-bar/index.json': '{"component":true}\n'
 } as const
 
-/** Supplies Alipay's native custom-tab entry while React owns the visible tab bar. */
+/** Supplies the Alipay native custom-tab entry while React owns the visible tab bar. */
 export function createZfbCustomTabBarPlugin(contract: MiniContract): Plugin {
     return {
         name: 'vpt:zfb-custom-tab-bar',

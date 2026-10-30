@@ -114,7 +114,7 @@ test('leaves other module requests and server environments to their own resolver
     assert.equal(Reflect.apply(hook.handler, context, ['/src/client.ts']), undefined)
 })
 
-for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
+for (const target of ['wx', 'zfb', 'tb', 'tt', 'h5'] as const) {
     for (const command of ['serve', 'build'] as const) {
         test(`scopes the native Vite client for ${target} ${command}`, async () => {
             const config = await resolveConfig(

@@ -4,19 +4,26 @@ import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
 import { isMiniWatchBuild } from '../mini/watch/is-mini-watch-build.ts'
+import { createTbHmrPlugin } from './create-tb-hmr-plugin.ts'
 import { createZfbCustomTabBarPlugin } from './create-zfb-custom-tab-bar-plugin.ts'
 import { createZfbSkeleton } from './create-zfb-skeleton.ts'
 
-/** Adapts the shared Mini Program pipeline to the zfb public target. */
+/** Shares the AXML compiler between Alipay and Taobao. */
 export function createZfbMiniPlugins(vptOptions: VptOptions): PluginOption[] {
     const contract = createZfbMiniContract(vptOptions)
 
-    return [createMiniTargetPlugins(contract), createZfbCustomTabBarPlugin(contract)]
+    return [
+        createMiniTargetPlugins(contract),
+        createZfbCustomTabBarPlugin(contract),
+        vptOptions.target === 'tb' && createTbHmrPlugin()
+    ]
 }
 
-/** Binds the shared Mini Program core to Alipay runtime and output conventions. */
+/** Shares the Alipay Taro runtime and selects each target’s development transport and output settings. */
 export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
     const projectConfigFilename = 'mini.project.json'
+
+    const target = vptOptions.target
 
     return {
         options: vptOptions,
@@ -28,8 +35,8 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
             targetRuntimePath: resolveTaroRuntime('plugin-platform-alipay/runtime')
         },
         runtime: {
-            devtoolsHmrRuntime: resolveVptRuntime('zfb/dev/devtools-runtime'),
-            interpreterHmrRuntime: resolveVptRuntime('zfb/dev/interpreter-runtime')
+            devtoolsHmrRuntime: resolveVptRuntime(`${target}/dev/devtools-runtime`),
+            interpreterHmrRuntime: resolveVptRuntime(`${target}/dev/interpreter-runtime`)
         },
         styles: {
             appFileName: 'app.acss',

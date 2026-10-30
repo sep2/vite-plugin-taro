@@ -84,7 +84,7 @@ test('physical shared facade preserves upstream named exports and identities', a
     }
 })
 
-for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
+for (const target of ['wx', 'zfb', 'tb', 'tt', 'h5'] as const) {
     test(`provides tree-shakable shared utilities for ${target}`, async () => {
         const chunk = await bundleApi(
             `

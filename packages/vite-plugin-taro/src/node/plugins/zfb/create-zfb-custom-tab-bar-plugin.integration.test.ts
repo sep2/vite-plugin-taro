@@ -14,9 +14,9 @@ const authoredFiles = {
     json: '{"component":true,"usingComponents":{}}'
 } as const
 
-function createOptions(): VptOptions {
+function createOptions(target: 'zfb' | 'tb'): VptOptions {
     return {
-        target: 'zfb',
+        target,
         app: 'src/app.tsx',
         pages: [{ path: 'pages/home/index' }, { path: 'pages/about/index' }],
         appJson: {
@@ -73,69 +73,71 @@ async function readEntry(output: string): Promise<Record<string, string>> {
     return files
 }
 
-for (const authored of [false, true]) {
-    test(`builds the Alipay custom tab entry with authored native files ${authored}`, async () => {
-        const root = await createProject()
-        if (authored) {
-            const publicDir = path.join(root, 'public/customize-tab-bar')
-            await mkdir(publicDir, { recursive: true })
-            for (const [extension, source] of Object.entries(authoredFiles)) {
-                await writeFile(path.join(publicDir, `index.${extension}`), source)
+for (const target of ['zfb', 'tb'] as const) {
+    for (const authored of [false, true]) {
+        test(`builds the ${target} custom tab entry with authored native files ${authored}`, async () => {
+            const root = await createProject()
+            if (authored) {
+                const publicDir = path.join(root, 'public/customize-tab-bar')
+                await mkdir(publicDir, { recursive: true })
+                for (const [extension, source] of Object.entries(authoredFiles)) {
+                    await writeFile(path.join(publicDir, `index.${extension}`), source)
+                }
             }
-        }
-        const output = path.join(root, 'dist')
-        await build({
-            root,
-            configFile: false,
-            logLevel: 'silent',
-            plugins: vpt(createOptions()),
-            build: { outDir: output }
+            const output = path.join(root, 'dist')
+            await build({
+                root,
+                configFile: false,
+                logLevel: 'silent',
+                plugins: vpt(createOptions(target)),
+                build: { outDir: output }
+            })
+            const files = await readEntry(output)
+            if (authored) {
+                assert.deepEqual(files, authoredFiles)
+            } else {
+                assert.equal(files.js, 'Component({})\n')
+                assert.match(files.acss, /display: none/)
+                assert.match(files.axml, /vpt-tab-bar-placeholder/)
+            }
         })
-        const files = await readEntry(output)
-        if (authored) {
-            assert.deepEqual(files, authoredFiles)
-        } else {
-            assert.equal(files.js, 'Component({})\n')
-            assert.match(files.acss, /display: none/)
-            assert.match(files.axml, /vpt-tab-bar-placeholder/)
+    }
+
+    test(`publishes the ${target} placeholder on development startup and restart`, { timeout: 25_000 }, async () => {
+        const root = await createProject()
+        const output = path.join(root, 'dist')
+        for (const generation of ['startup', 'restart']) {
+            await rm(path.join(output, 'customize-tab-bar'), { recursive: true, force: true })
+            const publication = Promise.withResolvers<void>()
+            const server = await createServer({
+                root,
+                configFile: false,
+                logLevel: 'silent',
+                plugins: [
+                    vpt(createOptions(target)),
+                    {
+                        name: 'test:zfb-custom-tab-bar-publication',
+                        enforce: 'post',
+                        writeBundle: {
+                            order: 'post',
+                            handler() {
+                                publication.resolve()
+                            }
+                        }
+                    }
+                ],
+                build: { outDir: output },
+                server: { host: '127.0.0.1', port: 0 }
+            })
+            try {
+                await server.listen()
+                await publication.promise
+                const files = await readEntry(output)
+                assert.equal(files.js, 'Component({})\n', generation)
+                assert.match(files.acss, /display: none/, generation)
+            } finally {
+                await server.close()
+            }
         }
     })
 }
-
-test('publishes the Alipay placeholder on development startup and restart', { timeout: 25_000 }, async () => {
-    const root = await createProject()
-    const output = path.join(root, 'dist')
-    for (const generation of ['startup', 'restart']) {
-        await rm(path.join(output, 'customize-tab-bar'), { recursive: true, force: true })
-        const publication = Promise.withResolvers<void>()
-        const server = await createServer({
-            root,
-            configFile: false,
-            logLevel: 'silent',
-            plugins: [
-                vpt(createOptions()),
-                {
-                    name: 'test:zfb-custom-tab-bar-publication',
-                    enforce: 'post',
-                    writeBundle: {
-                        order: 'post',
-                        handler() {
-                            publication.resolve()
-                        }
-                    }
-                }
-            ],
-            build: { outDir: output },
-            server: { host: '127.0.0.1', port: 0 }
-        })
-        try {
-            await server.listen()
-            await publication.promise
-            const files = await readEntry(output)
-            assert.equal(files.js, 'Component({})\n', generation)
-            assert.match(files.acss, /display: none/, generation)
-        } finally {
-            await server.close()
-        }
-    }
-})

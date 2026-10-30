@@ -17,7 +17,7 @@ export default function vpt(options: VptOptions): PluginOption[] {
         createClientTaroPlugin(options.target),
         ...react(options.react),
         ...(options.target === 'wx' ? createWxMiniPlugins(options) : []),
-        ...(options.target === 'zfb' ? createZfbMiniPlugins(options) : []),
+        ...(options.target === 'zfb' || options.target === 'tb' ? createZfbMiniPlugins(options) : []),
         ...(options.target === 'tt' ? createTtMiniPlugins(options) : []),
         ...(options.target === 'h5' ? createH5TargetPlugins(options) : [])
     ]
