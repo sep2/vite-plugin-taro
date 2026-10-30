@@ -1,6 +1,6 @@
 ---
 title: 条件编译
-description: 使用条件指令编写微信、支付宝、抖音小程序和 Web 的目标专用源码。
+description: 使用条件指令编写微信、支付宝、淘宝、抖音小程序和 Web 的目标专用源码。
 ---
 
 目标专用源码可以使用条件块。
@@ -14,6 +14,10 @@ console.log('仅微信小程序')
 
 // #ifdef zfb
 console.log('仅支付宝小程序')
+// #endif
+
+// #ifdef tb
+console.log('仅淘宝小程序')
 // #endif
 
 // #ifdef tt
@@ -45,7 +49,7 @@ console.log('非 H5 目标')
 
 支持：
 
-- `#ifdef wx`、`#ifdef zfb`、`#ifdef tt` 和 `#ifdef h5`；
+- `#ifdef wx`、`#ifdef zfb`、`#ifdef tb`、`#ifdef tt` 和 `#ifdef h5`；
 - `#ifndef`；
 - `#else`；
 - `#endif`；

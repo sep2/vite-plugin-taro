@@ -13,12 +13,13 @@ description: 配置构建目标、App、页面和小程序项目文件。
 target: 'wx'
 ```
 
-| 值 | 输出 |
-| --- | --- |
-| `wx` | 微信小程序 |
+| 值    | 输出         |
+|-------|--------------|
+| `wx`  | 微信小程序   |
 | `zfb` | 支付宝小程序 |
-| `tt` | 抖音小程序 |
-| `h5` | Web 应用 |
+| `tb`  | 淘宝小程序   |
+| `tt`  | 抖音小程序   |
+| `h5`  | Web 应用     |
 
 ## `renderer`
 
@@ -28,10 +29,10 @@ target: 'wx'
 renderer: 'dom'
 ```
 
-| 值 | 行为                                                                                                              |
-| --- |-------------------------------------------------------------------------------------------------------------------|
-| `template` | 使用 Taro 的递归模板与 `setData()` 进行渲染。                                                                     |
-| `dom` | 使用原生 DOM 渲染，不需要 `wxml`，零 `setData()` 调用，性能极佳，与原生持平；当前支持微信、抖音。支付宝暂不支持。 |
+| 值         | 行为                                                                                                                            |
+|------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `template` | 使用 Taro 的递归模板与 `setData()` 进行渲染。                                                                                   |
+| `dom`      | 使用原生 DOM 渲染，不需要 `wxml`，零 `setData()` 调用，性能极佳，与原生持平；当前支持微信、抖音。其它平台自动退回template模式。 |
 
 微信 DOM 模式需要开启 `glass-easel`。 DOM 渲染同时支持 `Webview` 和 `Skyeline`。
 
@@ -181,19 +182,20 @@ appJson: {
 
 以下由 vpt 自动维护，无需填写：
 
-| 字段 | 来源 |
-| --- | --- |
-| `pages` | 根据 `pages` 选项生成 |
-| `subPackages` / `subpackages` | 根据自动分包结果生成 |
-| `routes` | 根据 `pages` 生成 H5 路由 |
+| 字段                          | 来源                      |
+|-------------------------------|---------------------------|
+| `pages`                       | 根据 `pages` 选项生成     |
+| `subPackages` / `subpackages` | 根据自动分包结果生成      |
+| `routes`                      | 根据 `pages` 生成 H5 路由 |
 
 即使传入这些字段，vpt 也会用构建结果替换它们。
 
-`appJson` 接受普通 JSON 对象，按当前目标的原生配置原样输出，不在微信、支付宝和抖音之间翻译字段。字段名称和取值以对应平台文档为准。
+`appJson` 接受普通 JSON 对象，按当前目标的原生配置原样输出，不在微信、支付宝、淘宝和抖音之间翻译字段。字段名称和取值以对应平台文档为准。
 
-### 支付宝自定义 Tabs
+### 支付宝与淘宝自定义 Tabs
 
-支付宝设置 `appJson.tabBar.customize: true` 时，vpt 会在输出目录的 `customize-tab-bar/` 中自动生成隐藏的原生占位组件。可直接在页面中使用 React 开发 Tabs 组件，通过 `Taro.switchTab()` 切换 Tab 页面。
+支付宝和淘宝设置 `appJson.tabBar.customize: true` 时，vpt 会在输出目录的 `customize-tab-bar/` 中自动生成隐藏的原生占位组件。可直接在页面中使用
+React 开发 Tabs 组件，通过 `Taro.switchTab()` 切换 Tab 页面。
 
 应用通过 Vite 的 `public` 目录或其他插件提供的同名文件会保留，vpt 只补齐其余占位文件。
 
@@ -216,19 +218,20 @@ projectConfigJson: {
 }
 ```
 
-微信写入 `project.config.json`，支付宝写入 `mini.project.json`，抖音写入 `project.config.json`。
+微信写入 `project.config.json`，支付宝和淘宝写入 `mini.project.json`，抖音写入 `project.config.json`。
 
 小程序监听构建（`build:... --watch`）会自动关闭生成配置中的开发者工具热重载：
 
-| 目标 | 监听构建中强制设为 `false` 的字段 |
-| --- | --- |
-| 微信 | `setting.compileHotReLoad` |
-| 支付宝 | `developOptions.hotReload` |
-| 抖音 | 顶层 `compileHotReload` 和 `setting.compileHotReLoad` |
+| 目标         | 监听构建中强制设为 `false` 的字段                     |
+|--------------|-------------------------------------------------------|
+| 微信         | `setting.compileHotReLoad`                            |
+| 支付宝、淘宝 | `developOptions.hotReload`                            |
+| 抖音         | 顶层 `compileHotReload` 和 `setting.compileHotReLoad` |
 
 ## `projectPrivateConfigJson`
 
-可选。提供时写入对应平台的私有配置文件，不与 `projectConfigJson` 合并。微信和抖音监听构建会强制设置私有配置中的 `setting.compileHotReLoad: false`，避免覆盖共享配置的关闭设置；其余字段及支付宝私有配置原样输出：
+可选。提供时写入对应平台的私有配置文件，不与 `projectConfigJson` 合并。微信和抖音监听构建会强制设置私有配置中的
+`setting.compileHotReLoad: false`，避免覆盖共享配置的关闭设置；其余字段及支付宝私有配置原样输出：
 
 ```ts
 projectPrivateConfigJson: {
@@ -238,11 +241,12 @@ projectPrivateConfigJson: {
 }
 ```
 
-微信写入 `project.private.config.json`；支付宝写入 `.mini-ide/project-ide.json`；抖音写入 `project.private.config.json`；H5 构建忽略该选项。
+微信写入 `project.private.config.json`；支付宝和淘宝写入 `.mini-ide/project-ide.json`；抖音写入
+`project.private.config.json`；H5 构建忽略该选项。
 
 ## `sitemapJson`
 
-可选。微信构建仅在提供该选项时生成 `sitemap.json`；支付宝、抖音和 H5 忽略它：
+可选。微信构建仅在提供该选项时生成 `sitemap.json`；支付宝、淘宝、抖音和 H5 忽略它：
 
 ```ts
 sitemapJson: {
@@ -326,39 +330,39 @@ hmr: {
 }
 ```
 
-| `mode` | 行为                                                                     |
-| --- |--------------------------------------------------------------------------|
-| `devtools` | 默认值。把原生补丁写入项目，由小程序开发工具重新执行 Page。              |
+| `mode`        | 行为                                                                     |
+|---------------|--------------------------------------------------------------------------|
+| `devtools`    | 默认值。把原生补丁写入项目，由小程序开发工具重新执行 Page。              |
 | `interpreter` | 通过 Vite 现有 WebSocket 推送源码，使用解释器执行代码，不重新注册 Page。 |
-| `rebuild` | 每次有效源码变化都重新生成完整原生项目并重启 App，不创建或应用增量补丁。 |
+| `rebuild`     | 每次有效源码变化都重新生成完整原生项目并重启 App，不创建或应用增量补丁。 |
 
 该选项不改变 H5 或生产构建输出。
 
 
 ## 生成的小程序配置文件
 
-| vpt 配置 | WX 输出 | ZFB 输出 | TT 输出 |
-| --- | --- | --- | --- |
-| `appJson` 和 `pages` | `app.json` | `app.json` | `app.json` |
-| `pages[].config` | `${path}.json` | `${path}.json` | `${path}.json` |
-| `projectConfigJson` | `project.config.json` | `mini.project.json` | `project.config.json` |
+| vpt 配置                   | WX 输出                       | ZFB / TB 输出                | TT 输出                       |
+|----------------------------|-------------------------------|------------------------------|-------------------------------|
+| `appJson` 和 `pages`       | `app.json`                    | `app.json`                   | `app.json`                    |
+| `pages[].config`           | `${path}.json`                | `${path}.json`               | `${path}.json`                |
+| `projectConfigJson`        | `project.config.json`         | `mini.project.json`          | `project.config.json`         |
 | `projectPrivateConfigJson` | `project.private.config.json` | `.mini-ide/project-ide.json` | `project.private.config.json` |
-| `sitemapJson`（可选） | 提供时生成 `sitemap.json` | — | — |
+| `sitemapJson`（可选）      | 提供时生成 `sitemap.json`     | —                            | —                             |
 
 ## Vite 配置
 
 下面这些设置继续使用 Vite，不放入 `vpt()`：
 
-| 需求 | 配置位置 |
-| --- | --- |
-| 输出目录 | `build.outDir` |
-| H5 部署基础路径 | `base` |
-| 源码别名 | `resolve.alias` |
-| 全局标识符替换 | `define` |
-| PostCSS | `css.postcss` 或 PostCSS 配置文件 |
-| 静态文件 | `public` 目录 |
-| 开发服务器 | `server` |
-| 其他构建扩展 | Vite 插件 |
+| 需求            | 配置位置                          |
+|-----------------|-----------------------------------|
+| 输出目录        | `build.outDir`                    |
+| H5 部署基础路径 | `base`                            |
+| 源码别名        | `resolve.alias`                   |
+| 全局标识符替换  | `define`                          |
+| PostCSS         | `css.postcss` 或 PostCSS 配置文件 |
+| 静态文件        | `public` 目录                     |
+| 开发服务器      | `server`                          |
+| 其他构建扩展    | Vite 插件                         |
 
 H5 需要项目根目录下的 `index.html`，其中包含挂载节点：
 
@@ -370,7 +374,8 @@ H5 需要项目根目录下的 `index.html`，其中包含挂载节点：
 
 ### 小程序中的 `globalThis`
 
-微信（`wx`）、支付宝（`zfb`）和抖音（`tt`）均支持直接使用 `globalThis`。vpt 自动提供统一的全局对象绑定，无需手动导入、配置 `define` 或添加 `globalThis` polyfill。
+微信（`wx`）、支付宝（`zfb`）、淘宝（`tb`）和抖音（`tt`）均支持直接使用 `globalThis`。vpt 自动提供统一的全局对象绑定，无需手动导入、配置
+`define` 或添加 `globalThis` polyfill。
 
 安装在全局对象上的 API 也可通过裸标识符访问，同名局部变量遵循正常的 JavaScript 作用域规则。
 

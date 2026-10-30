@@ -21,16 +21,16 @@ pnpm build:plugin
 
 ## 工作区结构
 
-| 路径 | 用途 |
-| --- | --- |
-| `packages/vite-plugin-taro` | 发布到 npm 的 Vite 插件 |
-| `packages/create-vite-taro` | 项目生成器及包含真实 Tab 路由与 React 标签栏的默认模板 |
-| `packages/taro-runtime` | 从固定版本 Taro 开发依赖构建的统一运行时、React 与平台适配包 |
-| `demo/loan-genius` | 微信、支付宝、抖音与 Web 综合示例 |
-| `demo/native-comp-demo` | 微信、支付宝与抖音原生组件示例 |
-| `demo/hmr-stress-demo` | 微信与支付宝深层 React 树及页面栈 HMR 压力测试项目；暂不包含抖音目标 |
-| `demo/towxml-stream-demo` | 微信 Towxml 原生组件与流式渲染示例 |
-| `docs` | Astro Starlight 文档站 |
+| 路径                        | 用途                                                                 |
+| --------------------------- | -------------------------------------------------------------------- |
+| `packages/vite-plugin-taro` | 发布到 npm 的 Vite 插件                                              |
+| `packages/create-vite-taro` | 项目生成器及包含真实 Tab 路由与 React 标签栏的默认模板               |
+| `packages/taro-runtime`     | 从固定版本 Taro 开发依赖构建的统一运行时、React 与平台适配包         |
+| `demo/loan-genius`          | 微信、支付宝、淘宝、抖音与 Web 综合示例                              |
+| `demo/native-comp-demo`     | 微信、支付宝与抖音原生组件示例                                       |
+| `demo/hmr-stress-demo`      | 微信与支付宝深层 React 树及页面栈 HMR 压力测试项目；暂不包含抖音目标 |
+| `demo/towxml-stream-demo`   | 微信 Towxml 原生组件与流式渲染示例                                   |
+| `docs`                      | Astro Starlight 文档站                                               |
 
 ## 构建与验证
 
@@ -49,13 +49,14 @@ pnpm test
 ```sh
 pnpm build:template:wx
 pnpm build:template:zfb
+pnpm build:template:tb
 pnpm build:template:tt
 pnpm build:template:h5
 ```
 
-每个命令先构建运行时适配包，再从默认模板生成临时项目，使用工作区依赖构建，并将产物保留在仓库根目录的 `dist/wx`、`dist/zfb`、`dist/tt` 或 `dist/h5`。构建完成后清理临时项目。
+每个命令先构建运行时适配包，再从默认模板生成临时项目，使用工作区依赖构建，并将产物保留在仓库根目录的 `dist/wx`、`dist/zfb`、`dist/tb`、`dist/tt` 或 `dist/h5`。构建完成后清理临时项目。
 
-默认使用生成项目的环境配置。需要指定 AppID 时，可在 `packages/create-vite-taro/.env.local` 中配置 `VITE_VPT_WECHAT_APP_ID`、`VITE_VPT_ALIPAY_APP_ID` 和 `VITE_VPT_TIKTOK_APP_ID`。此文件存在时，构建脚本将其复制到临时项目，由 Vite 读取对应平台的 AppID。小程序开发者工具可直接打开对应的根目录 `dist/<target>`。
+默认使用生成项目的环境配置。需要指定 AppID 时，可在 `packages/create-vite-taro/.env.local` 中配置 `VITE_VPT_WECHAT_APP_ID`、`VITE_VPT_ALIPAY_APP_ID`、`VITE_VPT_TAOBAO_APP_ID` 和 `VITE_VPT_TIKTOK_APP_ID`。此文件存在时，构建脚本将其复制到临时项目，由 Vite 读取对应平台的 AppID。小程序开发者工具可直接打开对应的根目录 `dist/<target>`。
 
 ### 示例应用
 
@@ -63,6 +64,7 @@ pnpm build:template:h5
 pnpm typecheck:loan-genius
 pnpm build:loan-genius:wx
 pnpm build:loan-genius:zfb
+pnpm build:loan-genius:tb
 pnpm build:loan-genius:tt
 pnpm build:loan-genius:h5
 
@@ -95,6 +97,7 @@ pnpm --filter docs build
 ```sh
 pnpm dev:loan-genius:wx
 pnpm dev:loan-genius:zfb
+pnpm dev:loan-genius:tb
 pnpm dev:loan-genius:tt
 pnpm dev:loan-genius:h5
 pnpm dev:native-comp-demo:wx
@@ -105,7 +108,7 @@ pnpm dev:hmr-stress-demo:zfb
 pnpm dev:towxml-stream-demo:wx
 ```
 
-运行微信目标后，在微信开发者工具中打开对应项目的 `dist/wx`；运行支付宝目标后，在支付宝小程序开发者工具中打开 `dist/zfb`；运行抖音目标后，在抖音开发者工具中打开 `dist/tt`。HMR 压力项目的自动编辑与断言工具当前仅连接微信开发者工具，应通过仓库根目录的 `pnpm stress:hmr-stress-demo:burst` 运行。运行 H5 目标后，使用 Vite 输出的本地地址。
+运行微信目标后，在微信开发者工具中打开对应项目的 `dist/wx`；运行支付宝目标后，在支付宝小程序开发者工具中打开 `dist/zfb`；运行淘宝目标后，在淘宝开发者工具中打开 `dist/tb`；运行抖音目标后，在抖音开发者工具中打开 `dist/tt`。HMR 压力项目的自动编辑与断言工具当前仅连接微信开发者工具，应通过仓库根目录的 `pnpm stress:hmr-stress-demo:burst` 运行。运行 H5 目标后，使用 Vite 输出的本地地址。
 
 ## 生成文件
 

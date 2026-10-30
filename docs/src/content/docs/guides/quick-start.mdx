@@ -1,17 +1,17 @@
 ---
 title: 快速开始
-description: 从创建项目到运行微信、支付宝、抖音小程序与 Web 应用。
+description: 从创建项目到运行微信、支付宝、淘宝、抖音小程序与 Web 应用。
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components'
 
-本指南使用 `create-vite-taro` 创建一个同时支持微信、支付宝、抖音小程序和 Web 的应用。默认模板已经配置好 Vite 8、React 19、Taro 4、TypeScript 和 Tailwind CSS v4。
+本指南使用 `create-vite-taro` 创建一个同时支持微信、支付宝、淘宝、抖音小程序和 Web 的应用。默认模板已经配置好 Vite 8、React 19、Taro 4、TypeScript 和 Tailwind CSS v4。
 
 ## 准备工作
 
 - Node.js 24 或更高版本。
 - pnpm、npm 或 yarn。推荐使用 pnpm。
-- 安装[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)和/或支付宝/抖音小程序开发者工具最新版。
+- 安装[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)和/或支付宝/淘宝/抖音小程序开发者工具最新版。
 - 对应平台的小程序 App ID。没有微信 App ID 时也可以先使用测试号体验部分功能。
 
 ## 1. 创建项目
@@ -54,6 +54,7 @@ yarn install
 ```dotenv
 VITE_VPT_WECHAT_APP_ID=wx1234567890abcdef
 VITE_VPT_ALIPAY_APP_ID=2021000000000000
+VITE_VPT_TAOBAO_APP_ID=2021000000000000
 VITE_VPT_TIKTOK_APP_ID=testAppId
 ```
 
@@ -69,6 +70,7 @@ VITE_VPT_TIKTOK_APP_ID=testAppId
 ```sh
 pnpm dev:wx         # 微信小程序
 pnpm dev:zfb        # 支付宝小程序
+pnpm dev:tb         # 淘宝小程序
 pnpm dev:tt         # 抖音小程序
 pnpm dev:h5         # Web 应用
 ```
@@ -79,6 +81,7 @@ pnpm dev:h5         # Web 应用
 ```sh
 npm run dev:wx      # 微信小程序
 npm run dev:zfb     # 支付宝小程序
+npm run dev:tb      # 淘宝小程序
 npm run dev:tt      # 抖音小程序
 npm run dev:h5      # Web 应用
 ```
@@ -89,6 +92,7 @@ npm run dev:h5      # Web 应用
 ```sh
 yarn dev:wx         # 微信小程序
 yarn dev:zfb        # 支付宝小程序
+yarn dev:tb         # 淘宝小程序
 yarn dev:tt         # 抖音小程序
 yarn dev:h5         # Web 应用
 ```
@@ -96,7 +100,7 @@ yarn dev:h5         # Web 应用
     </TabItem>
 </Tabs>
 
-- **小程序：** 等待 Vite 完成初始构建，然后在对应平台的开发者工具中导入生成目录：微信 `dist/wx`、支付宝 `dist/zfb`、抖音 `dist/tt`。不要打开项目源码根目录。
+- **小程序：** 等待 Vite 完成初始构建，然后在对应平台的开发者工具中导入生成目录：微信 `dist/wx`、支付宝 `dist/zfb`、淘宝 `dist/tb`、抖音 `dist/tt`。不要打开项目源码根目录。
 - **Web：** 在浏览器中访问终端显示的地址。
 
 如需同时开发多个目标，请在不同终端中分别运行对应命令。
@@ -111,6 +115,7 @@ yarn dev:h5         # Web 应用
 ```sh
 pnpm build:wx --watch        # 微信小程序
 pnpm build:zfb --watch       # 支付宝小程序
+pnpm build:tb --watch        # 淘宝小程序
 pnpm build:tt --watch        # 抖音小程序
 ```
 
@@ -120,6 +125,7 @@ pnpm build:tt --watch        # 抖音小程序
 ```sh
 npm run build:wx -- --watch  # 微信小程序
 npm run build:zfb -- --watch # 支付宝小程序
+npm run build:tb -- --watch  # 淘宝小程序
 npm run build:tt -- --watch  # 抖音小程序
 ```
 
@@ -129,6 +135,7 @@ npm run build:tt -- --watch  # 抖音小程序
 ```sh
 yarn build:wx --watch        # 微信小程序
 yarn build:zfb --watch       # 支付宝小程序
+yarn build:tb --watch        # 淘宝小程序
 yarn build:tt --watch        # 抖音小程序
 ```
 
@@ -184,6 +191,7 @@ HTML 标签可以与 `ScrollView` 等 Taro 组件混用。
 ```sh
 pnpm build:wx        # 构建微信小程序到 dist/wx
 pnpm build:zfb       # 构建支付宝小程序到 dist/zfb
+pnpm build:tb        # 构建淘宝小程序到 dist/tb
 pnpm build:tt        # 构建抖音小程序到 dist/tt
 pnpm build:h5        # 构建 Web 应用到 dist/h5
 pnpm preview:h5      # 预览 Web 生产构建
@@ -196,6 +204,7 @@ pnpm typecheck       # 使用 tsc 检查类型
 ```sh
 npm run build:wx     # 构建微信小程序到 dist/wx
 npm run build:zfb    # 构建支付宝小程序到 dist/zfb
+npm run build:tb     # 构建淘宝小程序到 dist/tb
 npm run build:tt     # 构建抖音小程序到 dist/tt
 npm run build:h5     # 构建 Web 应用到 dist/h5
 npm run preview:h5   # 预览 Web 生产构建
@@ -208,6 +217,7 @@ npm run typecheck    # 使用 tsc 检查类型
 ```sh
 yarn build:wx        # 构建微信小程序到 dist/wx
 yarn build:zfb       # 构建支付宝小程序到 dist/zfb
+yarn build:tb        # 构建淘宝小程序到 dist/tb
 yarn build:tt        # 构建抖音小程序到 dist/tt
 yarn build:h5        # 构建 Web 应用到 dist/h5
 yarn preview:h5      # 预览 Web 生产构建
@@ -223,6 +233,7 @@ yarn typecheck       # 使用 tsc 检查类型
 | --- | --- | --- | --- |
 | 微信小程序（`wx`） | `dev:wx` | `build:wx` | `dist/wx` |
 | 支付宝小程序（`zfb`） | `dev:zfb` | `build:zfb` | `dist/zfb` |
+| 淘宝小程序（`tb`） | `dev:tb` | `build:tb` | `dist/tb` |
 | 抖音小程序（`tt`） | `dev:tt` | `build:tt` | `dist/tt` |
 | Web（`h5`） | `dev:h5` | `build:h5` | `dist/h5` |
 
@@ -254,7 +265,7 @@ my-app/
 
 ### 小程序开发者工具无法打开项目
 
-确认导入的是当前目标的 `dist/wx`、`dist/zfb` 或 `dist/tt`，并检查 `.env.local` 中对应的 App ID 是否属于当前开发者账号。
+确认导入的是当前目标的 `dist/wx`、`dist/zfb`、`dist/tb` 或 `dist/tt`，并检查 `.env.local` 中对应的 App ID 是否属于当前开发者账号。
 
 ### Tailwind 工具类没有生效
 
