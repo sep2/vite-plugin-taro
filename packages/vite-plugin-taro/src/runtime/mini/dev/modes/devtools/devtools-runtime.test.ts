@@ -38,8 +38,8 @@ type CapturedSocketMessage = Readonly<{
 
 type TestHarness = Readonly<{
     openSocket: () => void
-    closeSocket: () => void
-    failSocket: () => void
+    closeSocket: (details?: unknown) => void
+    failSocket: (details?: unknown) => void
     emitSocketMessage: (data: string | ArrayBuffer) => void
     messages: CapturedSocketMessage[]
     closed: Array<Readonly<{ code: number; reason: string }>>
@@ -60,8 +60,8 @@ async function createConnectingTestHarness(): Promise<TestHarness> {
     // Native lifecycle callbacks remain under test control so sends before OPEN fail like DevTools.
     let opened = false
     let onOpen = () => {}
-    let onClose = () => {}
-    let onError = () => {}
+    let onClose = (_details?: unknown) => {}
+    let onError = (_details?: unknown) => {}
     const socket: MiniSocketTask = {
         onOpen(listener) {
             onOpen = listener
@@ -105,13 +105,13 @@ async function createConnectingTestHarness(): Promise<TestHarness> {
             opened = true
             onOpen()
         },
-        closeSocket() {
+        closeSocket(details) {
             opened = false
-            onClose()
+            onClose(details)
         },
-        failSocket() {
+        failSocket(details) {
             opened = false
-            onError()
+            onError(details)
         },
         emitSocketMessage(data) {
             receiveSocketMessage({ data: data })
@@ -212,6 +212,17 @@ test('reports patch failure before closing the socket and stops subsequent insta
     closeSocket()
     assert.equal(warn.mock.callCount(), 1)
 })
+
+for (const event of ['closeSocket', 'failSocket'] as const) {
+    test(`includes native ${event} details in the disconnect diagnostic`, async (context) => {
+        const warn = context.mock.method(console, 'warn', () => {})
+        const harness = await createConnectingTestHarness()
+        const details = { error: 8, errorMessage: 'Invalid protocol header', code: 1006, reason: 'Handshake failed' }
+        harness[event](details)
+        assert.equal(warn.mock.callCount(), 1)
+        assert.equal(warn.mock.calls[0]?.arguments[1], details)
+    })
+}
 
 for (const state of ['connecting', 'open'] as const) {
     for (const event of ['closeSocket', 'failSocket'] as const) {

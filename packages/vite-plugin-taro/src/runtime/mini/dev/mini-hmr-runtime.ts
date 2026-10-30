@@ -116,13 +116,13 @@ class MiniHotContext {
     prune(_callback?: () => void): void {}
 }
 
-/** Task-scoped socket surface shared by the WX and Alipay Mini Program APIs. */
+/** Task-scoped transport shared by Mini Program HMR adapters, retaining native terminal diagnostics. */
 export type MiniSocketTask = Readonly<{
     send(options: Readonly<{ data: string }>): void
     close(options: Readonly<{ code: number; reason: string }>): void
     onOpen(listener: () => void): void
-    onClose(listener: () => void): void
-    onError(listener: () => void): void
+    onClose(listener: (details?: unknown) => void): void
+    onError(listener: (details?: unknown) => void): void
     onMessage(listener: (result: Readonly<{ data: unknown }>) => void): void
 }>
 
@@ -309,14 +309,15 @@ export class MiniHmrRuntime extends DevRuntime {
         this.session = { buildId: info.buildId, appliedSeq: 0 }
 
         const socket = this.connectSocket(info.endpoint)
-        const handleDisconnect = () => {
+        const handleDisconnect = (details?: unknown) => {
             this.socket = undefined
             if (this.disconnectWarningHandled) {
                 return
             }
             this.disconnectWarningHandled = true
             console.warn(
-                '[vpt] HMR disconnected. Ensure the Vite dev server is running, then reload the Mini Program in DevTools.'
+                '[vpt] HMR disconnected. Ensure the Vite dev server is running, then reload the Mini Program in DevTools.',
+                ...(details === undefined ? [] : [details])
             )
         }
         socket.onClose(handleDisconnect)
