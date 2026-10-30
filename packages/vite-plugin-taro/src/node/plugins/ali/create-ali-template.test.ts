@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createZfbTemplate } from './create-zfb-template.ts'
+import { createAliTemplate } from './create-ali-template.ts'
 
-test('renders Alipay-specific component, third-party, and PageMeta branches', () => {
-    const template = createZfbTemplate()
+test('renders shared AXML component, third-party, and PageMeta branches', () => {
+    const template = createAliTemplate()
     const source = template.buildTemplate({
         includes: new Set(['view', 'map', 'picker', 'swiper', 'swiper-item']),
         exclude: new Set(),

@@ -9,16 +9,16 @@ import { createTestProject } from '../../../tests/create-test-project.ts'
 import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import { publishSourceGeneration } from '../../../tests/publish-source-generation.ts'
 import vpt from '../../../vpt.ts'
+import { createAliMiniContract } from '../../ali/plugins.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createWxMiniContract } from '../../wx/plugins.ts'
-import { createZfbMiniContract } from '../../zfb/plugins.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { createMiniWatchPlugin } from '../watch/create-mini-watch-plugin.ts'
 import { createMiniOverridePlugin } from './create-mini-override-plugin.ts'
 
 const miniContracts = {
     wx: createWxMiniContract,
-    zfb: createZfbMiniContract,
+    zfb: createAliMiniContract,
     tt: createTtMiniContract
 } as const
 

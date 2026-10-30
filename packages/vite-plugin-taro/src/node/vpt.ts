@@ -1,13 +1,13 @@
 import react from '@vitejs/plugin-react'
 import type { PluginOption } from 'vite'
 import type { VptOptions } from '../options.ts'
+import { createAliMiniPlugins } from './plugins/ali/plugins.ts'
 import { createClientTaroPlugin } from './plugins/client/client-taro.ts'
 import { createConditionalDirectivePlugin } from './plugins/conditional/conditional-directives.ts'
 import { createDepsPlugin } from './plugins/deps/create-deps-plugin.ts'
 import { createH5TargetPlugins } from './plugins/h5/plugins.ts'
 import { createTtMiniPlugins } from './plugins/tt/plugins.ts'
 import { createWxMiniPlugins } from './plugins/wx/plugins.ts'
-import { createZfbMiniPlugins } from './plugins/zfb/plugins.ts'
 
 /** Creates the Vite plugins for one Taro target. */
 export default function vpt(options: VptOptions): PluginOption[] {
@@ -17,7 +17,7 @@ export default function vpt(options: VptOptions): PluginOption[] {
         createClientTaroPlugin(options.target),
         ...react(options.react),
         ...(options.target === 'wx' ? createWxMiniPlugins(options) : []),
-        ...(options.target === 'zfb' || options.target === 'tb' ? createZfbMiniPlugins(options) : []),
+        ...(options.target === 'zfb' || options.target === 'tb' ? createAliMiniPlugins(options) : []),
         ...(options.target === 'tt' ? createTtMiniPlugins(options) : []),
         ...(options.target === 'h5' ? createH5TargetPlugins(options) : [])
     ]

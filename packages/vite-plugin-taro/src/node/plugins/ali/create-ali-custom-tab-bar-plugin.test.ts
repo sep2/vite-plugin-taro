@@ -10,8 +10,8 @@ import { createH5TargetPlugins } from '../h5/plugins.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createTtMiniPlugins } from '../tt/plugins.ts'
 import { createWxMiniPlugins } from '../wx/plugins.ts'
-import { createZfbCustomTabBarPlugin } from './create-zfb-custom-tab-bar-plugin.ts'
-import { createZfbMiniContract } from './plugins.ts'
+import { createAliCustomTabBarPlugin } from './create-ali-custom-tab-bar-plugin.ts'
+import { createAliMiniContract } from './plugins.ts'
 
 const fileNames = [
     'customize-tab-bar/index.acss',
@@ -21,7 +21,7 @@ const fileNames = [
 ] as const
 
 function createContract(appJson: VptJsonObject): MiniContract {
-    return createZfbMiniContract({
+    return createAliMiniContract({
         target: 'zfb',
         app: 'src/app.tsx',
         pages: [],
@@ -35,7 +35,7 @@ function generateFiles(
     bundle: Record<string, unknown>,
     publicDir: string
 ): Record<string, string> {
-    const hook = createZfbCustomTabBarPlugin(createContract(appJson)).generateBundle
+    const hook = createAliCustomTabBarPlugin(createContract(appJson)).generateBundle
     assert.ok(hook && typeof hook === 'object')
     // This generation-local journal records the assets emitted through the Vite hook.
     const files: Rolldown.EmittedFile[] = []
@@ -59,7 +59,7 @@ function generateFiles(
 }
 
 test('runs after project output in the client environment', () => {
-    const plugin = createZfbCustomTabBarPlugin(createContract({}))
+    const plugin = createAliCustomTabBarPlugin(createContract({}))
     assert.equal(plugin.enforce, 'post')
     assert.ok(plugin.generateBundle && typeof plugin.generateBundle === 'object')
     assert.equal(plugin.generateBundle.order, 'post')
@@ -68,7 +68,7 @@ test('runs after project output in the client environment', () => {
     assert.equal(Reflect.apply(plugin.applyToEnvironment, null, [{ name: 'ssr' }]), false)
 })
 
-test('emits a hidden native component from the Alipay contract', (context) => {
+test('emits the shared native custom-tab placeholder', (context) => {
     const appJson = { tabBar: { customize: true, items: [{ pagePath: 'pages/home/index', name: 'Home' }] } }
     const original = structuredClone(appJson)
     const files = generateFiles(appJson, {}, '')
@@ -115,7 +115,7 @@ test('preserves native files already emitted by another plugin', () => {
 })
 
 test('preserves public native files and supplies their missing companions', async () => {
-    const root = await createTestProject('zfb-tab-bar-public-')
+    const root = await createTestProject('ali-tab-bar-public-')
     const publicDir = path.join(root, 'public')
     const entry = path.join(publicDir, 'customize-tab-bar/index.js')
     const source = 'Component({ data: { authored: true } })'
@@ -150,7 +150,7 @@ for (const [target, createPlugins] of [
                         plugin &&
                         typeof plugin === 'object' &&
                         'name' in plugin &&
-                        plugin.name === 'vpt:zfb-custom-tab-bar'
+                        plugin.name === 'vpt:ali-custom-tab-bar'
                 ),
             false
         )

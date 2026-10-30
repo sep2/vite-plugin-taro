@@ -4,23 +4,23 @@ import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
 import { isMiniWatchBuild } from '../mini/watch/is-mini-watch-build.ts'
+import { createAliCustomTabBarPlugin } from './create-ali-custom-tab-bar-plugin.ts'
+import { createAliSkeleton } from './create-ali-skeleton.ts'
 import { createTbHmrPlugin } from './create-tb-hmr-plugin.ts'
-import { createZfbCustomTabBarPlugin } from './create-zfb-custom-tab-bar-plugin.ts'
-import { createZfbSkeleton } from './create-zfb-skeleton.ts'
 
 /** Shares the AXML compiler between Alipay and Taobao. */
-export function createZfbMiniPlugins(vptOptions: VptOptions): PluginOption[] {
-    const contract = createZfbMiniContract(vptOptions)
+export function createAliMiniPlugins(vptOptions: VptOptions): PluginOption[] {
+    const contract = createAliMiniContract(vptOptions)
 
     return [
         createMiniTargetPlugins(contract),
-        createZfbCustomTabBarPlugin(contract),
+        createAliCustomTabBarPlugin(contract),
         vptOptions.target === 'tb' && createTbHmrPlugin()
     ]
 }
 
 /** Shares the Alipay Taro runtime and selects each target’s development transport and output settings. */
-export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
+export function createAliMiniContract(vptOptions: VptOptions): MiniContract {
     const projectConfigFilename = 'mini.project.json'
 
     const target = vptOptions.target
@@ -45,7 +45,7 @@ export function createZfbMiniContract(vptOptions: VptOptions): MiniContract {
         output: {
             projectConfigFilename,
             projectPrivateConfigFilename: '.mini-ide/project-ide.json',
-            generateProjectSkeleton: createZfbSkeleton
+            generateProjectSkeleton: createAliSkeleton
         },
         override: [
             // Format 2 migrates enableHMR to developOptions.hotReload; IDE preferences do not own this field.

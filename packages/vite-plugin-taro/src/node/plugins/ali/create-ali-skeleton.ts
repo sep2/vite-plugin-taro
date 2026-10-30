@@ -17,10 +17,10 @@ import {
     replaceExactlyOnce,
     toRootRelativePath
 } from '../mini/skeleton/skeleton-utils.ts'
-import { createZfbTemplate } from './create-zfb-template.ts'
+import { createAliTemplate } from './create-ali-template.ts'
 
 /**
- * Generates the Alipay templates that project one React ownership tree through two independent native Page data roots.
+ * Generates shared Alipay/Taobao AXML templates that project one React ownership tree through two native Page data roots.
  *
  * ## Native data ownership
  *
@@ -67,23 +67,23 @@ import { createZfbTemplate } from './create-zfb-template.ts'
  * declaration, but accepts an empty array and still packages the files beneath that root. Keeping `pages: []` preserves the real
  * model: no synthetic Page, native lifecycle, route, or template exists merely to make code eligible for asynchronous loading.
  */
-export function createZfbSkeleton(
+export function createAliSkeleton(
     { bundle, subpackages, nativeComponents, isProduction }: MiniProjectSkeletonInput,
     contract: MiniContract
 ): Rolldown.EmittedAsset[] {
     const { options, output, taro } = contract
-    const template = createZfbTemplate()
+    const template = createAliTemplate()
     const componentConfig = collectTemplateComponentConfig(bundle, taro.componentsReactPath, nativeComponents)
     const nativeComponentConfig = createNativeComponentConfig(nativeComponents)
     const recursiveComponentJson = createRecursiveComponentJson(nativeComponentConfig)
-    const baseTemplateSource = buildZfbBaseTemplate(template.buildTemplate(componentConfig))
+    const baseTemplateSource = buildAliBaseTemplate(template.buildTemplate(componentConfig))
     const recursiveComponentTemplateSource = buildRecursiveComponentTemplate(
         template.buildBaseComponentTemplate('.axml')
     )
     const customWrapperTemplateSource = buildRecursiveCustomWrapperTemplate(
         template.buildCustomComponentTemplate('.axml')
     )
-    const generatedSubpackages = subpackages.map((subpackage) => createZfbSubpackageJson(subpackage.root))
+    const generatedSubpackages = subpackages.map((subpackage) => createAliSubpackageJson(subpackage.root))
     const jsonAsset = (fileName: string, value: MiniJsonObject) => createJsonAsset(fileName, value, isProduction)
 
     return [
@@ -105,7 +105,7 @@ export function createZfbSkeleton(
                 jsonAsset(`${page.path}.json`, createSkeletonPageJson(page, nativeComponentConfig)),
                 createTextAsset(
                     `${page.path}.axml`,
-                    buildZfbPageTemplate({
+                    buildAliPageTemplate({
                         source: pageTemplateSource,
                         baseTemplatePath: baseTemplatePath
                     })
@@ -120,13 +120,13 @@ export function createZfbSkeleton(
     ]
 }
 
-/** Adds Alipay's transparent App collection and threads the independent Page root through every recursive data scope. */
-export function buildZfbBaseTemplate(source: string): string {
+/** Adds the shared transparent App collection and threads the independent Page root through every recursive data scope. */
+export function buildAliBaseTemplate(source: string): string {
     return buildRecursiveBaseTemplate(source, 'a')
 }
 
 /** Keeps Taro's optional PageMeta output while replacing its Page-owned template table with the two-root component bridge. */
-function buildZfbPageTemplate({
+function buildAliPageTemplate({
     source,
     baseTemplatePath
 }: Readonly<{
@@ -137,19 +137,19 @@ function buildZfbPageTemplate({
         source,
         `<import src="${baseTemplatePath}"/>`,
         '',
-        'Alipay Page base import'
+        'AXML Page base import'
     )
 
     return replaceExactlyOnce(
         withoutBaseImport,
         '<template is="taro_tmpl" data="{{root:root}}" />',
         '<comp i="{{app}}" p="{{page}}" />',
-        'Alipay Page template entry'
+        'AXML Page template entry'
     )
 }
 
-/** Declares one Alipay code-only generated package without inventing a native route. */
-function createZfbSubpackageJson(root: string): MiniJsonObject {
+/** Declares one code-only generated package with an empty native page list. */
+function createAliSubpackageJson(root: string): MiniJsonObject {
     return {
         root: root,
         pages: []

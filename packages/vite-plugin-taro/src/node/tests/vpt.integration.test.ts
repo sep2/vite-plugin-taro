@@ -804,7 +804,7 @@ for (const target of ['zfb', 'tb'] as const) {
                         import { Button } from '@tarojs/components'
 
                         export default function Home() {
-                            return <View id="zfb-home"><Text>ZFB page marker</Text><Button>ZFB button</Button></View>
+                            return <View id="ali-home"><Text>Ali page marker</Text><Button>Ali button</Button></View>
                         }
                     `
                 }
@@ -879,7 +879,7 @@ for (const target of ['zfb', 'tb'] as const) {
                 assert.deepEqual(projectJson, createOptions(target).projectConfigJson)
                 assert.doesNotMatch(pageTemplate, /<import src="\.\.\/\.\.\/base\.axml"\s*\/>/)
                 assert.match(pageTemplate, /<comp i="{{app}}" p="{{page}}" \/>/)
-                assert.match(javascript, /ZFB page marker/)
+                assert.match(javascript, /Ali page marker/)
                 assertNativeShells(output)
             }
         )
@@ -1022,14 +1022,14 @@ for (const target of ['zfb', 'tb'] as const) {
                         import { View } from '@tarojs/components'
 
                         export default function Feature() {
-                            return <View>Lazy zfb feature marker</View>
+                            return <View>Lazy Ali feature marker</View>
                         }
                     `
                 }
             },
             (output) => {
                 const chunks = output.filter((candidate): candidate is OutputChunk => candidate.type === 'chunk')
-                const featureChunk = chunks.find((chunk) => chunk.code.includes('Lazy zfb feature marker'))
+                const featureChunk = chunks.find((chunk) => chunk.code.includes('Lazy Ali feature marker'))
                 assert.ok(featureChunk)
                 const rootMatch = /^(sub\/p_[a-f0-9]{8})\//.exec(featureChunk.fileName)
                 assert.ok(rootMatch)
@@ -1048,7 +1048,7 @@ for (const target of ['zfb', 'tb'] as const) {
                 assert.equal(
                     chunks.some(
                         (chunk) =>
-                            !chunk.fileName.startsWith(`${root}/`) && chunk.code.includes('Lazy zfb feature marker')
+                            !chunk.fileName.startsWith(`${root}/`) && chunk.code.includes('Lazy Ali feature marker')
                     ),
                     false
                 )
@@ -1145,7 +1145,7 @@ for (const target of ['zfb', 'tb'] as const) {
                     `,
                     'src/native/native-counter/counter.js': 'Component({ props: { count: 0 } })',
                     'src/native/native-counter/counter.json': '{"component":true,"styleIsolation":"apply-shared"}',
-                    'src/native/native-counter/counter.axml': '<view>Native zfb counter marker</view>',
+                    'src/native/native-counter/counter.axml': '<view>Native Ali counter marker</view>',
                     'src/native/native-counter/counter.acss': '.counter { color: red; }',
                     'src/native/native-counter/payload.bin': Uint8Array.from([0, 1, 2, 255])
                 }
@@ -1175,7 +1175,7 @@ for (const target of ['zfb', 'tb'] as const) {
                 })
                 assert.equal(
                     String(requireAsset(output, `${nativeRoot}/counter.axml`).source),
-                    '<view>Native zfb counter marker</view>'
+                    '<view>Native Ali counter marker</view>'
                 )
                 assert.equal(
                     String(requireAsset(output, `${nativeRoot}/counter.acss`).source),

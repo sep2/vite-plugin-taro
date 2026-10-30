@@ -3,10 +3,10 @@ import path from 'node:path'
 import test from 'node:test'
 import { normalizePath } from 'vite'
 import { resolveVptRuntime } from '../../../utils/packages.ts'
+import { createAliMiniContract } from '../../ali/plugins.ts'
 import { appComponentId } from '../../client/constant.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createWxMiniContract } from '../../wx/plugins.ts'
-import { createZfbMiniContract } from '../../zfb/plugins.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import {
     miniAppCapsuleId,
@@ -117,7 +117,7 @@ test('resolves fixed and route-specific private IDs', () => {
 
 for (const [target, createContract] of [
     ['wx', createWxMiniContract],
-    ['zfb', createZfbMiniContract],
+    ['zfb', createAliMiniContract],
     ['tt', createTtMiniContract]
 ] as const) {
     test(`${target}: resolves the selected target host for every renderer configuration`, () => {

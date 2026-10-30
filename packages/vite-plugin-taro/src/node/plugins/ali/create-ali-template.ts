@@ -1,5 +1,5 @@
 import { capitalize, RecursiveTemplate, toCamelCase } from '@tarojs/shared/dist/template.js'
-import { components as zfbComponents } from 'vite-plugin-taro-runtime/plugin-platform-alipay/runtime-utils'
+import { components as aliComponents } from 'vite-plugin-taro-runtime/plugin-platform-alipay/runtime-utils'
 import { recursiveMerge } from '../mini/skeleton/recursive-merge.ts'
 
 type ComponentAttributes = Record<string, string>
@@ -12,7 +12,7 @@ type TemplatePage = Readonly<{
 
 const nodeNameKey = 'nn'
 
-class ZfbTemplate extends RecursiveTemplate {
+class AliTemplate extends RecursiveTemplate {
     exportExpr = 'export default'
     supportXS = true
     isXMLSupportRecursiveReference = false
@@ -165,12 +165,12 @@ class ZfbTemplate extends RecursiveTemplate {
     }
 }
 
-/** Creates the Taro Alipay template implementation without loading its CLI platform package. */
-export function createZfbTemplate(): RecursiveTemplate {
-    const template = new ZfbTemplate()
+/** Creates the shared Alipay/Taobao template compiler from Taro's Alipay component definitions. */
+export function createAliTemplate(): RecursiveTemplate {
+    const template = new AliTemplate()
 
     // Taro retains and mutates this component registry while applying platform-specific removals.
-    template.mergeComponents({ helper: { recursiveMerge } }, zfbComponents)
+    template.mergeComponents({ helper: { recursiveMerge } }, aliComponents)
     delete template.internalComponents.Slider['block-size']
     delete template.internalComponents.Slider['block-color']
     delete template.internalComponents.Swiper.bindAnimationFinish

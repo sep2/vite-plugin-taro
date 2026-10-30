@@ -15,8 +15,8 @@ import {
 import { dev } from 'rolldown/experimental'
 import { type BuildOptions, createServer } from 'vite'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
+import { createAliMiniContract } from '../../ali/plugins.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
-import { createZfbMiniContract } from '../../zfb/plugins.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { renderNative } from '../render/native.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
@@ -433,8 +433,8 @@ export const nextValue = next.default({})
 })
 
 for (const [target, createContract] of [
-    ['zfb', createZfbMiniContract],
-    ['tb', createZfbMiniContract],
+    ['zfb', createAliMiniContract],
+    ['tb', createAliMiniContract],
     ['tt', createTtMiniContract]
 ] as const) {
     for (const mode of ['devtools', 'interpreter'] as const) {

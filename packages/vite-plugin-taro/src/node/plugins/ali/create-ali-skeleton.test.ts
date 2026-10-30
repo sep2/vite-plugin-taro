@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildZfbBaseTemplate } from './create-zfb-skeleton.ts'
-import { createZfbMiniContract } from './plugins.ts'
+import { buildAliBaseTemplate } from './create-ali-skeleton.ts'
+import { createAliMiniContract } from './plugins.ts'
 
-const contract = createZfbMiniContract({
+const contract = createAliMiniContract({
     target: 'zfb',
     app: 'src/app.tsx',
     pages: [
@@ -32,12 +32,12 @@ const contract = createZfbMiniContract({
 
 test('rejects a Taro base template that lost its recursive child contract', () => {
     assert.throws(
-        () => buildZfbBaseTemplate('<template name="taro_tmpl" />'),
+        () => buildAliBaseTemplate('<template name="taro_tmpl" />'),
         /Recursive base templates must recurse through compact child data/
     )
 })
 
-test('assembles contract-selected Alipay templates without WX dialect output', () => {
+test('assembles shared AXML templates from the target contract', () => {
     const { projectConfigFilename, projectPrivateConfigFilename } = contract.output
     const output = contract.output.generateProjectSkeleton(
         {

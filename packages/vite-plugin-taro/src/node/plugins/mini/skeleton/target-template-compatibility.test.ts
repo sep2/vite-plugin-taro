@@ -65,8 +65,8 @@ async function createTemplate(platform: Platform, implementation: Implementation
             return createWxTemplate()
         }
         if (platform === 'zfb') {
-            const { createZfbTemplate } = await import('../../zfb/create-zfb-template.ts')
-            return createZfbTemplate()
+            const { createAliTemplate } = await import('../../ali/create-ali-template.ts')
+            return createAliTemplate()
         }
         const { createTtTemplate } = await import('../../tt/create-tt-template.ts')
         return createTtTemplate()

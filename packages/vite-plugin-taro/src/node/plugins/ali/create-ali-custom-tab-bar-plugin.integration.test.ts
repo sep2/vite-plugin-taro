@@ -33,7 +33,7 @@ function createOptions(target: 'zfb' | 'tb'): VptOptions {
 }
 
 async function createProject(): Promise<string> {
-    const root = await createTestProject('zfb-custom-tab-bar-')
+    const root = await createTestProject('ali-custom-tab-bar-')
     const sources = {
         'src/app.tsx': `
             import type { PropsWithChildren } from 'react'
@@ -116,7 +116,7 @@ for (const target of ['zfb', 'tb'] as const) {
                 plugins: [
                     vpt(createOptions(target)),
                     {
-                        name: 'test:zfb-custom-tab-bar-publication',
+                        name: 'test:ali-custom-tab-bar-publication',
                         enforce: 'post',
                         writeBundle: {
                             order: 'post',

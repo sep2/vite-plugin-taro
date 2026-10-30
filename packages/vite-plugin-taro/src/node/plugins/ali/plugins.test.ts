@@ -4,8 +4,8 @@ import { resolveConfig } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import { miniBootstrapId, miniPageCapsuleId } from '../mini/module/module.ts'
-import { createZfbSkeleton } from './create-zfb-skeleton.ts'
-import { createZfbMiniContract, createZfbMiniPlugins } from './plugins.ts'
+import { createAliSkeleton } from './create-ali-skeleton.ts'
+import { createAliMiniContract, createAliMiniPlugins } from './plugins.ts'
 
 for (const target of ['zfb', 'tb'] as const) {
     const options: VptOptions = {
@@ -16,9 +16,9 @@ for (const target of ['zfb', 'tb'] as const) {
         projectConfigJson: {}
     }
 
-    test(`${target}: shares the ZFB compiler and Taro runtime with target-specific development entries`, () => {
-        const contract = createZfbMiniContract(options)
-        const plugins = createZfbMiniPlugins(options).flat(2)
+    test(`${target}: shares the AXML compiler and Taro runtime with target-specific development entries`, () => {
+        const contract = createAliMiniContract(options)
+        const plugins = createAliMiniPlugins(options).flat(2)
         const names = plugins.flatMap((plugin) =>
             plugin && typeof plugin === 'object' && 'name' in plugin ? [plugin.name] : []
         )
@@ -36,7 +36,7 @@ for (const target of ['zfb', 'tb'] as const) {
         ]) {
             assert.ok(names.includes(name), name)
         }
-        assert.ok(names.includes('vpt:zfb-custom-tab-bar'))
+        assert.ok(names.includes('vpt:ali-custom-tab-bar'))
         assert.equal(names.includes('vpt:tb-hmr'), target === 'tb')
         assert.equal(contract.taro.env, 'alipay')
         assert.equal(contract.taro.componentsReactPath, resolveTaroRuntime('plugin-platform-alipay/components-react'))
@@ -50,14 +50,14 @@ for (const target of ['zfb', 'tb'] as const) {
         assert.deepEqual(contract.styles, { appFileName: 'app.acss', globalFileName: 'assets/global.acss' })
         assert.equal(contract.output.projectConfigFilename, 'mini.project.json')
         assert.equal(contract.output.projectPrivateConfigFilename, '.mini-ide/project-ide.json')
-        assert.equal(contract.output.generateProjectSkeleton, createZfbSkeleton)
+        assert.equal(contract.output.generateProjectSkeleton, createAliSkeleton)
     })
 
     for (const command of ['build', 'serve'] as const) {
         for (const watch of [undefined, {}]) {
             test(`${target}: selects its JSON rules for ${command} with watch=${!!watch}`, async () => {
                 const config = await resolveConfig({ configFile: false, build: { watch } }, command)
-                const rules = createZfbMiniContract(options).override.filter((rule) => rule.apply(config))
+                const rules = createAliMiniContract(options).override.filter((rule) => rule.apply(config))
                 assert.deepEqual(
                     rules.map(({ name, content }) => ({ name, content })),
                     command === 'build' && watch

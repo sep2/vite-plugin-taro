@@ -5,10 +5,10 @@ import { build, normalizePath, resolveConfig } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { resolveVptRuntime } from '../../utils/packages.ts'
 import { wrapPluginTransform } from '../../utils/vite.ts'
+import { createAliMiniContract } from '../ali/plugins.ts'
 import { clientTaroNativeId } from '../client/constant.ts'
 import { createTtMiniContract } from '../tt/plugins.ts'
 import { createWxMiniContract } from '../wx/plugins.ts'
-import { createZfbMiniContract } from '../zfb/plugins.ts'
 import {
     miniAppCapsuleId,
     miniAppShellId,
@@ -100,7 +100,7 @@ test('native rendering resolves loader from each output generation rather than a
 
 for (const [target, createContract] of [
     ['wx', createWxMiniContract],
-    ['zfb', createZfbMiniContract],
+    ['zfb', createAliMiniContract],
     ['tt', createTtMiniContract]
 ] as const) {
     test(`${target}: selects the target host while preserving public renderer options`, () => {
