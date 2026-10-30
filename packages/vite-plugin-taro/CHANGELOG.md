@@ -1,5 +1,27 @@
 # vite-plugin-taro
 
+## 0.8.4
+
+### 新增与改进
+
+- 274baa3c：新增淘宝小程序目标 `target: 'tb'`，复用支付宝 AXML 编译器、Taro API 与运行时，支持自动分包、原生组件及 React 自定义标签栏。
+- 274baa3c、d5c1ee62：提供淘宝 HMR 传输，兼容开发工具省略 WebSocket 子协议的握手，同时保留令牌认证和 Host 校验。
+- d5c1ee62：HMR 断线提示携带原生连接失败、错误和关闭详情，便于诊断连接问题。
+
+### 升级说明
+
+从 `0.8.3` 升级到 `0.8.4`：
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.8.4
+```
+
+运行时随插件自动升级到 `0.8.4`。完成升级后完整重启 Vite 开发服务器，并重新编译开发者工具中的项目。
+
+淘宝项目设置 `target: 'tb'`、`hmr.mode: 'interpreter'`，使用支付宝兼容的应用和项目配置，并在 `appJson` 中设置 `subPackageBuildType: 'shared'`。
+
+`VptTarget` 新增 `'tb'`。穷举该类型的配置函数需增加淘宝分支；仅支持部分平台的应用应声明明确的目标联合类型，例如 `'wx' | 'zfb' | 'tt'`。
+
 ## 0.8.3
 
 ### 修复

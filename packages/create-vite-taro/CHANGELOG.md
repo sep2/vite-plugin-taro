@@ -1,5 +1,24 @@
 # create-vite-taro
 
+## 0.8.4
+
+### 新增与改进
+
+- fbf76ee3：默认模板新增淘宝开发与构建脚本、独立 App ID 配置、导航栏适配和开发工具配置，支持自动分包及 React 自定义标签栏。
+- fbf76ee3：创建项目后的开发命令提示与模板脚本保持同步；模板 README 使用 pnpm 命令，并提供 `build --watch` 示例。
+
+### 升级说明
+
+生成器从 `0.8.3` 升级到 `0.8.4`，使用新版模板创建项目：
+
+```sh
+pnpm create vite-taro@0.8.4 my-app
+```
+
+新项目自动使用同版插件与运行时。淘宝项目在 `.env.local` 中填写 `VITE_VPT_TAOBAO_APP_ID`，运行 `pnpm dev:tb`，并用淘宝开发者工具导入 `dist/tb`。
+
+已有项目执行 `pnpm add -D --save-exact vite-plugin-taro@0.8.4` 升级插件；采用淘宝目标时，合并模板中的淘宝脚本、环境变量和平台配置。
+
 ## 0.8.3
 
 ### 变更
