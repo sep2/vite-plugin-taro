@@ -92,7 +92,7 @@
         "typecheck:towxml-stream-demo": "pnpm --filter towxml-stream-demo typecheck",
         "typecheck:loan-genius": "pnpm --filter loan-genius typecheck",
         "test": "pnpm test:release && pnpm --filter vite-plugin-taro test",
-        "test:release": "node --test scripts/*.test.ts",
+        "test:release": "node --experimental-vfs --test scripts/*.test.ts",
         "test:coverage": "pnpm --filter vite-plugin-taro test:coverage",
         "lint": "biome check .",
         "format": "biome check --write .",

@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
+import { mkdir, readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { test } from 'node:test'
-import { setTimeout as delay } from 'node:timers/promises'
-import { projectTempDir } from './project-temp-dir.ts'
+import { createMemoryTestProject } from '../../../packages/vite-plugin-taro/src/node/tests/create-memory-test-project.ts'
 import { writeFixtureSource } from './write-fixture-source.ts'
 
-test('concurrent readers only observe complete source generations during a burst', async () => {
-    const root = await mkdtemp(path.join(projectTempDir, 'loan-fixture-write-'))
+test('concurrent readers only observe complete source generations during a burst', async (context) => {
+    const root = createMemoryTestProject(context)
     const file = path.join(root, 'page.tsx')
     const generations = Array.from(
         { length: 100 },
@@ -22,8 +21,6 @@ test('concurrent readers only observe complete source generations during a burst
     const reader = (async () => {
         while (publishing) {
             observed.add(await readFile(file, 'utf8'))
-            // Give the publisher a chance to acquire Windows replacement access between reader handles.
-            await delay(1)
         }
     })()
     try {
@@ -32,39 +29,27 @@ test('concurrent readers only observe complete source generations during a burst
         }
     } finally {
         publishing = false
-        try {
-            await reader
-            assert.ok(observed.size > 1)
-            for (const source of observed) {
-                assert.ok(completeSources.has(source), `Reader observed an incomplete source (${source.length} bytes)`)
-            }
-            assert.deepEqual(await readdir(root), ['page.tsx'])
-        } finally {
-            await rm(root, { recursive: true, force: true })
-        }
+        await reader
     }
+    assert.ok(observed.size > 1)
+    for (const source of observed) {
+        assert.ok(completeSources.has(source), `Reader observed an incomplete source (${source.length} bytes)`)
+    }
+    assert.deepEqual(await readdir(root), ['page.tsx'])
 })
 
-test('intentional syntax errors are published unchanged for recovery cases', async () => {
-    const root = await mkdtemp(path.join(projectTempDir, 'loan-fixture-syntax-'))
-    try {
-        const file = path.join(root, 'page.tsx')
-        const invalidSource = 'export default function Broken(\n'
-        await writeFixtureSource(file, invalidSource)
-        assert.equal(await readFile(file, 'utf8'), invalidSource)
-    } finally {
-        await rm(root, { recursive: true, force: true })
-    }
+test('intentional syntax errors are published unchanged for recovery cases', async (context) => {
+    const root = createMemoryTestProject(context)
+    const file = path.join(root, 'page.tsx')
+    const invalidSource = 'export default function Broken(\n'
+    await writeFixtureSource(file, invalidSource)
+    assert.equal(await readFile(file, 'utf8'), invalidSource)
 })
 
-test('failed publication removes its temporary file', async () => {
-    const root = await mkdtemp(path.join(projectTempDir, 'loan-fixture-failure-'))
-    try {
-        const destination = path.join(root, 'directory')
-        await mkdir(destination)
-        await assert.rejects(writeFixtureSource(destination, 'source'))
-        assert.deepEqual(await readdir(root), ['directory'])
-    } finally {
-        await rm(root, { recursive: true, force: true })
-    }
+test('failed publication removes its temporary file', async (context) => {
+    const root = createMemoryTestProject(context)
+    const destination = path.join(root, 'directory')
+    await mkdir(destination)
+    await assert.rejects(writeFixtureSource(destination, 'source'))
+    assert.deepEqual(await readdir(root), ['directory'])
 })

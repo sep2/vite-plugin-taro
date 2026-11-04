@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, symlink, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import { projectTempDir } from '../../../tests/project-temp-dir.ts'
+import { createMemoryTestProject } from '../../../tests/create-memory-test-project.ts'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import {
     classifyMiniModule,
@@ -107,8 +107,7 @@ test('polyfill execution follows the virtual entry while package paths only cont
 
 for (const layout of ['installed', 'linked'] as const) {
     test(`framework and polyfill roots follow Node resolution in the ${layout} package layout`, async (context) => {
-        const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-framework-roots-')))
-        context.after(() => rm(root, { recursive: true, force: true }))
+        const root = createMemoryTestProject(context)
         const runtimeRoot = path.join(
             root,
             layout === 'installed' ? 'node_modules/vite-plugin-taro-runtime' : 'renamed-runtime-source'
@@ -140,8 +139,12 @@ for (const layout of ['installed', 'linked'] as const) {
         await mkdir(path.join(runtimeRoot, 'dist/runtime'), { recursive: true })
         await writeFile(path.join(runtimeRoot, 'dist/runtime/index.js'), '')
         if (layout === 'linked') {
-            await symlink(runtimeRoot, path.join(root, 'node_modules/vite-plugin-taro-runtime'), 'junction')
-            await symlink(polyfillRoot, path.join(root, 'node_modules/core-js'), 'junction')
+            await symlink(
+                '../renamed-runtime-source',
+                path.join(root, 'node_modules/vite-plugin-taro-runtime'),
+                'junction'
+            )
+            await symlink('../renamed-polyfill-source', path.join(root, 'node_modules/core-js'), 'junction')
         }
 
         const fixtureRequire = createRequire(path.join(root, 'consumer.js'))

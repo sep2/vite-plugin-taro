@@ -5,7 +5,7 @@ import test from 'node:test'
 import { runInNewContext } from 'node:vm'
 import type { Rolldown } from 'vite'
 import type { VptJsonObject } from '../../../options.ts'
-import { createTestProject } from '../../tests/create-test-project.ts'
+import { createMemoryTestProject } from '../../tests/create-memory-test-project.ts'
 import { createH5TargetPlugins } from '../h5/plugins.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createTtMiniPlugins } from '../tt/plugins.ts'
@@ -114,8 +114,8 @@ test('preserves native files already emitted by another plugin', () => {
     assert.equal(entry.source, source)
 })
 
-test('preserves public native files and supplies their missing companions', async () => {
-    const root = await createTestProject('ali-tab-bar-public-')
+test('preserves public native files and supplies their missing companions', async (context) => {
+    const root = createMemoryTestProject(context)
     const publicDir = path.join(root, 'public')
     const entry = path.join(publicDir, 'customize-tab-bar/index.js')
     const source = 'Component({ data: { authored: true } })'

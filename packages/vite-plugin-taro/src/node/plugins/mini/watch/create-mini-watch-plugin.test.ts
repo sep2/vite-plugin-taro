@@ -4,6 +4,7 @@ import path from 'node:path'
 import test from 'node:test'
 import type { InlineConfig, Plugin } from 'vite'
 import { build, resolveConfig } from 'vite'
+import { createMemoryTestProject } from '../../../tests/create-memory-test-project.ts'
 import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import { publishSourceGeneration } from '../../../tests/publish-source-generation.ts'
 import { createMiniWatchPlugin } from './create-mini-watch-plugin.ts'
@@ -18,8 +19,7 @@ const wxWatchContract = {
 } as const
 
 test('enables the filesystem policy only for physical watch builds, including production mode', async (context) => {
-    const root = await fs.mkdtemp(path.join(projectTempDir, 'vpt-mini-watch-config-'))
-    context.after(() => fs.rm(root, { recursive: true, force: true }))
+    const root = createMemoryTestProject(context)
     const options = {
         root,
         configFile: false,

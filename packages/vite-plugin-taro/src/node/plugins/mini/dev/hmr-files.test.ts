@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
-import { projectTempDir } from '../../../tests/project-temp-dir.ts'
+import { createMemoryTestProject } from '../../../tests/create-memory-test-project.ts'
 import { renderDevelopmentAppStyle, renderHmrInfo, writeDevelopmentFile } from './hmr-files.ts'
 
 test('renders frozen CommonJS build metadata', () => {
@@ -23,21 +23,17 @@ test('revises the development App style entry for each complete build', () => {
     )
 })
 
-test('atomically replaces a complete development file without leaving temporary files', async () => {
-    const root = await fs.mkdtemp(path.join(projectTempDir, 'vpt-hmr-file-'))
+test('atomically replaces a complete development file without leaving temporary files', async (context) => {
+    const root = createMemoryTestProject(context)
     const fileName = 'hmr/info.js'
     const filePath = path.join(root, fileName)
 
-    try {
-        await writeDevelopmentFile(root, fileName, 'old generation')
-        const previousInode = (await fs.stat(filePath)).ino
+    await writeDevelopmentFile(root, fileName, 'old generation')
+    await using previousFile = await fs.open(filePath, 'r')
 
-        await writeDevelopmentFile(root, fileName, 'new generation')
+    await writeDevelopmentFile(root, fileName, 'new generation')
 
-        assert.equal(await fs.readFile(filePath, 'utf8'), 'new generation')
-        assert.notEqual((await fs.stat(filePath)).ino, previousInode)
-        assert.deepEqual(await fs.readdir(path.dirname(filePath)), ['info.js'])
-    } finally {
-        await fs.rm(root, { force: true, recursive: true })
-    }
+    assert.equal(await fs.readFile(filePath, 'utf8'), 'new generation')
+    assert.equal(await previousFile.readFile('utf8'), 'old generation')
+    assert.deepEqual(await fs.readdir(path.dirname(filePath)), ['info.js'])
 })

@@ -22,6 +22,7 @@
         "test-devtools:restart": "cross-env VPT_HMR_RESTART_BUILD_DELAY_MS=3000 node scripts/run-devtools-tests.ts restart",
         "test-devtools:port-swap": "cross-env VPT_HMR_RESTART_BUILD_DELAY_MS=3000 node scripts/run-port-swap-devtools-test.ts port-swap",
         "test-build-watch:restart": "cross-env VPT_HMR_RESTART_BUILD_DELAY_MS=3000 node scripts/run-build-watch-devtools-test.ts",
+        "test": "node --experimental-vfs --test scripts/*.test.ts",
         "typecheck": "tsc --project tsconfig.json"
     },
     "dependencies": {

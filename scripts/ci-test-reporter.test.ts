@@ -1,24 +1,56 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { Readable } from 'node:stream'
-import test, { type TestContext } from 'node:test'
+import test from 'node:test'
 import type { TestEvent } from 'node:test/reporters'
+import { pathToFileURL } from 'node:url'
 import ciTestReporter from './ci-test-reporter.ts'
-import { projectTempDir } from './project-temp-dir.ts'
 
 // Node imports custom reporters as ESM; Windows drive-letter paths are not valid module URLs.
 const reporter = new URL('./ci-test-reporter.ts', import.meta.url).href
 
-function runFixture(t: TestContext, source: string) {
-    const root = mkdtempSync(path.join(projectTempDir, 'vpt-ci-reporter-'))
-    t.after(() => rmSync(root, { recursive: true, force: true }))
-    assert.equal(path.dirname(root), path.resolve(import.meta.dirname, '../tmp'))
-    const fixture = path.join(root, 'fixture.test.mjs')
-    writeFileSync(fixture, source)
-    const result = spawnSync(process.execPath, ['--test', `--test-reporter=${reporter}`, fixture], {
-        cwd: root,
+function runFixture(source: string) {
+    const fixture = path.join(import.meta.dirname, 'fixture.test.mjs')
+    // Each worker mounts its own source before Node resolves the test entrypoint.
+    const preload = `
+        import { registerHooks } from 'node:module'
+        import { after } from 'node:test'
+        import { pathToFileURL } from 'node:url'
+        import { create } from 'node:vfs'
+        const filesystem = create()
+        filesystem.writeFileSync('/fixture.test.mjs', ${JSON.stringify(source)})
+        const root = filesystem.mount()
+        const hooks = registerHooks({
+            resolve(id, context, nextResolve) {
+                if (id === ${JSON.stringify(pathToFileURL(fixture).href)}) {
+                    return { url: pathToFileURL(root + '/fixture.test.mjs').href, shortCircuit: true }
+                }
+                return nextResolve(id, context)
+            }
+        })
+        after(() => {
+            hooks.deregister()
+            filesystem.unmount()
+        })
+    `
+    const input = `
+        import { run } from 'node:test'
+        import reporter from ${JSON.stringify(reporter)}
+        const tests = run({
+            files: [${JSON.stringify(fixture)}],
+            execArgv: ['--experimental-vfs', '--import', ${JSON.stringify(`data:text/javascript,${encodeURIComponent(preload)}`)}]
+        })
+        // The parent runner owns the process exit status, including abnormal worker exits.
+        tests.on('test:fail', (event) => {
+            if (event.todo === undefined && event.skip === undefined) {
+                process.exitCode = 1
+            }
+        })
+        tests.compose(reporter).pipe(process.stdout)
+    `
+    const result = spawnSync(process.execPath, [], {
+        input,
         encoding: 'utf8',
         // Start an independent runner instead of inheriting the parent test worker's recursion guard.
         env: { ...process.env, NODE_TEST_CONTEXT: undefined },
@@ -33,9 +65,8 @@ test('CI reporter module specifier is a file URL, not a native absolute path', (
     assert.equal(new URL(reporter).protocol, 'file:')
 })
 
-test('CI reporter hides passing, skipped and TODO tests while retaining totals and logs', (t) => {
+test('CI reporter hides passing, skipped and TODO tests while retaining totals and logs', () => {
     const result = runFixture(
-        t,
         `
             import test, { describe } from 'node:test'
             describe('passing suite marker', () => {
@@ -65,9 +96,8 @@ test('CI reporter hides passing, skipped and TODO tests while retaining totals a
     assert.match(result.stdout, /diagnostic marker/)
 })
 
-test('CI reporter retains failed assertion details and a nonzero exit status', (t) => {
+test('CI reporter retains failed assertion details and a nonzero exit status', () => {
     const result = runFixture(
-        t,
         `
             import assert from 'node:assert/strict'
             import test from 'node:test'
@@ -85,8 +115,8 @@ test('CI reporter retains failed assertion details and a nonzero exit status', (
     assert.match(result.stdout, /fail 1/)
 })
 
-test('CI reporter retains failed worker exit codes', (t) => {
-    const result = runFixture(t, 'process.exit(23)')
+test('CI reporter retains failed worker exit codes', () => {
+    const result = runFixture('process.exit(23)')
     assert.equal(result.status, 1, result.stdout + result.stderr)
     assert.match(result.stdout, /FAIL/)
     assert.match(result.stdout, /ERR_TEST_FAILURE/)

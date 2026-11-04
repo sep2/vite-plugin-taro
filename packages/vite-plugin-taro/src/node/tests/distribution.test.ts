@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import test from 'node:test'
@@ -8,7 +8,7 @@ import { resolveConfig } from 'vite'
 import taroPackage from 'vite-plugin-taro-runtime/taro/package.json' with { type: 'json' }
 import { h5AppPath } from '../plugins/h5/constant.ts'
 import { resolveTaroRuntime } from '../utils/packages.ts'
-import { projectTempDir } from './project-temp-dir.ts'
+import { createMemoryTestProject } from './create-memory-test-project.ts'
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const distRoot = path.join(packageRoot, 'dist')
@@ -105,34 +105,31 @@ async function assertRuntimeDistCopied(sourceRoot: string, outputRoot: string): 
     await assertFilesCopied(sourceRoot, outputRoot, retainedFiles)
 }
 
-test('compares selected package files using filesystem-relative paths', async () => {
-    const root = await mkdtemp(path.join(projectTempDir, 'vpt-distribution-paths-'))
+test('compares selected package files using filesystem-relative paths', async (context) => {
+    const root = createMemoryTestProject(context)
     const sourceRoot = path.join(root, 'source')
     const outputRoot = path.join(root, 'output')
     const files = ['lib/react/index.js', 'dist/taro-components/taro-components.css', 'global.css']
-    try {
-        await Promise.all(
+    await Promise.all(
+        [sourceRoot, outputRoot].flatMap((directory) =>
             files.map(async (file) => {
-                const source = path.join(sourceRoot, file)
-                await mkdir(path.dirname(source), { recursive: true })
-                await writeFile(source, file)
+                const destination = path.join(directory, file)
+                await mkdir(path.dirname(destination), { recursive: true })
+                await writeFile(destination, file)
             })
         )
-        await cp(sourceRoot, outputRoot, { recursive: true })
-        await assertSelectedPackageFilesCopied(sourceRoot, outputRoot, [
-            'lib/react',
-            'dist/taro-components/taro-components.css',
-            'global.css'
-        ])
-        // Redundant segments expose the raw-selector mismatch on POSIX too; Windows also normalizes separators.
-        await assertSelectedPackageFilesCopied(sourceRoot, outputRoot, [
-            './lib/react',
-            'dist/taro-components/./taro-components.css',
-            './global.css'
-        ])
-    } finally {
-        await rm(root, { recursive: true, force: true })
-    }
+    )
+    await assertSelectedPackageFilesCopied(sourceRoot, outputRoot, [
+        'lib/react',
+        'dist/taro-components/taro-components.css',
+        'global.css'
+    ])
+    // Redundant segments expose the raw-selector mismatch on POSIX too; Windows also normalizes separators.
+    await assertSelectedPackageFilesCopied(sourceRoot, outputRoot, [
+        './lib/react',
+        'dist/taro-components/./taro-components.css',
+        './global.css'
+    ])
 })
 
 test('publishes a compiler that depends on the unified Taro runtime package', async () => {

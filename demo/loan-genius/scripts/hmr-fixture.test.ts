@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtemp, open, realpath, rm } from 'node:fs/promises'
+import { open, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import { test } from 'node:test'
+import { createMemoryTestProject } from '../../../packages/vite-plugin-taro/src/node/tests/create-memory-test-project.ts'
 import { stopLoanHmrServer, withLoanHmrFixture } from './hmr-fixture.ts'
-import { projectTempDir } from './project-temp-dir.ts'
 
 test('state-retention probe reads the opt-in URL from the host global', async () => {
     await withLoanHmrFixture('state-retention', async (fixture) => {
@@ -22,8 +22,8 @@ test('state-retention probe reads the opt-in URL from the host global', async ()
     })
 })
 
-test('server cleanup awaits exit and closes the log handle', async () => {
-    const root = await mkdtemp(path.join(projectTempDir, 'loan-server-cleanup-'))
+test('server cleanup awaits exit and closes the log handle', async (context) => {
+    const root = createMemoryTestProject(context)
     const logFile = await open(path.join(root, 'vite.log'), 'w')
     const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 10000)'], { stdio: 'ignore' })
     try {
@@ -34,14 +34,13 @@ test('server cleanup awaits exit and closes the log handle', async () => {
     } finally {
         child.kill('SIGKILL')
         await logFile.close()
-        await rm(root, { recursive: true, force: true })
     }
 })
 
 test('forced shutdown reports failure but still closes the log handle', {
     skip: process.platform === 'win32'
-}, async () => {
-    const root = await mkdtemp(path.join(projectTempDir, 'loan-server-forced-'))
+}, async (context) => {
+    const root = createMemoryTestProject(context)
     const logFile = await open(path.join(root, 'vite.log'), 'w')
     const child = spawn(
         process.execPath,
@@ -63,6 +62,5 @@ test('forced shutdown reports failure but still closes the log handle', {
     } finally {
         child.kill('SIGKILL')
         await logFile.close()
-        await rm(root, { recursive: true, force: true })
     }
 })

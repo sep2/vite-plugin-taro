@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { removeDirectory } from '../.agents/skills/test-published-packages/scripts/remove-directory.ts'
+import { createMemoryTestProject } from '../packages/vite-plugin-taro/src/node/tests/create-memory-test-project.ts'
 
 function createDirectory(): string {
     const temporaryRoot = fileURLToPath(new URL('../packages/vite-plugin-taro/tmp/', import.meta.url))
@@ -13,9 +14,8 @@ function createDirectory(): string {
 }
 
 test('directory removal clears nested output and accepts an absent directory', (context) => {
-    const directory = createDirectory()
-    context.after(() => removeDirectory(directory))
-    mkdirSync(`${directory}/nested`)
+    const directory = `${createMemoryTestProject(context)}/output`
+    mkdirSync(`${directory}/nested`, { recursive: true })
     writeFileSync(`${directory}/nested/output.js`, 'output')
     removeDirectory(directory)
     assert.equal(existsSync(directory), false)

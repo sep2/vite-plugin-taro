@@ -49,11 +49,11 @@ jobs:
               run: pnpm typecheck
 
             - name: Test release preparation and package artifacts
-              run: node --test --test-reporter=./scripts/ci-test-reporter.ts scripts/*.test.ts
+              run: node --experimental-vfs --test --test-reporter=./scripts/ci-test-reporter.ts scripts/*.test.ts
 
             - name: Enforce 100% coverage
               # Limit discovery to source tests; tmp/ contains generated fixtures.
-              run: pnpm --filter vite-plugin-taro exec c8 node --test --test-reporter=../../scripts/ci-test-reporter.ts --test-concurrency=4 "src/**/*.test.ts" "scripts/**/*.test.ts"
+              run: pnpm --filter vite-plugin-taro exec c8 node --experimental-vfs --test --test-reporter=../../scripts/ci-test-reporter.ts --test-concurrency=4 "src/**/*.test.ts" "scripts/**/*.test.ts"
 
             - name: Test native component TikTok demo
               run: pnpm --filter native-comp-demo test

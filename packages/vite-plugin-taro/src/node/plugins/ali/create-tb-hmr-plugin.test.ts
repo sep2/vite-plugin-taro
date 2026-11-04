@@ -2,12 +2,12 @@ import assert from 'node:assert/strict'
 import { request } from 'node:http'
 import test, { type TestContext } from 'node:test'
 import { createServer } from 'vite'
-import { createTestProject } from '../../tests/create-test-project.ts'
+import { createMemoryTestProject } from '../../tests/create-memory-test-project.ts'
 import { hmrEndpointPath } from '../mini/dev/hmr-protocol.ts'
 import { createTbHmrPlugin } from './create-tb-hmr-plugin.ts'
 
 async function createFixture(context: TestContext) {
-    const root = await createTestProject('tb-socket-')
+    const root = createMemoryTestProject(context)
     const server = await createServer({
         root,
         configFile: false,

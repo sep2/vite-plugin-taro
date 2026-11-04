@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm'
 import { build } from 'rolldown'
 import { createServer, normalizePath, resolveConfig } from 'vite'
 import vpt from '../../../../index.ts'
-import { projectTempDir } from '../../../tests/project-temp-dir.ts'
+import { createMemoryTestProject } from '../../../tests/create-memory-test-project.ts'
 import { toViteFileImportPath } from '../../../utils/modules.ts'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import { createMiniViteClientPlugin } from './create-mini-vite-client-plugin.ts'
@@ -27,7 +27,7 @@ for (const base of ['/', '/native/']) {
             normalizePath(toViteFileImportPath(viteClientId))
         ].flatMap((request) => [request, `${request}?v=1`])
         const server = await createServer({
-            root: projectTempDir,
+            root: createMemoryTestProject(t),
             configFile: false,
             logLevel: 'silent',
             base,
