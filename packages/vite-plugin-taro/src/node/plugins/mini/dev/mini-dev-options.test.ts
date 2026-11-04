@@ -13,6 +13,7 @@ import {
     type RolldownOutput
 } from 'rolldown'
 import { dev } from 'rolldown/experimental'
+import Sval from 'sval'
 import { type BuildOptions, createServer } from 'vite'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import { createAliMiniContract } from '../../ali/plugins.ts'
@@ -42,6 +43,15 @@ const options = {
     }
 } satisfies Pick<MiniContract, 'options'>
 const hmrMode = createDevtoolsHmrMode(runtimeFile)
+
+/** Names survive the minifier's existing compression and mangling passes within the Mini syntax target. */
+function assertDevelopmentMinification(output: OutputOptions): void {
+    assert.equal(output.keepNames, false)
+    assert.deepEqual(output.minify, {
+        compress: { target: 'es2018', keepNames: { function: true, class: true } },
+        mangle: { keepNames: true }
+    })
+}
 
 /** These tests inspect options only: never watch workspace files or populate its shared dependency cache. */
 async function createOptionsServer(context: TestContext, build: BuildOptions) {
@@ -210,7 +220,7 @@ test('adapts physical wx development output without changing configured filename
         assetFileNames: 'static/[name]-[hash:8][extname]',
         chunkFileNames: configuredChunkFileNames,
         entryFileNames: '[name]-[hash]',
-        keepNames: false
+        keepNames: true
     }
     const server = await createOptionsServer(context, { rolldownOptions: { output: configuredOutput } })
 
@@ -247,14 +257,13 @@ test('adapts physical wx development output without changing configured filename
     assert.equal(output.chunkFileNames(createPreRenderedChunk('feature')), 'chunks/feature.[hash].js')
     assert.equal(output.entryFileNames, configuredOutput.entryFileNames)
     assert.equal(output.format, 'es')
-    assert.equal(output.minify, true)
-    assert.equal(output.keepNames, true)
+    assertDevelopmentMinification(output)
     assert.equal(output.sourcemap, false)
     assert.deepEqual(configuredOutput, {
         assetFileNames: 'static/[name]-[hash:8][extname]',
         chunkFileNames: configuredChunkFileNames,
         entryFileNames: '[name]-[hash]',
-        keepNames: false
+        keepNames: true
     })
     assert.equal(viteTransformOptions.sourcemap, true, 'Replacing the native transform must not mutate Vite ownership')
 
@@ -317,8 +326,7 @@ test('executes generated development code with a bundled runtime and no ambient 
                 name: 'test:runtime-output',
                 options() {
                     assert.equal(output.format, 'es')
-                    assert.equal(output.minify, true)
-                    assert.equal(output.keepNames, true)
+                    assertDevelopmentMinification(output)
                     assert.equal(output.sourcemap, false)
                 },
                 // Keep Rolldown's dev graph in ESM and use Mini's actual late CommonJS conversion for VM execution.
@@ -368,11 +376,66 @@ test('executes generated development code with a bundled runtime and no ambient 
     assert.equal(exports.answer, 42)
 })
 
+test('minified development emits ES2018 syntax for colliding class names', async (context) => {
+    const server = await createOptionsServer(context, {})
+    const plugin = createMiniDevOptionsPlugin({ server, contract: options, hmrMode })
+    const output = requireSingleOutput(await plugin.options({ output: {} }))
+    const entry = '\0test:class-names'
+    const dependency = '\0test:other-class'
+    const sources = new Map([
+        [
+            entry,
+            `
+import { ReadableStream as Other } from ${JSON.stringify(dependency)}
+class ReadableStream { get value() { return 'local stream' } }
+export const localValue = new ReadableStream().value
+export const otherValue = new Other().value
+export const classNames = [new ReadableStream().constructor.name, new Other().constructor.name]
+`
+        ],
+        [dependency, "export class ReadableStream { get value() { return 'other stream' } }"]
+    ])
+    const result = await build({
+        input: entry,
+        plugins: [
+            {
+                name: 'test:class-names',
+                resolveId(id) {
+                    if (sources.has(id)) {
+                        return id
+                    }
+                },
+                load(id) {
+                    return sources.get(id)
+                }
+            }
+        ],
+        output: { ...output, format: 'cjs', exports: 'named' },
+        write: false
+    })
+    const chunk = result.output[0]
+    assert.ok(chunk?.type === 'chunk')
+    assertDevelopmentMinification(output)
+    new Sval({ ecmaVer: 2018, sourceType: 'script' }).parse(chunk.code)
+
+    // Bundle evaluation populates this isolated namespace with both colliding modules' observable values.
+    const exports: Record<string, unknown> = {}
+    runInNewContext(chunk.code, { exports })
+    assert.equal(exports.localValue, 'local stream')
+    assert.equal(exports.otherValue, 'other stream')
+    assert.ok(Array.isArray(exports.classNames))
+    assert.equal(exports.classNames.length, 2)
+    assert.notEqual(exports.classNames[0], exports.classNames[1])
+    for (const name of exports.classNames) {
+        assert.match(name, /^ReadableStream(?:\$\d+)?$/)
+    }
+})
+
 test('minified development keeps HOC component names compatible with React Refresh', async (context) => {
     const server = await createOptionsServer(context, {})
     const plugin = createMiniDevOptionsPlugin({ server, contract: options, hmrMode })
     const output = requireSingleOutput(await plugin.options({ output: {} }))
-    assert.equal(output.minify, true)
+    assertDevelopmentMinification(output)
     const refreshRuntimePath = path.join(
         path.dirname(packageRequire.resolve('@vitejs/plugin-react')),
         'refresh-runtime.js'
@@ -380,6 +443,8 @@ test('minified development keeps HOC component names compatible with React Refre
     const entry = '\0test:refresh-hoc'
     const result = await build({
         input: entry,
+        // Match Mini's source lowering before exercising its final minification settings.
+        transform: { target: 'es2018' },
         plugins: [
             {
                 name: 'test:refresh-hoc',
@@ -419,6 +484,7 @@ export const nextValue = next.default({})
     })
     const chunk = result.output[0]
     assert.ok(chunk?.type === 'chunk')
+    new Sval({ ecmaVer: 2018, sourceType: 'script' }).parse(chunk.code)
     // Bundle execution populates this isolated namespace; a mocked timer observes accepted Refresh without scheduling work.
     const exports: Record<string, unknown> = {}
     const scheduleRefresh = context.mock.fn()
@@ -456,8 +522,7 @@ for (const [target, createContract] of [
             const devMode = adapted.experimental?.devMode
             const output = requireSingleOutput(adapted)
 
-            assert.equal(output.minify, true)
-            assert.equal(output.keepNames, true)
+            assertDevelopmentMinification(output)
             assert.ok(devMode && typeof devMode === 'object')
             assertRuntimeWrapper(devMode.implement)
         })

@@ -4,6 +4,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import { stripVTControlCharacters } from 'node:util'
+import Sval from 'sval'
 import { createLogger, createServer, type Logger, normalizePath, type Plugin, type ViteDevServer } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { runtimeReportEvent } from '../../../../runtime/mini/dev/hmr-protocol.ts'
@@ -515,6 +516,41 @@ test('rejects startup without removing the last complete output on failure', asy
         await server.close()
         await rm(root, { force: true, recursive: true })
     }
+})
+
+test('emits ES2018 chunks and patches for dependencies with colliding class names', async (context) => {
+    const streamSource = "export class ReadableStream { get value() { return 'initial stream' } }"
+    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory', undefined, {
+        'src/pages/home/stream-one.ts': streamSource,
+        'src/pages/home/stream-two.ts': "export class ReadableStream { get value() { return 'other stream' } }",
+        'src/pages/home/suffix.ts': `
+                import { ReadableStream } from './stream-one'
+                import { ReadableStream as Other } from './stream-two'
+                export const suffix = new ReadableStream().value + new Other().value
+            `
+    })
+    context.after(fixture.close)
+    const parser = new Sval({ ecmaVer: 2018, sourceType: 'script' })
+    const sources = await fixture.readJavaScript()
+    assert.ok(sources.some((source) => /ReadableStream\$\d+/.test(source)))
+    for (const source of sources) {
+        parser.parse(source)
+    }
+    const info = await readFile(fixture.infoPath, 'utf8')
+    const appStyle = await readFile(fixture.appStylePath, 'utf8')
+
+    await publishSourceGeneration(
+        path.join(path.dirname(fixture.pagePath), 'stream-one.ts'),
+        streamSource.replace('initial stream', 'updated stream')
+    )
+    const patch = await waitForFile(
+        fixture.patchesPath,
+        (source) => source.includes('updated stream'),
+        maximumWaitAttempts
+    )
+    parser.parse(patch)
+    assert.equal(await readFile(fixture.infoPath, 'utf8'), info)
+    assert.equal(await readFile(fixture.appStylePath, 'utf8'), appStyle)
 })
 
 test('patches a bundled utility without rewriting its Page capsule or rotating the App', async (context) => {
