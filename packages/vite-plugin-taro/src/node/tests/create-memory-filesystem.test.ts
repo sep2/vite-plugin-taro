@@ -25,17 +25,49 @@ test('uses a Windows null-device spelling preserved by stock Vite', () => {
     assert.equal(getVfsDevicePath('/dev/null', '/workspace/project'), '/dev/null')
 })
 
-test('only rewrites the OS device property when its spelling changes', (context) => {
-    const devNull = os.devNull
-    const devicePath = getVfsDevicePath(devNull, process.cwd())
-    const defineProperty = context.mock.method(Object, 'defineProperty')
-    using fixture = createMemoryFilesystem()
-    assert.ok(existsSync(fixture.root))
-    const writes = defineProperty.mock.calls
-        .filter(({ arguments: args }) => args[0] === os && args[1] === 'devNull')
-        .map(({ arguments: args }) => args[2].value)
-    assert.deepEqual(writes, devicePath === devNull ? [] : [devicePath, devNull])
-})
+for (const devNull of ['/dev/null', '\\\\.\\nul']) {
+    test(`mounts and disposes the memory filesystem with device ${devNull}`, (context) => {
+        const originalDevNull = os.devNull
+        context.after(() => Object.defineProperty(os, 'devNull', { value: originalDevNull }))
+        // Scope the simulated OS device to this test; the mocked mount leaves Node's router untouched.
+        Object.defineProperty(os, 'devNull', { value: devNull })
+        const descriptor = Object.getOwnPropertyDescriptor(os, 'devNull')
+        const devicePath = getVfsDevicePath(devNull, process.cwd())
+        const root = path.join(projectTempDir, 'mock-vfs-mount')
+        const mount = context.mock.method(VirtualFileSystem.prototype, 'mount', () => {
+            assert.equal(os.devNull, devicePath)
+            return root
+        })
+        const unmount = context.mock.method(VirtualFileSystem.prototype, 'unmount', () => {})
+        const defineProperty = context.mock.method(Object, 'defineProperty')
+        {
+            using fixture = createMemoryFilesystem()
+            assert.equal(fixture.root, root)
+            assert.equal(mount.mock.callCount(), 1)
+            assert.equal(unmount.mock.callCount(), 0)
+            assert.deepEqual(Object.getOwnPropertyDescriptor(os, 'devNull'), descriptor)
+            const writes = defineProperty.mock.calls
+                .filter(({ arguments: args }) => args[0] === os && args[1] === 'devNull')
+                .map(({ arguments: args }) => args[2].value)
+            assert.deepEqual(writes, devicePath === devNull ? [] : [devicePath, devNull])
+        }
+        assert.equal(unmount.mock.callCount(), 1)
+    })
+
+    test(`restores device ${devNull} when mounting throws`, (context) => {
+        const originalDevNull = os.devNull
+        context.after(() => Object.defineProperty(os, 'devNull', { value: originalDevNull }))
+        // Scope the simulated OS device to this test, including the mount failure path.
+        Object.defineProperty(os, 'devNull', { value: devNull })
+        const descriptor = Object.getOwnPropertyDescriptor(os, 'devNull')
+        context.mock.method(VirtualFileSystem.prototype, 'mount', () => {
+            assert.equal(os.devNull, getVfsDevicePath(devNull, process.cwd()))
+            throw new Error('mount failed')
+        })
+        assert.throws(() => createMemoryFilesystem(), /mount failed/)
+        assert.deepEqual(Object.getOwnPropertyDescriptor(os, 'devNull'), descriptor)
+    })
+}
 
 test('stock Vite module paths address the mounted memory tree', async () => {
     const descriptor = Object.getOwnPropertyDescriptor(os, 'devNull')
@@ -86,13 +118,4 @@ test('initializes the memory router before restoring the OS device spelling', ()
         { cwd: path.resolve(import.meta.dirname, '../../..'), timeout: 30000 }
     )
     assert.equal(existsSync(device), false)
-})
-
-test('restores the OS null-device property when mounting throws', (context) => {
-    const descriptor = Object.getOwnPropertyDescriptor(os, 'devNull')
-    context.mock.method(VirtualFileSystem.prototype, 'mount', () => {
-        throw new Error('mount failed')
-    })
-    assert.throws(() => createMemoryFilesystem(), /mount failed/)
-    assert.deepEqual(Object.getOwnPropertyDescriptor(os, 'devNull'), descriptor)
 })
