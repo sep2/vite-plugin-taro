@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { isPromise } from 'node:util/types'
 import { createContext, runInContext } from 'node:vm'
 import { build } from 'vite'
 import vpt from '../../index.ts'
-import { createTestProject } from './create-test-project.ts'
+import { createMemoryBuildProject } from './create-memory-build-project.ts'
 
 // https://github.com/sep2/vite-plugin-taro/issues/35
 // Skyline documents attached (inclusive) as the deadline for reliably publishing the first-frame target:
@@ -40,20 +39,14 @@ const files = {
 
 for (const prerender of [undefined, false, true]) {
     test(`Skyline #35: first-frame targets require Page prerender=true (configured: ${prerender})`, async () => {
-        const root = await createTestProject('first-frame-')
-        try {
-            await Promise.all(
-                Object.entries(files).map(async ([name, source]) => {
-                    const file = path.join(root, name)
-                    await mkdir(path.dirname(file), { recursive: true })
-                    await writeFile(file, source)
-                })
-            )
-            const result = await build({
-                root,
-                configFile: false,
-                logLevel: 'silent',
-                plugins: vpt({
+        using project = createMemoryBuildProject(files)
+        const result = await build({
+            root: project.root,
+            configFile: false,
+            logLevel: 'silent',
+            plugins: [
+                project.plugin,
+                vpt({
                     target: 'wx',
                     app: 'src/app.tsx',
                     pages: [
@@ -62,55 +55,49 @@ for (const prerender of [undefined, false, true]) {
                     ],
                     appJson: { renderer: 'skyline', componentFramework: 'glass-easel' },
                     projectConfigJson: {}
-                }),
-                build: { write: false, minify: false }
-            })
-            assert.ok(!Array.isArray(result) && 'output' in result)
-            const sources = new Map(
-                result.output.map((file) => [file.fileName, file.type === 'chunk' ? file.code : String(file.source)])
-            )
-            const pageJson = sources.get('pages/detail/index.json')
-            assert.ok(pageJson)
-            assert.equal(
-                Object.hasOwn(JSON.parse(pageJson), 'prerender'),
-                false,
-                'prerender is not a native config field'
-            )
-            const template = sources.get('base.wxml')
-            assert.ok(template)
-            const keyAttribute = /<share-element\b[^>]*\bkey="{{i\.(\w+)}}"/.exec(template)?.[1]
-            assert.ok(keyAttribute, 'the emitted native template must bind the shared-element key')
-            const context = createContext({ assert, performance, console: { ...console, info() {} }, global: {} })
-            runInContext(nativeHost, context)
-            // Execute the actual bootstrap, capsules, React renderer and Taro runtime with native-only host doubles.
-            const modules = new Map<string, { exports: unknown }>()
-            function load(name: string): unknown {
-                const cached = modules.get(name)
-                if (cached) {
-                    return cached.exports
-                }
-                const source = sources.get(name)
-                assert.ok(source, `Missing native module: ${name}`)
-                const module: { exports: unknown } = { exports: {} }
-                modules.set(name, module)
-                const execute: unknown = runInContext(`(function(require, module, exports) {\n${source}\n})`, context)
-                assert.ok(typeof execute === 'function')
-                execute(
-                    (request: string) => load(path.posix.join(path.posix.dirname(name), request)),
-                    module,
-                    module.exports
-                )
-                return module.exports
+                })
+            ],
+            build: { write: false, minify: false }
+        })
+        assert.ok(!Array.isArray(result) && 'output' in result)
+        const sources = new Map(
+            result.output.map((file) => [file.fileName, file.type === 'chunk' ? file.code : String(file.source)])
+        )
+        const pageJson = sources.get('pages/detail/index.json')
+        assert.ok(pageJson)
+        assert.equal(Object.hasOwn(JSON.parse(pageJson), 'prerender'), false, 'prerender is not a native config field')
+        const template = sources.get('base.wxml')
+        assert.ok(template)
+        const keyAttribute = /<share-element\b[^>]*\bkey="{{i\.(\w+)}}"/.exec(template)?.[1]
+        assert.ok(keyAttribute, 'the emitted native template must bind the shared-element key')
+        const context = createContext({ assert, performance, console: { ...console, info() {} }, global: {} })
+        runInContext(nativeHost, context)
+        // Execute the actual bootstrap, capsules, React renderer and Taro runtime with native-only host doubles.
+        const modules = new Map<string, { exports: unknown }>()
+        function load(name: string): unknown {
+            const cached = modules.get(name)
+            if (cached) {
+                return cached.exports
             }
-            context.load = load
-            context.keyAttribute = keyAttribute
-            context.prerender = prerender === true
-            const completion: unknown = runInContext(scenario, context)
-            assert.ok(isPromise(completion))
-            await completion
-        } finally {
-            await rm(root, { recursive: true, force: true })
+            const source = sources.get(name)
+            assert.ok(source, `Missing native module: ${name}`)
+            const module: { exports: unknown } = { exports: {} }
+            modules.set(name, module)
+            const execute: unknown = runInContext(`(function(require, module, exports) {\n${source}\n})`, context)
+            assert.ok(typeof execute === 'function')
+            execute(
+                (request: string) => load(path.posix.join(path.posix.dirname(name), request)),
+                module,
+                module.exports
+            )
+            return module.exports
         }
+        context.load = load
+        context.keyAttribute = keyAttribute
+        context.prerender = prerender === true
+        const completion: unknown = runInContext(scenario, context)
+        assert.ok(isPromise(completion))
+        await completion
     })
 }
 

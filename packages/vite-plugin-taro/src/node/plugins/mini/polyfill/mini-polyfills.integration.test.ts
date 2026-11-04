@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -10,6 +10,7 @@ import { parseSync } from 'rolldown/utils'
 import { build, createServer, normalizePath, type Plugin } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { interpreterServerEvent } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
+import { createMemoryBuildProject } from '../../../tests/create-memory-build-project.ts'
 import { createTestProject } from '../../../tests/create-test-project.ts'
 import { publishSourceGeneration } from '../../../tests/publish-source-generation.ts'
 import { packageRequire } from '../../../utils/packages.ts'
@@ -31,13 +32,9 @@ async function compileFixture(
     polyfills: readonly string[],
     onDevReady?: (chunks: readonly NativeFile[], root: string) => Promise<void>
 ): Promise<readonly NativeFile[]> {
-    const root = await createTestProject('polyfills-')
-    const pagePath = normalizePath(path.join(root, 'src/pages/home/index.tsx'))
     const pageSource = 'export default function Home() { return null }'
-    const sources: ReadonlyMap<string, string> = new Map([
-        [
-            normalizePath(path.join(root, 'src/probe.ts')),
-            `
+    const files = {
+        'src/probe.ts': `
             import { document as taroDocument } from 'vite-plugin-taro-runtime/runtime/mini'
             const url = new URL('child', 'https://example.com/dir/page')
             const params = new URLSearchParams('a=1&b=2&a=3')
@@ -52,19 +49,22 @@ async function compileFixture(
                 local: ((URL) => URL)('local'),
                 structuredClone: typeof structuredClone
             }
-        `
-        ],
-        [
-            normalizePath(path.join(root, 'src/app.tsx')),
-            `
+        `,
+        'src/app.tsx': `
             import { probe } from './probe.ts'
             globalThis.polyfillProbe = probe
             globalThis.readPerformanceNow = () => performance.now()
             export default function App({ children }) { return children }
-        `
-        ],
-        [pagePath, pageSource]
-    ])
+        `,
+        'src/pages/home/index.tsx': pageSource
+    }
+    using project = mode === 'production' ? createMemoryBuildProject(files) : undefined
+    const root = project?.root ?? (await createTestProject('polyfills-'))
+    const pagePath = normalizePath(path.join(root, 'src/pages/home/index.tsx'))
+    // Development uses virtual modules except for the Page edited by native watcher probes.
+    const sources: ReadonlyMap<string, string> = new Map(
+        project ? [] : Object.entries(files).map(([file, source]) => [normalizePath(path.join(root, file)), source])
+    )
     // This completion cell captures exactly one initial output graph; the server is closed before returning it.
     const output = Promise.withResolvers<readonly NativeFile[]>()
     const capture: Plugin = {
@@ -174,7 +174,7 @@ async function compileFixture(
             root,
             configFile: false as const,
             logLevel: 'silent' as const,
-            plugins: [vpt(options), capture],
+            plugins: [project?.plugin, vpt(options), capture],
             // The host writes metadata relative to outDir itself, so a relative default would pollute the package's dist.
             build: {
                 outDir: path.join(root, 'dist'),
@@ -206,7 +206,7 @@ async function compileFixture(
                 assert.ok(map.mappings.length > 0)
                 assert.ok(map.sources.length > 0)
             }
-            assert.deepEqual(await readdir(root), [], 'Production fixtures must not materialize sources or output')
+            await assert.rejects(access(path.join(root, 'dist')), { code: 'ENOENT' })
             return await output.promise
         } else {
             if (onDevReady) {
@@ -246,7 +246,9 @@ async function compileFixture(
         } else {
             process.env.NODE_ENV = previousNodeEnv
         }
-        await rm(root, { recursive: true, force: true })
+        if (!project) {
+            await rm(root, { recursive: true, force: true })
+        }
     }
 }
 

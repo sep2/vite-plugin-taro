@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import test, { type TestContext } from 'node:test'
+import test from 'node:test'
 import { build, type RolldownPluginOption } from 'rolldown'
 import { defineParallelPlugin, viteTransformPlugin } from 'rolldown/experimental'
-import { projectTempDir } from '../../../tests/project-temp-dir.ts'
+import { createMemoryBuildProject } from '../../../tests/create-memory-build-project.ts'
 import { replaceViteTransformPlugin } from './replace-vite-transform-plugin.ts'
 
 type TransformConfig = Parameters<typeof replaceViteTransformPlugin>[1]
@@ -44,21 +43,14 @@ test('leaves a disabled Oxc pipeline unchanged', async () => {
     assert.strictEqual(await replaceViteTransformPlugin(plugins, { ...config, oxc: false }), plugins)
 })
 
-/** Owns only temporary physical transform inputs; Rolldown writes no output and starts no watcher. */
-async function createFixture(context: TestContext): Promise<string> {
-    const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-oxc-options-')))
-    context.after(() => rm(root, { recursive: true, force: true }))
-    return root
-}
-
-test('keeps Vite default filters while disabling intermediate source maps', async (context) => {
-    const root = await createFixture(context)
+test('keeps Vite default filters while disabling intermediate source maps', async () => {
+    using project = createMemoryBuildProject({
+        'entry.ts': 'export const answer: number = 42',
+        'ignored.js': 'export const value = source?.value'
+    })
+    const { root } = project
     const entry = path.join(root, 'entry.ts')
     const ignored = path.join(root, 'ignored.js')
-    await Promise.all([
-        writeFile(entry, 'export const answer: number = 42'),
-        writeFile(ignored, 'export const value = source?.value')
-    ])
     const replacement = await replaceViteTransformPlugin(
         viteTransformPlugin({ root, transformOptions: { sourcemap: true } }),
         { ...config, root }
@@ -69,6 +61,7 @@ test('keeps Vite default filters while disabling intermediate source maps', asyn
     await build({
         input: [entry, ignored],
         plugins: [
+            project.plugin,
             replacement,
             {
                 name: 'fixture:observe-transform',
@@ -93,19 +86,19 @@ test('keeps Vite default filters while disabling intermediate source maps', asyn
 })
 
 for (const consumer of ['client', 'server'] as const) {
-    test(`preserves configured filters, tsconfig, JSX injection and ${consumer} refresh semantics`, async (context) => {
-        const root = await createFixture(context)
+    test(`preserves configured filters, tsconfig, JSX injection and ${consumer} refresh semantics`, async () => {
+        const source = 'export function App() { const value: number = injected; return <view>{value}</view> }'
+        using project = createMemoryBuildProject({
+            'entry.tsx': source,
+            'skipped.tsx': source,
+            'no-refresh.tsx': source
+        })
+        const { root } = project
         const entry = path.join(root, 'entry.tsx')
         const skipped = path.join(root, 'skipped.tsx')
         const noRefresh = path.join(root, 'no-refresh.tsx')
-        const tsconfig = path.join(root, 'custom-tsconfig.json')
-        const source = 'export function App() { const value: number = injected; return <view>{value}</view> }'
-        await Promise.all([
-            writeFile(entry, source),
-            writeFile(skipped, source),
-            writeFile(noRefresh, source),
-            writeFile(tsconfig, JSON.stringify({ compilerOptions: { jsx: 'react', jsxFactory: 'renderElement' } }))
-        ])
+        // The native transform reads a checked-in tsconfig while its module sources live in VFS.
+        const tsconfig = path.resolve(import.meta.dirname, '../../../tests/fixtures/jsx-tsconfig.json')
         const configured = {
             root,
             consumer,
@@ -127,6 +120,7 @@ for (const consumer of ['client', 'server'] as const) {
             input: [entry, skipped, noRefresh],
             external: ['react/jsx-runtime'],
             plugins: [
+                project.plugin,
                 replacement,
                 {
                     name: 'fixture:observe-jsx',

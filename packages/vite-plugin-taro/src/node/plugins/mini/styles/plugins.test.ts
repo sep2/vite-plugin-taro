@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
-import { access, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { access, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { type BuildOptions, build, normalizePath, type Plugin } from 'vite'
+import { createMemoryBuildProject } from '../../../tests/create-memory-build-project.ts'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
-import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { miniHtmlBase } from './mini-html-base.ts'
@@ -18,25 +17,9 @@ const contract = {
     }
 } satisfies Pick<MiniContract, 'styles'>
 
-/** Serve ordinary absolute module IDs from memory so the real Vite/CSS transforms still run, without creating source files. */
 function createSourceFixture(files: Readonly<Record<string, string>>, entryName: string) {
-    const root = path.join(projectTempDir, `vpt-memory-styles-${randomUUID()}`)
-    const sources: ReadonlyMap<string, string> = new Map(
-        Object.entries(files).map(([file, source]) => [normalizePath(path.join(root, file)), source])
-    )
-    const plugin: Plugin = {
-        name: 'test:memory-style-sources',
-        resolveId(id, importer) {
-            const resolved = normalizePath(
-                importer && id.startsWith('.') ? path.resolve(path.dirname(importer), id) : id
-            )
-            return sources.has(resolved) ? resolved : undefined
-        },
-        load(id) {
-            return sources.get(normalizePath(id))
-        }
-    }
-    return { root, entry: path.join(root, entryName), plugin }
+    const project = createMemoryBuildProject(files)
+    return { ...project, entry: path.join(project.root, entryName) }
 }
 
 test('handles physical and ignored query fragments before watcher cleanup', async () => {
@@ -59,41 +42,37 @@ test('handles physical and ignored query fragments before watcher cleanup', asyn
 })
 
 test('invalidates Tailwind compiler dependencies through the HMR hook', async () => {
-    const root = await realpath(await mkdtemp(path.join(projectTempDir, 'vpt-style-hot-update-')))
-
-    try {
-        const styleId = path.join(root, 'app.css')
-        const themeId = path.join(root, 'theme.css')
-        const source = ['@import "tailwindcss";', '@import "./theme.css";', '@source inline("bg-brand");'].join('\n')
-        await writeFile(themeId, '@theme { --color-brand: #123456; }')
-        const styles = createMiniStylePlugin(contract, createMiniStyleEntries(path.join(root, 'app.ts'), []))
-        const transformHook = styles.transform
-        const hotUpdateHook = styles.hotUpdate
-        assert.ok(transformHook)
-        assert.ok(hotUpdateHook)
-        const transform = typeof transformHook === 'function' ? transformHook : transformHook.handler
-        const hotUpdate = typeof hotUpdateHook === 'function' ? hotUpdateHook : hotUpdateHook.handler
-        // Collect compiler inputs to verify the changed theme is a registered dependency.
-        const watchedFiles = new Set<string>()
-        const context = {
-            environment: { config: { root } },
-            addWatchFile(file: string) {
-                watchedFiles.add(normalizePath(file))
-            }
+    using project = createMemoryBuildProject({})
+    const { root } = project
+    const styleId = path.join(root, 'app.css')
+    const themeId = path.join(root, 'theme.css')
+    const source = ['@import "tailwindcss";', '@import "./theme.css";', '@source inline("bg-brand");'].join('\n')
+    await writeFile(themeId, '@theme { --color-brand: #123456; }')
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(path.join(root, 'app.ts'), []))
+    const transformHook = styles.transform
+    const hotUpdateHook = styles.hotUpdate
+    assert.ok(transformHook)
+    assert.ok(hotUpdateHook)
+    const transform = typeof transformHook === 'function' ? transformHook : transformHook.handler
+    const hotUpdate = typeof hotUpdateHook === 'function' ? hotUpdateHook : hotUpdateHook.handler
+    // Collect compiler inputs to verify the changed theme is a registered dependency.
+    const watchedFiles = new Set<string>()
+    const context = {
+        environment: { config: { root } },
+        addWatchFile(file: string) {
+            watchedFiles.add(normalizePath(file))
         }
-
-        const initial = await Reflect.apply(transform, context, [source, styleId])
-        assert.match(initial.code, /#123456/)
-        assert.ok(watchedFiles.has(normalizePath(themeId)))
-
-        await writeFile(themeId, '@theme { --color-brand: #654321; }')
-        await Reflect.apply(hotUpdate, context, [{ file: themeId }])
-        const updated = await Reflect.apply(transform, context, [source, styleId])
-        assert.match(updated.code, /#654321/)
-        assert.doesNotMatch(updated.code, /#123456/)
-    } finally {
-        await rm(root, { recursive: true, force: true })
     }
+
+    const initial = await Reflect.apply(transform, context, [source, styleId])
+    assert.match(initial.code, /#123456/)
+    assert.ok(watchedFiles.has(normalizePath(themeId)))
+
+    await writeFile(themeId, '@theme { --color-brand: #654321; }')
+    await Reflect.apply(hotUpdate, context, [{ file: themeId }])
+    const updated = await Reflect.apply(transform, context, [source, styleId])
+    assert.match(updated.code, /#654321/)
+    assert.doesNotMatch(updated.code, /#123456/)
 })
 
 test('transforms WXSS and JavaScript from one supplied class set without source discovery', async () => {
@@ -111,11 +90,7 @@ test('transforms WXSS and JavaScript from one supplied class set without source 
 })
 
 test('minifies the complete compiler stylesheet before later WX output hooks', async () => {
-    const {
-        root,
-        entry: applicationEntry,
-        plugin
-    } = createSourceFixture(
+    using project = createSourceFixture(
         {
             'src/app.ts':
                 "import './app.css';\nimport styles from './card.module.css';\nconsole.log({ className: 'mt-2.5', module: styles.card });\nvoid import('./pages/example/index.ts')\n",
@@ -132,6 +107,7 @@ test('minifies the complete compiler stylesheet before later WX output hooks', a
         },
         'src/app.ts'
     )
+    const { root, entry: applicationEntry, plugin } = project
     const styles = createMiniStylePlugin(contract, createMiniStyleEntries(applicationEntry, []))
     const verifyAssetOwnership: Plugin = {
         name: 'test:verify-wx-style-ownership',
@@ -185,7 +161,6 @@ test('minifies the complete compiler stylesheet before later WX output hooks', a
     assert.match(javaScript, /mt-2_d5/)
     assert.doesNotMatch(javaScript, /mt-2\.5/)
     assert.ok(javaScript.includes(moduleClassName))
-    await assert.rejects(access(root), { code: 'ENOENT' })
 })
 
 for (const extension of ['wxss', 'acss', 'ttss']) {
@@ -197,11 +172,7 @@ for (const extension of ['wxss', 'acss', 'ttss']) {
                 '.first { color: red; }',
                 '.second { color: green; }'
             ]
-            const {
-                root,
-                entry: appId,
-                plugin
-            } = createSourceFixture(
+            using project = createSourceFixture(
                 {
                     'app.ts': "import './app.css'; console.log('app')",
                     'app.css': css[0]!,
@@ -213,6 +184,7 @@ for (const extension of ['wxss', 'acss', 'ttss']) {
                 },
                 'app.ts'
             )
+            const { root, entry: appId, plugin } = project
             const firstId = path.join(root, 'pages/first.ts')
             const secondId = path.join(root, 'pages/second.ts')
             const globalFileName = `assets/global.${extension}`
@@ -267,7 +239,7 @@ for (const extension of ['wxss', 'acss', 'ttss']) {
                 assert.doesNotMatch(byName.get(`pages/page-0/index.${extension}`)!, /\.h5-span|\.app\b|\.second\b/)
                 assert.doesNotMatch(byName.get(`pages/page-1/index.${extension}`)!, /\.h5-span|\.app\b|\.first\b/)
             }
-            await assert.rejects(access(root), { code: 'ENOENT' })
+            await assert.rejects(access(path.join(root, 'dist')), { code: 'ENOENT' })
         })
     }
 }
@@ -283,11 +255,7 @@ const minificationCases = [
 for (const extension of ['wxss', 'acss']) {
     for (const scenario of minificationCases) {
         test(`preserves authored rpx while minifying only global.${extension}: ${scenario.name}`, async () => {
-            const {
-                root,
-                entry: appPath,
-                plugin
-            } = createSourceFixture(
+            using project = createSourceFixture(
                 {
                     'app.ts': "import './app.css'\nconsole.log('application')\n",
                     'app.css': [
@@ -298,6 +266,7 @@ for (const extension of ['wxss', 'acss']) {
                 },
                 'app.ts'
             )
+            const { root, entry: appPath, plugin } = project
             const globalFileName = `assets/global.${extension}`
             const nativeFileName = `components/counter/index.${extension}`
             const nativeStyle = '.native-counter { padding: 1px; }\n'
@@ -359,17 +328,13 @@ for (const extension of ['wxss', 'acss']) {
             assert.doesNotMatch(css, /[\d.](?:px|rem)\b/)
             assert.equal(String(nativeOutput.source), nativeStyle)
             assert.ok(!result.output.some((asset) => asset.fileName.endsWith('.css')))
-            await assert.rejects(access(root), { code: 'ENOENT' })
+            await assert.rejects(access(path.join(root, 'dist')), { code: 'ENOENT' })
         })
     }
 }
 
 test('captures CSS minification and splitting configured by a later ordinary plugin', async () => {
-    const {
-        root,
-        entry: appPath,
-        plugin
-    } = createSourceFixture(
+    using project = createSourceFixture(
         {
             'app.ts': 'export {}\n',
             'page.ts': "import './page.css'; console.log('page')",
@@ -377,6 +342,7 @@ test('captures CSS minification and splitting configured by a later ordinary plu
         },
         'app.ts'
     )
+    const { root, entry: appPath, plugin } = project
     const pagePath = path.join(root, 'page.ts')
     const result = await build({
         root,
@@ -407,11 +373,12 @@ test('captures CSS minification and splitting configured by a later ordinary plu
     assert.match(String(globalStyle.source), /\.h5-span,\.h5-a\{display:inline\}/)
     assert.match(String(globalStyle.source), /\.page\{padding:4rpx\}/)
     assert.equal(String(pageStyle.source), '')
-    await assert.rejects(access(root), { code: 'ENOENT' })
+    await assert.rejects(access(path.join(root, 'dist')), { code: 'ENOENT' })
 })
 
 test('emits the HTML base once even when the application has no styles', async () => {
-    const { root, entry: appPath, plugin } = createSourceFixture({ 'app.ts': 'export {}\n' }, 'app.ts')
+    using project = createSourceFixture({ 'app.ts': 'export {}\n' }, 'app.ts')
+    const { root, entry: appPath, plugin } = project
 
     const styles = createMiniStylePlugin(contract, createMiniStyleEntries(appPath, []))
     const result = await build({
@@ -435,5 +402,4 @@ test('emits the HTML base once even when the application has no styles', async (
     assert.equal((css.match(/\.h5-span/g) ?? []).length, 1)
     assert.match(css, /display:\s*inline/)
     assert.doesNotMatch(css, /@layer/)
-    await assert.rejects(access(root), { code: 'ENOENT' })
 })

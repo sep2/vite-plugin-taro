@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { createContext, runInContext } from 'node:vm'
@@ -8,7 +7,7 @@ import { type BuildOptions, normalizePath, build as viteBuild } from 'vite'
 import vpt, { type VptOptions, type VptTarget } from '../../index.ts'
 import { classifyMiniModule } from '../plugins/mini/module/module.ts'
 import { resolveVptRuntime } from '../utils/packages.ts'
-import { createTestProject } from './create-test-project.ts'
+import { createMemoryBuildProject } from './create-memory-build-project.ts'
 
 const appSource = `
     import type { PropsWithChildren } from 'react'
@@ -27,41 +26,26 @@ type BuildFixture = Readonly<{
     mode?: 'development' | 'production'
 }>
 
-/** Builds one disposable consumer project through Vite's public build API. */
+/** Builds one memory-backed consumer project through Vite's public build API. */
 async function inspectFixtureBuild<Result>(
     fixture: BuildFixture,
     inspect: (output: BuildOutput) => Result | Promise<Result>
 ): Promise<Result> {
-    const root = await createTestProject('build-')
-    try {
-        await Promise.all(
-            Object.entries(fixture.files).map(async ([fileName, source]) => {
-                const filePath = path.join(root, fileName)
-                await mkdir(path.dirname(filePath), { recursive: true })
-                await writeFile(filePath, source)
-            })
-        )
-
-        const result = await viteBuild({
-            root,
-            configFile: false,
-            mode: fixture.mode,
-            logLevel: 'silent',
-            plugins: vpt(fixture.options),
-            build: {
-                minify: false,
-                ...fixture.build,
-                write: false
-            }
-        })
-        if (Array.isArray(result) || !('output' in result)) {
-            assert.fail('Expected one Vite environment build')
+    using project = createMemoryBuildProject(fixture.files)
+    const result = await viteBuild({
+        root: project.root,
+        configFile: false,
+        mode: fixture.mode,
+        logLevel: 'silent',
+        plugins: [project.plugin, vpt(fixture.options)],
+        build: {
+            minify: false,
+            ...fixture.build,
+            write: false
         }
-
-        return await inspect(result.output)
-    } finally {
-        await rm(root, { force: true, recursive: true })
-    }
+    })
+    assert.ok(!Array.isArray(result) && 'output' in result, 'Expected one Vite environment build')
+    return await inspect(result.output)
 }
 
 function createOptions(target: VptTarget): VptOptions {

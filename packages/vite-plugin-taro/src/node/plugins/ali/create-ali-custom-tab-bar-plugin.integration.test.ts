@@ -4,6 +4,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { build, createServer } from 'vite'
 import type { VptOptions } from '../../../options.ts'
+import { createMemoryBuildProject } from '../../tests/create-memory-build-project.ts'
 import { createTestProject } from '../../tests/create-test-project.ts'
 import vpt from '../../vpt.ts'
 
@@ -32,22 +33,23 @@ function createOptions(target: 'zfb' | 'tb'): VptOptions {
     }
 }
 
+const sources = {
+    'src/app.tsx': `
+        import type { PropsWithChildren } from 'react'
+        export default function App({ children }: PropsWithChildren) { return children }
+    `,
+    'src/pages/home/index.tsx': `
+        import { View } from 'virtual:taro/components'
+        export default function Home() { return <View>Home</View> }
+    `,
+    'src/pages/about/index.tsx': `
+        import { View } from 'virtual:taro/components'
+        export default function About() { return <View>About</View> }
+    `
+}
+
 async function createProject(): Promise<string> {
     const root = await createTestProject('ali-custom-tab-bar-')
-    const sources = {
-        'src/app.tsx': `
-            import type { PropsWithChildren } from 'react'
-            export default function App({ children }: PropsWithChildren) { return children }
-        `,
-        'src/pages/home/index.tsx': `
-            import { View } from 'virtual:taro/components'
-            export default function Home() { return <View>Home</View> }
-        `,
-        'src/pages/about/index.tsx': `
-            import { View } from 'virtual:taro/components'
-            export default function About() { return <View>About</View> }
-        `
-    }
     for (const [name, source] of Object.entries(sources)) {
         const file = path.join(root, name)
         await mkdir(path.dirname(file), { recursive: true })
@@ -76,26 +78,35 @@ async function readEntry(output: string): Promise<Record<string, string>> {
 for (const target of ['zfb', 'tb'] as const) {
     for (const authored of [false, true]) {
         test(`builds the ${target} custom tab entry with authored native files ${authored}`, async () => {
-            const root = await createProject()
-            if (authored) {
-                const publicDir = path.join(root, 'public/customize-tab-bar')
-                await mkdir(publicDir, { recursive: true })
-                for (const [extension, source] of Object.entries(authoredFiles)) {
-                    await writeFile(path.join(publicDir, `index.${extension}`), source)
-                }
-            }
-            const output = path.join(root, 'dist')
-            await build({
-                root,
+            const publicFiles = authored
+                ? Object.fromEntries(
+                      Object.entries(authoredFiles).map(([extension, source]) => [
+                          `public/customize-tab-bar/index.${extension}`,
+                          source
+                      ])
+                  )
+                : {}
+            using project = createMemoryBuildProject({ ...sources, ...publicFiles })
+            const result = await build({
+                root: project.root,
                 configFile: false,
                 logLevel: 'silent',
-                plugins: vpt(createOptions(target)),
-                build: { outDir: output }
+                plugins: [project.plugin, vpt(createOptions(target))],
+                build: { write: false }
             })
-            const files = await readEntry(output)
+            assert.ok(!Array.isArray(result) && 'output' in result)
+            const tabFiles = result.output.filter((file) => file.fileName.startsWith('customize-tab-bar/'))
             if (authored) {
-                assert.deepEqual(files, authoredFiles)
+                assert.deepEqual(tabFiles, [], 'Public native files are preserved rather than regenerated')
+                assert.deepEqual(await readEntry(path.join(project.root, 'public')), authoredFiles)
             } else {
+                const files = Object.fromEntries(
+                    tabFiles.map((file) => {
+                        assert.equal(file.type, 'asset')
+                        return [path.extname(file.fileName).slice(1), String(file.source)]
+                    })
+                )
+                assert.deepEqual(JSON.parse(files.json), { component: true })
                 assert.equal(files.js, 'Component({})\n')
                 assert.match(files.acss, /display: none/)
                 assert.match(files.axml, /vpt-tab-bar-placeholder/)
