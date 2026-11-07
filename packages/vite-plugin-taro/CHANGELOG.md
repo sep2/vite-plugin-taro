@@ -1,5 +1,22 @@
 # vite-plugin-taro
 
+## 0.8.6
+
+### 变更
+
+- 784bfcae：更新 Vite 至 `8.3.6`、Rolldown 至 `1.2.16`、Tailwind CSS 至 `4.3.4`、React 插件至 `^6.2.1`，同步构建依赖。
+- 784bfcae：更新 `@tarojs/shared` 至 `4.3.2`，配套运行时升级至 `0.8.6`。
+
+### 升级说明
+
+从 `0.8.5` 升级到 `0.8.6`，所有目标的应用同步更新插件、Vite 和 Rolldown：
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.8.6 vite@8.3.6 rolldown@1.2.16
+```
+
+如项目在 overrides 或 resolutions 中固定了 Vite、Rolldown 版本，同步改为 `8.3.6` 和 `1.2.16`；引用直接依赖的 `$rolldown` 配置保持不变。运行时随插件自动升级到 `0.8.6`。完成安装后重启开发服务器并重新构建应用；小程序项目在开发者工具中重新编译。
+
 ## 0.8.5
 
 ### 修复

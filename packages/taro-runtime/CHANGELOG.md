@@ -1,5 +1,23 @@
 # vite-plugin-taro-runtime
 
+## 0.8.6
+
+### 变更
+
+- 784bfcae：内置 Taro 从 `4.3.1` 升级至 `4.3.2`，同步渲染器、平台适配包和运行时补丁。
+- 784bfcae：节点克隆保留独立的 dataset 属性写入顺序，移除映射到同一 dataset 键的属性时恢复剩余属性的值。
+- 784bfcae：更新 H5 依赖 hls.js 至 `^1.7.4`、tslib 至 `^2.9.1`。
+
+### 升级说明
+
+从 `0.8.5` 升级到 `0.8.6`：运行时随 `vite-plugin-taro@0.8.6` 自动升级。应用同步更新插件及其构建依赖：
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.8.6 vite@8.3.6 rolldown@1.2.16
+```
+
+如应用直接声明了运行时依赖，同步执行 `pnpm add --save-exact vite-plugin-taro-runtime@0.8.6`。插件与运行时统一使用 `0.8.6`，升级后重启开发服务器并重新构建应用。
+
 ## 0.8.5
 
 ### 变更
