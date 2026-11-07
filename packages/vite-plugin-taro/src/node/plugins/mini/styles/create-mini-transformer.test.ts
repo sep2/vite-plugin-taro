@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { compile } from '@tailwindcss/node'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 
 const classSet = new Set(['px-1.25', 'py-5.5', 'w-1/2'])
@@ -65,6 +66,41 @@ test('retains native prefix exceptions without adding browser prefixes', async (
     assert.match(css, /-webkit-line-clamp:\s*2/)
     assert.match(css, /\.unprefixed\s*\{\s*user-select:\s*none;\s*appearance:\s*none\s*\}/)
     assert.doesNotMatch(css, /-(?:webkit|moz|ms)-(?:appearance|user-select)/)
+})
+
+test('converts nested pixel fallbacks while preserving variable names and quoted values', async () => {
+    const css = await createMiniTransformer().transformStylesheet(`
+        .sizes {
+            width: var(--width, 10px);
+            padding: var(--space, var(--fallback, 8px));
+            content: "10px";
+            background-image: url("/10px.png");
+        }
+    `)
+    assert.match(css, /width: var\(--width, 10rpx\)/)
+    assert.match(css, /padding: var\(--space, var\(--fallback, 8rpx\)\)/)
+    assert.match(css, /content: "10px"/)
+    assert.match(css, /url\("\/10px\.png"\)/)
+})
+
+test('preserves dynamic opacity and its fallback when lowering transparent color mixes', async () => {
+    const css = await createMiniTransformer().transformStylesheet(
+        '.color { color: color-mix(in srgb, #ff0000 var(--opacity, 50%), transparent); }'
+    )
+    assert.match(css, /color: rgba\(255, 0, 0, var\(--opacity, 50%\)\)/)
+    assert.doesNotMatch(css, /color-mix\(/)
+})
+
+test('initializes Tailwind border variables outside browser capability probes', async () => {
+    const compiler = await compile('@tailwind utilities;', { base: process.cwd(), onDependency() {} })
+    const source = compiler.build(['border-b-[1px]'])
+    assert.match(source, /margin-trim: block/)
+
+    const css = await createMiniTransformer().transformStylesheet(source)
+    assert.match(css, /view,text,::before,::after\s*\{\s*--tw-border-style: solid;/)
+    assert.match(css, /border-bottom-style: var\(--tw-border-style\)/)
+    assert.match(css, /border-bottom-width: 1rpx/)
+    assert.doesNotMatch(css, /@supports|@property|margin-trim/)
 })
 
 test('rewrites only generated Tailwind classes in strings and template elements', () => {
