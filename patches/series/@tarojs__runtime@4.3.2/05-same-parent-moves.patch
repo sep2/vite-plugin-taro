@@ -1,8 +1,8 @@
 diff --git a/dist/dom/node.d.ts b/dist/dom/node.d.ts
-index 92948ef44a4b92f2adda1c114e95535118d2b79d..c74dbf6314d8a4178a3a60a743d4349382883027 100644
+index 78a7fd41995215951d692a2c1e0762a71995d4b6..41509d40e454e4385d2f9396e180a232bebfde7b 100644
 --- a/dist/dom/node.d.ts
 +++ b/dist/dom/node.d.ts
-@@ -82,8 +82,9 @@ declare class TaroNode extends TaroEventTarget {
+@@ -85,8 +85,9 @@ declare class TaroNode extends TaroEventTarget {
       * 逻辑插入完成后调用，包含未挂载的父节点；默认准备模板 payload。
       * this 为新父节点，refChild 为空表示追加；index 仅在存在 refChild 时表示插入位置。
       * isReplace 表示替换的插入阶段，旧 refChild 随后另行移除；host 此处只同步插入。
@@ -14,10 +14,10 @@ index 92948ef44a4b92f2adda1c114e95535118d2b79d..c74dbf6314d8a4178a3a60a743d43493
       * 逻辑解绑及按 cleanRef 清理事件索引后调用；this 为原父节点，child.parentNode 已为空。
       * 每次实际移除都会通知，options.doUpdate=false 仅抑制默认模板更新。
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index c456ad0ba846e297151ee81865c605a936a5a922..f000eb8bd9e5f377fd08d06d67b0a53dd9f5703e 100644
+index f00d5c9f9271cbf53adb5609e3cd68e799f7abad..1c0bed2551264edf31123dc8d2b03d7ebc29b0a4 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
-@@ -150,10 +150,15 @@ class TaroNode extends TaroEventTarget {
+@@ -158,10 +158,15 @@ class TaroNode extends TaroEventTarget {
              }, refChild);
              return newChild;
          }
@@ -37,7 +37,7 @@ index c456ad0ba846e297151ee81865c605a936a5a922..f000eb8bd9e5f377fd08d06d67b0a53d
          let index = 0;
          // Data structure
          newChild.parentNode = this;
-@@ -168,7 +173,7 @@ class TaroNode extends TaroEventTarget {
+@@ -176,7 +181,7 @@ class TaroNode extends TaroEventTarget {
          }
          // Delegation runs after the logical insertion, including on detached parents.
          // Its default implementation prepares template payloads; native hosts can replace it before any serialization work.
@@ -46,7 +46,7 @@ index c456ad0ba846e297151ee81865c605a936a5a922..f000eb8bd9e5f377fd08d06d67b0a53d
          this.delegateContextInvalidation();
          MutationObserver.record({
              type: "childList" /* MutationRecordType.CHILD_LIST */,
-@@ -255,14 +260,19 @@ class TaroNode extends TaroEventTarget {
+@@ -267,14 +272,19 @@ class TaroNode extends TaroEventTarget {
       * index 仅在有 refChild 时表示逻辑插入位置，追加分支中的值不表示末尾索引。
       * isReplace 表示 replaceChild 的插入阶段：refChild 此时仍在树中，随后由原方法
       * 单独移除。原生 host 此处执行插入，旧节点的移除由移除委托接收。

@@ -116,11 +116,12 @@ index 2bd6a91145ee0aae2c58838b36cfb9c6572c6f3e..68454f0ba5b0e8ee3d2231ea2b04c108
          recordMutation(record);
      }
 diff --git a/dist/dom-external/node.js b/dist/dom-external/node.js
-index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..092c834279ee5eca5b12ce1a6106f93202ffa91b 100644
+index a6cdae92d257850dbeaf34debda2e57b78363acf..46d07fd874e76538b58ad4c801ab872ea5540c64 100644
 --- a/dist/dom-external/node.js
 +++ b/dist/dom-external/node.js
-@@ -1,6 +1,14 @@
+@@ -1,7 +1,15 @@
 -import { PROPS, DATASET, OBJECT, STYLE } from '../constants/index.js';
+ import { copyDatasetAttributeOrder } from '../dom/dataset.js';
 +import { TaroElement } from '../dom/element.js';
 +import { TaroNode } from '../dom/node.js';
 +import { Style } from '../dom/style.js';
@@ -135,7 +136,7 @@ index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..092c834279ee5eca5b12ce1a6106f932
  /**
   * An implementation of `Element.insertAdjacentHTML()`
   * to support Vue 3 with a version of or greater than `vue@3.1.2`
-@@ -31,31 +39,61 @@ function insertAdjacentHTML(position, html) {
+@@ -30,38 +38,62 @@ function insertAdjacentHTML(position, html) {
          }
      }
  }
@@ -176,6 +177,7 @@ index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..092c834279ee5eca5b12ce1a6106f932
 -            newNode[key] = value;
 +    }
 +    newNode.dataset = Object.assign({}, this.dataset);
++    copyDatasetAttributeOrder(this, newNode);
 +    // Copy an existing declaration; unstyled sources and clones retain lazy allocation.
 +    const sourceStyle = this._style;
 +    if (sourceStyle) {
@@ -196,7 +198,14 @@ index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..092c834279ee5eca5b12ce1a6106f932
          }
      }
      if (isDeep) {
--        newNode.childNodes = this.childNodes.map(node => node.cloneNode(true));
+-        newNode.childNodes = this.childNodes.map(node => {
+-            const child = node.cloneNode(true);
+-            child.parentNode = newNode;
+-            return child;
+-        });
+-    }
+-    if (this.nodeType === 1 /* NodeType.ELEMENT_NODE */) {
+-        copyDatasetAttributeOrder(this, newNode);
 +        const notifyInsertion = newNode.delegateChildInsertion !== templateChildInsertion;
 +        for (const child of this.childNodes) {
 +            const clonedChild = child.cloneNode(true);
@@ -269,10 +278,10 @@ index 354bfc00bc34df0c4248acb6aafe2b4b679130be..32ed88b20ef65f5c8a8519ef76c37792
  }
  
 diff --git a/dist/dom/element.js b/dist/dom/element.js
-index 160f3682d64625bb33221a76453677fa0d1fe8fa..daea28644e1e15d3bd0ced11bcb59bed62649f49 100644
+index e1f059f49f8ee144e36e807dac71e36ac7165f71..b6dbc5735c6d475b51f3f8004937f050e81e7fb8 100644
 --- a/dist/dom/element.js
 +++ b/dist/dom/element.js
-@@ -14,7 +14,6 @@ class TaroElement extends TaroNode {
+@@ -15,7 +15,6 @@ class TaroElement extends TaroNode {
          this.props = {};
          this.dataset = EMPTY_OBJ;
          this.nodeType = 1 /* NodeType.ELEMENT_NODE */;
@@ -280,7 +289,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..daea28644e1e15d3bd0ced11bcb59bed
          hooks.call('patchElement', this);
      }
      _stopPropagation(event) {
-@@ -22,7 +21,7 @@ class TaroElement extends TaroNode {
+@@ -23,7 +22,7 @@ class TaroElement extends TaroNode {
          let target = this;
          // eslint-disable-next-line no-cond-assign
          while ((target = target.parentNode)) {
@@ -289,7 +298,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..daea28644e1e15d3bd0ced11bcb59bed
              if (!isArray(listeners)) {
                  continue;
              }
-@@ -32,6 +31,13 @@ class TaroElement extends TaroNode {
+@@ -33,6 +32,13 @@ class TaroElement extends TaroNode {
              }
          }
      }
@@ -303,7 +312,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..daea28644e1e15d3bd0ced11bcb59bed
      get id() {
          return this.getAttribute(ID);
      }
-@@ -56,7 +62,7 @@ class TaroElement extends TaroNode {
+@@ -57,7 +63,7 @@ class TaroElement extends TaroNode {
      get attributes() {
          const props = this.props;
          const propKeys = Object.keys(props);
@@ -312,7 +321,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..daea28644e1e15d3bd0ced11bcb59bed
          const attrs = propKeys.map(key => ({ name: key, value: props[key] }));
          return attrs.concat(style ? { name: STYLE, value: style } : []);
      }
-@@ -89,10 +95,14 @@ class TaroElement extends TaroNode {
+@@ -90,10 +96,14 @@ class TaroElement extends TaroNode {
      blur() {
          this.setAttribute(FOCUS, false);
      }
@@ -329,7 +338,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..daea28644e1e15d3bd0ced11bcb59bed
              MutationObserver.record({
                  target: this,
                  type: "attributes" /* MutationRecordType.ATTRIBUTES */,
-@@ -124,6 +134,18 @@ class TaroElement extends TaroNode {
+@@ -126,6 +136,18 @@ class TaroElement extends TaroNode {
                  }
                  break;
          }
@@ -348,7 +357,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..daea28644e1e15d3bd0ced11bcb59bed
          // Serialization
          if (!this._root)
              return;
-@@ -165,13 +187,15 @@ class TaroElement extends TaroNode {
+@@ -167,13 +189,15 @@ class TaroElement extends TaroNode {
          }
      }
      removeAttribute(qualifiedName) {
@@ -371,9 +380,9 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..daea28644e1e15d3bd0ced11bcb59bed
          if (qualifiedName === STYLE) {
              this.style.cssText = '';
          }
-@@ -185,6 +209,16 @@ class TaroElement extends TaroNode {
+@@ -190,6 +214,16 @@ class TaroElement extends TaroNode {
+                 removeDatasetAttribute(this, qualifiedName);
              }
-             delete this.props[qualifiedName];
          }
 +        this.delegateAttributeRemoval(qualifiedName, isStaticView);
 +    }
@@ -388,7 +397,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..daea28644e1e15d3bd0ced11bcb59bed
          // Serialization
          if (!this._root)
              return;
-@@ -225,7 +259,7 @@ class TaroElement extends TaroNode {
+@@ -230,7 +264,7 @@ class TaroElement extends TaroNode {
          }
      }
      getAttribute(qualifiedName) {
@@ -397,7 +406,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..daea28644e1e15d3bd0ced11bcb59bed
          return attr !== null && attr !== void 0 ? attr : '';
      }
      getElementsByTagName(tagName) {
-@@ -242,7 +276,7 @@ class TaroElement extends TaroNode {
+@@ -247,7 +281,7 @@ class TaroElement extends TaroNode {
      }
      dispatchEvent(event) {
          const cancelable = event.cancelable;
@@ -406,7 +415,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..daea28644e1e15d3bd0ced11bcb59bed
          if (!isArray(listeners)) {
              return false;
          }
-@@ -275,32 +309,35 @@ class TaroElement extends TaroNode {
+@@ -284,32 +318,35 @@ class TaroElement extends TaroNode {
          return listeners != null;
      }
      addEventListener(type, handler, options) {
@@ -498,7 +507,7 @@ index 78893e78df38fd423937079db101a4fa848a1c73..38342f6e9312998212b17c3b3ed1bea9
      isOnlyClickBinded(): boolean;
  }
 diff --git a/dist/dom/event-target.js b/dist/dom/event-target.js
-index 3b3946c14f00d106e785bda1fed9bdf8103b2300..7414d12c4679afa560338e6cd62995a9fdab7aba 100644
+index 074d3c2a2b73dc8335c3d5239a0b80b38194437a..ee1d03a7644d02e87ab935662e209cc8cfbd07d2 100644
 --- a/dist/dom/event-target.js
 +++ b/dist/dom/event-target.js
 @@ -1,8 +1,15 @@
@@ -519,7 +528,7 @@ index 3b3946c14f00d106e785bda1fed9bdf8103b2300..7414d12c4679afa560338e6cd62995a9
      }
      addEventListener(type, handler, options) {
          type = type.toLowerCase();
-@@ -44,6 +51,11 @@ class TaroEventTarget {
+@@ -39,6 +46,11 @@ class TaroEventTarget {
          else {
              this.__handlers[type] = [handler];
          }
@@ -531,7 +540,7 @@ index 3b3946c14f00d106e785bda1fed9bdf8103b2300..7414d12c4679afa560338e6cd62995a9
      }
      removeEventListener(type, handler) {
          type = type.toLowerCase();
-@@ -56,7 +68,7 @@ class TaroEventTarget {
+@@ -51,7 +63,7 @@ class TaroEventTarget {
          if (!handler) {
              return;
          }
@@ -540,7 +549,7 @@ index 3b3946c14f00d106e785bda1fed9bdf8103b2300..7414d12c4679afa560338e6cd62995a9
          if (!isArray(handlers)) {
              return;
          }
-@@ -69,15 +81,28 @@ class TaroEventTarget {
+@@ -64,15 +76,28 @@ class TaroEventTarget {
              return;
          }
          handlers.splice(index, 1);
@@ -732,7 +741,7 @@ index 5a41497ad145c952b5e321778b3d2a1f67ad8999..07aef99cedaf8b29e3dee52f27d6e9e7
 +export { bumpNearestCtxEpochForRoot, getCachedNearestCtx, getNearestCtx, invalidateNearestCtx, isNearestCtxEnv };
  //# sourceMappingURL=nearest-ctx.js.map
 diff --git a/dist/dom/node.d.ts b/dist/dom/node.d.ts
-index a456e9adeecdaae566fe965b7054e55cf009530e..d5ef1df802491475c476a9bfcf94e72863d91ac6 100644
+index c8d91a90541ff698097c4843a3ab13d72de19344..39f92790188866dcdef098f63b3fca49fd2ac987 100644
 --- a/dist/dom/node.d.ts
 +++ b/dist/dom/node.d.ts
 @@ -19,11 +19,17 @@ declare class TaroNode extends TaroEventTarget {
@@ -755,7 +764,7 @@ index a456e9adeecdaae566fe965b7054e55cf009530e..d5ef1df802491475c476a9bfcf94e728
      protected findIndex(refChild: TaroNode): number;
      get _path(): string;
      get nextSibling(): TaroNode | null;
-@@ -71,6 +77,19 @@ declare class TaroNode extends TaroEventTarget {
+@@ -74,6 +80,19 @@ declare class TaroNode extends TaroEventTarget {
       *   2. remove C
       */
      removeChild<T extends TaroNode>(child: T, options?: RemoveChildOptions): T;
@@ -776,7 +785,7 @@ index a456e9adeecdaae566fe965b7054e55cf009530e..d5ef1df802491475c476a9bfcf94e728
      hasChildNodes(): boolean;
      enqueueUpdate(payload: UpdatePayload): void;
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index 0e0f8da396608d5bf9e9543f18f63013f38dd0c0..0fd875e3634625db4dbc3d7e3684e162f38baa72 100644
+index f60d30cf6e7fbbf921747f8e3d33992bfe9326eb..587d2165955698899f1db0a70c96261e61331d9d 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
 @@ -6,7 +6,7 @@ import { hydrate } from '../hydrate.js';
@@ -832,7 +841,7 @@ index 0e0f8da396608d5bf9e9543f18f63013f38dd0c0..0fd875e3634625db4dbc3d7e3684e162
      }
      findIndex(refChild) {
          const index = this.childNodes.indexOf(refChild);
-@@ -94,28 +105,32 @@ class TaroNode extends TaroEventTarget {
+@@ -102,28 +113,32 @@ class TaroNode extends TaroEventTarget {
       */
      // eslint-disable-next-line accessor-pairs
      set textContent(text) {
@@ -877,7 +886,7 @@ index 0e0f8da396608d5bf9e9543f18f63013f38dd0c0..0fd875e3634625db4dbc3d7e3684e162
      }
      /**
       * @doc https://developer.mozilla.org/zh-CN/docs/Web/API/Node/insertBefore
-@@ -138,10 +153,15 @@ class TaroNode extends TaroEventTarget {
+@@ -146,10 +161,15 @@ class TaroNode extends TaroEventTarget {
              }, refChild);
              return newChild;
          }
@@ -897,7 +906,7 @@ index 0e0f8da396608d5bf9e9543f18f63013f38dd0c0..0fd875e3634625db4dbc3d7e3684e162
          let index = 0;
          // Data structure
          newChild.parentNode = this;
-@@ -154,67 +174,24 @@ class TaroNode extends TaroEventTarget {
+@@ -162,67 +182,24 @@ class TaroNode extends TaroEventTarget {
              // appendChild
              this.childNodes.push(newChild);
          }
@@ -982,7 +991,7 @@ index 0e0f8da396608d5bf9e9543f18f63013f38dd0c0..0fd875e3634625db4dbc3d7e3684e162
          return newChild;
      }
      /**
-@@ -258,7 +235,7 @@ class TaroNode extends TaroEventTarget {
+@@ -270,7 +247,7 @@ class TaroNode extends TaroEventTarget {
       */
      removeChild(child, options = {}) {
          const { cleanRef, doUpdate } = options;
@@ -991,7 +1000,7 @@ index 0e0f8da396608d5bf9e9543f18f63013f38dd0c0..0fd875e3634625db4dbc3d7e3684e162
              // appendChild/replaceChild/insertBefore 不应该触发
              // @Todo: 但其实如果 newChild 的父节点是另一颗子树的节点，应该是要触发的
              MutationObserver.record({
-@@ -277,14 +254,85 @@ class TaroNode extends TaroEventTarget {
+@@ -289,14 +266,85 @@ class TaroNode extends TaroEventTarget {
          if (cleanRef !== false) {
              eventSource.removeNodeTree(child);
          }
@@ -1485,10 +1494,10 @@ index e3bd1f13c55c70a7f1613a4b8335c0069b8e0ba1..84b92fd6678725213a0b77533135fcb1
          data["cl" /* Shortcuts.Class */] = node.className;
      }
 diff --git a/dist/index.d.ts b/dist/index.d.ts
-index e417eee947a2b59a495ae6b2162f82bb7ef81bcf..dd91625204bd59da293e16669a2bc4b15f645750 100644
+index b45065cb4aec45fbc6e84a5d878a3769c2d8ab1e..2f81ed357b3d6c351408f0cc762cb3c783df9073 100644
 --- a/dist/index.d.ts
 +++ b/dist/index.d.ts
-@@ -12,7 +12,7 @@ export { taroHistoryProvider as history, taroLocationProvider as location, taroW
+@@ -13,7 +13,7 @@ export { TaroDocument } from './dom/document.js';
  export { TaroElement } from './dom/element.js';
  export { TaroEvent, createEvent, eventHandler, eventHandlerTTDom } from './dom/event.js';
  export { FormElement } from './dom/form.js';
@@ -1496,12 +1505,12 @@ index e417eee947a2b59a495ae6b2162f82bb7ef81bcf..dd91625204bd59da293e16669a2bc4b1
 +export { bumpNearestCtxEpochForRoot, getNearestCtx, invalidateNearestCtx, isNearestCtxEnv } from './dom/nearest-ctx.js';
  export { TaroNode } from './dom/node.js';
  export { TaroRootElement } from './dom/root.js';
- export { Style } from './dom/style.js';
+ export { ShadowRoot } from './dom/shadow-root.js';
 diff --git a/dist/index.js b/dist/index.js
-index 87bddc34e7021c352665e8cee1433af24c4b763a..b03f40dcbde925aaa2f802b6678439e5a0c1d132 100644
+index 3c9fea98872dd80c9743ff1832e06c7e12000ade..f294a916ed321015db5c382368de9883d6f14244 100644
 --- a/dist/index.js
 +++ b/dist/index.js
-@@ -13,7 +13,7 @@ export { taroHistoryProvider as history, taroLocationProvider as location, taroW
+@@ -14,7 +14,7 @@ export { TaroDocument } from './dom/document.js';
  export { TaroElement } from './dom/element.js';
  export { TaroEvent, createEvent, eventHandler, eventHandlerTTDom } from './dom/event.js';
  export { FormElement } from './dom/form.js';
@@ -1509,7 +1518,7 @@ index 87bddc34e7021c352665e8cee1433af24c4b763a..b03f40dcbde925aaa2f802b6678439e5
 +export { bumpNearestCtxEpochForRoot, getNearestCtx, invalidateNearestCtx, isNearestCtxEnv } from './dom/nearest-ctx.js';
  export { TaroNode } from './dom/node.js';
  export { TaroRootElement } from './dom/root.js';
- export { Style } from './dom/style.js';
+ export { ShadowRoot } from './dom/shadow-root.js';
 diff --git a/dist/utils/index.js b/dist/utils/index.js
 index 7c06f9a5ced23e9e3b7be97445fed318d61f777b..c21cfeaa9334b14e416e6e4cfe2a69441a7e6b28 100644
 --- a/dist/utils/index.js

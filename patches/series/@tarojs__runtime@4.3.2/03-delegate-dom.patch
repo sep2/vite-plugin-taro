@@ -35,10 +35,10 @@ index 354bfc00bc34df0c4248acb6aafe2b4b679130be..c159224fb0ce38ec8cba64f9f3debb62
  }
  
 diff --git a/dist/dom/element.js b/dist/dom/element.js
-index 160f3682d64625bb33221a76453677fa0d1fe8fa..968cab19cc6e92cc789797a23bb4b330202a688e 100644
+index e1f059f49f8ee144e36e807dac71e36ac7165f71..5690fbf94c4c88d6a27c49e519e4cfac775c94a3 100644
 --- a/dist/dom/element.js
 +++ b/dist/dom/element.js
-@@ -124,6 +124,18 @@ class TaroElement extends TaroNode {
+@@ -126,6 +126,18 @@ class TaroElement extends TaroNode {
                  }
                  break;
          }
@@ -57,9 +57,9 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..968cab19cc6e92cc789797a23bb4b330
          // Serialization
          if (!this._root)
              return;
-@@ -185,6 +197,16 @@ class TaroElement extends TaroNode {
+@@ -190,6 +202,16 @@ class TaroElement extends TaroNode {
+                 removeDatasetAttribute(this, qualifiedName);
              }
-             delete this.props[qualifiedName];
          }
 +        this.delegateAttributeRemoval(qualifiedName, isStaticView);
 +    }
@@ -74,7 +74,7 @@ index 160f3682d64625bb33221a76453677fa0d1fe8fa..968cab19cc6e92cc789797a23bb4b330
          // Serialization
          if (!this._root)
              return;
-@@ -275,32 +297,35 @@ class TaroElement extends TaroNode {
+@@ -284,32 +306,35 @@ class TaroElement extends TaroNode {
          return listeners != null;
      }
      addEventListener(type, handler, options) {
@@ -141,10 +141,10 @@ index 78893e78df38fd423937079db101a4fa848a1c73..4b8fac8181991d29ca3f5c06e676243f
      isOnlyClickBinded(): boolean;
  }
 diff --git a/dist/dom/event-target.js b/dist/dom/event-target.js
-index 3b3946c14f00d106e785bda1fed9bdf8103b2300..de066ca2492f61f675fd793dc585cf160fd6dfa6 100644
+index 074d3c2a2b73dc8335c3d5239a0b80b38194437a..21c6e3b486224159083d243671f4f27e65dc4af3 100644
 --- a/dist/dom/event-target.js
 +++ b/dist/dom/event-target.js
-@@ -44,6 +44,11 @@ class TaroEventTarget {
+@@ -39,6 +39,11 @@ class TaroEventTarget {
          else {
              this.__handlers[type] = [handler];
          }
@@ -156,7 +156,7 @@ index 3b3946c14f00d106e785bda1fed9bdf8103b2300..de066ca2492f61f675fd793dc585cf16
      }
      removeEventListener(type, handler) {
          type = type.toLowerCase();
-@@ -69,7 +74,20 @@ class TaroEventTarget {
+@@ -64,7 +69,20 @@ class TaroEventTarget {
              return;
          }
          handlers.splice(index, 1);
@@ -289,7 +289,7 @@ index 5a41497ad145c952b5e321778b3d2a1f67ad8999..07aef99cedaf8b29e3dee52f27d6e9e7
 +export { bumpNearestCtxEpochForRoot, getCachedNearestCtx, getNearestCtx, invalidateNearestCtx, isNearestCtxEnv };
  //# sourceMappingURL=nearest-ctx.js.map
 diff --git a/dist/dom/node.d.ts b/dist/dom/node.d.ts
-index a456e9adeecdaae566fe965b7054e55cf009530e..92948ef44a4b92f2adda1c114e95535118d2b79d 100644
+index c8d91a90541ff698097c4843a3ab13d72de19344..78a7fd41995215951d692a2c1e0762a71995d4b6 100644
 --- a/dist/dom/node.d.ts
 +++ b/dist/dom/node.d.ts
 @@ -20,10 +20,17 @@ declare class TaroNode extends TaroEventTarget {
@@ -311,7 +311,7 @@ index a456e9adeecdaae566fe965b7054e55cf009530e..92948ef44a4b92f2adda1c114e955351
      protected findIndex(refChild: TaroNode): number;
      get _path(): string;
      get nextSibling(): TaroNode | null;
-@@ -71,6 +78,18 @@ declare class TaroNode extends TaroEventTarget {
+@@ -74,6 +81,18 @@ declare class TaroNode extends TaroEventTarget {
       *   2. remove C
       */
      removeChild<T extends TaroNode>(child: T, options?: RemoveChildOptions): T;
@@ -331,7 +331,7 @@ index a456e9adeecdaae566fe965b7054e55cf009530e..92948ef44a4b92f2adda1c114e955351
      hasChildNodes(): boolean;
      enqueueUpdate(payload: UpdatePayload): void;
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index 0e0f8da396608d5bf9e9543f18f63013f38dd0c0..c456ad0ba846e297151ee81865c605a936a5a922 100644
+index f60d30cf6e7fbbf921747f8e3d33992bfe9326eb..f00d5c9f9271cbf53adb5609e3cd68e799f7abad 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
 @@ -6,7 +6,7 @@ import { hydrate } from '../hydrate.js';
@@ -373,7 +373,7 @@ index 0e0f8da396608d5bf9e9543f18f63013f38dd0c0..c456ad0ba846e297151ee81865c605a9
      }
      findIndex(refChild) {
          const index = this.childNodes.indexOf(refChild);
-@@ -101,13 +113,13 @@ class TaroNode extends TaroEventTarget {
+@@ -109,13 +121,13 @@ class TaroNode extends TaroEventTarget {
              this.removeChild(this.firstChild, { doUpdate: false });
          }
          if (text === '') {
@@ -390,7 +390,7 @@ index 0e0f8da396608d5bf9e9543f18f63013f38dd0c0..c456ad0ba846e297151ee81865c605a9
          }
          // @Todo: appendChild 会多触发一次
          MutationObserver.record({
-@@ -154,55 +166,10 @@ class TaroNode extends TaroEventTarget {
+@@ -162,55 +174,10 @@ class TaroNode extends TaroEventTarget {
              // appendChild
              this.childNodes.push(newChild);
          }
@@ -450,7 +450,7 @@ index 0e0f8da396608d5bf9e9543f18f63013f38dd0c0..c456ad0ba846e297151ee81865c605a9
          MutationObserver.record({
              type: "childList" /* MutationRecordType.CHILD_LIST */,
              target: this,
-@@ -277,14 +244,80 @@ class TaroNode extends TaroEventTarget {
+@@ -289,14 +256,80 @@ class TaroNode extends TaroEventTarget {
          if (cleanRef !== false) {
              eventSource.removeNodeTree(child);
          }
@@ -713,10 +713,10 @@ index 2d981033285f2c4266a3f4c12a774cac68656375..14f10f73c8a81435c61b63f619ddf968
                  }
              }
 diff --git a/dist/index.d.ts b/dist/index.d.ts
-index e417eee947a2b59a495ae6b2162f82bb7ef81bcf..dd91625204bd59da293e16669a2bc4b15f645750 100644
+index b45065cb4aec45fbc6e84a5d878a3769c2d8ab1e..2f81ed357b3d6c351408f0cc762cb3c783df9073 100644
 --- a/dist/index.d.ts
 +++ b/dist/index.d.ts
-@@ -12,7 +12,7 @@ export { taroHistoryProvider as history, taroLocationProvider as location, taroW
+@@ -13,7 +13,7 @@ export { TaroDocument } from './dom/document.js';
  export { TaroElement } from './dom/element.js';
  export { TaroEvent, createEvent, eventHandler, eventHandlerTTDom } from './dom/event.js';
  export { FormElement } from './dom/form.js';
@@ -724,12 +724,12 @@ index e417eee947a2b59a495ae6b2162f82bb7ef81bcf..dd91625204bd59da293e16669a2bc4b1
 +export { bumpNearestCtxEpochForRoot, getNearestCtx, invalidateNearestCtx, isNearestCtxEnv } from './dom/nearest-ctx.js';
  export { TaroNode } from './dom/node.js';
  export { TaroRootElement } from './dom/root.js';
- export { Style } from './dom/style.js';
+ export { ShadowRoot } from './dom/shadow-root.js';
 diff --git a/dist/index.js b/dist/index.js
-index 87bddc34e7021c352665e8cee1433af24c4b763a..b03f40dcbde925aaa2f802b6678439e5a0c1d132 100644
+index 3c9fea98872dd80c9743ff1832e06c7e12000ade..f294a916ed321015db5c382368de9883d6f14244 100644
 --- a/dist/index.js
 +++ b/dist/index.js
-@@ -13,7 +13,7 @@ export { taroHistoryProvider as history, taroLocationProvider as location, taroW
+@@ -14,7 +14,7 @@ export { TaroDocument } from './dom/document.js';
  export { TaroElement } from './dom/element.js';
  export { TaroEvent, createEvent, eventHandler, eventHandlerTTDom } from './dom/event.js';
  export { FormElement } from './dom/form.js';
@@ -737,4 +737,4 @@ index 87bddc34e7021c352665e8cee1433af24c4b763a..b03f40dcbde925aaa2f802b6678439e5
 +export { bumpNearestCtxEpochForRoot, getNearestCtx, invalidateNearestCtx, isNearestCtxEnv } from './dom/nearest-ctx.js';
  export { TaroNode } from './dom/node.js';
  export { TaroRootElement } from './dom/root.js';
- export { Style } from './dom/style.js';
+ export { ShadowRoot } from './dom/shadow-root.js';

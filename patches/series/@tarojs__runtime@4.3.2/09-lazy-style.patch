@@ -1,11 +1,11 @@
 diff --git a/dist/dom-external/node.js b/dist/dom-external/node.js
-index 4c6f7f6623cdafc8fd78bd572bdf7046ed7d7a06..092c834279ee5eca5b12ce1a6106f93202ffa91b 100644
+index 99b01db2d4594e27717f1c2a84e9e86fbd1c6656..46d07fd874e76538b58ad4c801ab872ea5540c64 100644
 --- a/dist/dom-external/node.js
 +++ b/dist/dom-external/node.js
 @@ -63,16 +63,21 @@ function cloneNode(isDeep) {
-         }
      }
      newNode.dataset = Object.assign({}, this.dataset);
+     copyDatasetAttributeOrder(this, newNode);
 -    newNode.style._value = Object.assign({}, this.style._value);
 -    for (const name of this.style._usedStyleProp) {
 -        newNode.style._usedStyleProp.add(name);
@@ -53,10 +53,10 @@ index 06c95ed23c1b2c038f502b20ddb7470a94734da9..32ed88b20ef65f5c8a8519ef76c37792
      set id(val: string);
      get className(): string;
 diff --git a/dist/dom/element.js b/dist/dom/element.js
-index a7e01b91304a50f330c226b8909a3b45b080f736..6821983296d82aa6c9f67cddbaf5159676f0ae03 100644
+index cb344f3e09ea00dbdbd3c68948c9080a88255b49..2276f2b57845484d0e5dbf172021097d14439c35 100644
 --- a/dist/dom/element.js
 +++ b/dist/dom/element.js
-@@ -14,7 +14,6 @@ class TaroElement extends TaroNode {
+@@ -15,7 +15,6 @@ class TaroElement extends TaroNode {
          this.props = {};
          this.dataset = EMPTY_OBJ;
          this.nodeType = 1 /* NodeType.ELEMENT_NODE */;
@@ -64,7 +64,7 @@ index a7e01b91304a50f330c226b8909a3b45b080f736..6821983296d82aa6c9f67cddbaf51596
          hooks.call('patchElement', this);
      }
      _stopPropagation(event) {
-@@ -32,6 +31,13 @@ class TaroElement extends TaroNode {
+@@ -33,6 +32,13 @@ class TaroElement extends TaroNode {
              }
          }
      }
@@ -78,7 +78,7 @@ index a7e01b91304a50f330c226b8909a3b45b080f736..6821983296d82aa6c9f67cddbaf51596
      get id() {
          return this.getAttribute(ID);
      }
-@@ -56,7 +62,7 @@ class TaroElement extends TaroNode {
+@@ -57,7 +63,7 @@ class TaroElement extends TaroNode {
      get attributes() {
          const props = this.props;
          const propKeys = Object.keys(props);
@@ -87,7 +87,7 @@ index a7e01b91304a50f330c226b8909a3b45b080f736..6821983296d82aa6c9f67cddbaf51596
          const attrs = propKeys.map(key => ({ name: key, value: props[key] }));
          return attrs.concat(style ? { name: STYLE, value: style } : []);
      }
-@@ -253,7 +259,7 @@ class TaroElement extends TaroNode {
+@@ -258,7 +264,7 @@ class TaroElement extends TaroNode {
          }
      }
      getAttribute(qualifiedName) {

@@ -1,9 +1,10 @@
 diff --git a/dist/dom-external/node.js b/dist/dom-external/node.js
-index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..4c6f7f6623cdafc8fd78bd572bdf7046ed7d7a06 100644
+index a6cdae92d257850dbeaf34debda2e57b78363acf..99b01db2d4594e27717f1c2a84e9e86fbd1c6656 100644
 --- a/dist/dom-external/node.js
 +++ b/dist/dom-external/node.js
-@@ -1,6 +1,14 @@
+@@ -1,7 +1,15 @@
 -import { PROPS, DATASET, OBJECT, STYLE } from '../constants/index.js';
+ import { copyDatasetAttributeOrder } from '../dom/dataset.js';
 +import { TaroElement } from '../dom/element.js';
 +import { TaroNode } from '../dom/node.js';
 +import { Style } from '../dom/style.js';
@@ -18,7 +19,7 @@ index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..4c6f7f6623cdafc8fd78bd572bdf7046
  /**
   * An implementation of `Element.insertAdjacentHTML()`
   * to support Vue 3 with a version of or greater than `vue@3.1.2`
-@@ -31,31 +39,56 @@ function insertAdjacentHTML(position, html) {
+@@ -30,38 +38,57 @@ function insertAdjacentHTML(position, html) {
          }
      }
  }
@@ -63,6 +64,7 @@ index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..4c6f7f6623cdafc8fd78bd572bdf7046
 -            newNode.style._usedStyleProp = new Set(Array.from(value._usedStyleProp));
 +    }
 +    newNode.dataset = Object.assign({}, this.dataset);
++    copyDatasetAttributeOrder(this, newNode);
 +    newNode.style._value = Object.assign({}, this.style._value);
 +    for (const name of this.style._usedStyleProp) {
 +        newNode.style._usedStyleProp.add(name);
@@ -71,11 +73,18 @@ index bedbaa261b42230bb97b23bbc566ecbfb45cb64d..4c6f7f6623cdafc8fd78bd572bdf7046
 +            newNode.style.setCssVariables(name);
          }
      }
+-    if (isDeep) {
+-        newNode.childNodes = this.childNodes.map(node => {
+-            const child = node.cloneNode(true);
+-            child.parentNode = newNode;
+-            return child;
+-        });
 +    if (newNode.style._usedStyleProp.size > 0 && newNode.style.delegateStyleUpdate !== templateStyleUpdate) {
 +        newNode.style.delegateStyleUpdate();
-+    }
-     if (isDeep) {
--        newNode.childNodes = this.childNodes.map(node => node.cloneNode(true));
+     }
+-    if (this.nodeType === 1 /* NodeType.ELEMENT_NODE */) {
+-        copyDatasetAttributeOrder(this, newNode);
++    if (isDeep) {
 +        const notifyInsertion = newNode.delegateChildInsertion !== templateChildInsertion;
 +        for (const child of this.childNodes) {
 +            const clonedChild = child.cloneNode(true);

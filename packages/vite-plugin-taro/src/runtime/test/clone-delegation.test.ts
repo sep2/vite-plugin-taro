@@ -128,6 +128,23 @@ assert.equal(deep.firstChild.nextSibling, null)
 deep.firstChild.value = 'changed'
 assert.equal(child.value, 'retained')
 
+// Dataset aliases retain last-write order independently in each clone, including after removals.
+const datasetSource = document.createElement('view')
+datasetSource.setAttribute('data-item-key', 'first')
+datasetSource.setAttribute('data-itemKey', 'second')
+datasetSource.setAttribute('data-item-key', 'latest')
+for (const isDeep of [false, true]) {
+    const clone = datasetSource.cloneNode(isDeep)
+    assert.equal(clone.dataset.itemKey, 'latest')
+    clone.removeAttribute('data-item-key')
+    assert.equal(clone.dataset.itemKey, 'second')
+    clone.removeAttribute('data-itemKey')
+    assert.equal(Object.hasOwn(clone.dataset, 'itemKey'), false)
+    assert.equal(datasetSource.dataset.itemKey, 'latest')
+}
+datasetSource.removeAttribute('data-item-key')
+assert.equal(datasetSource.dataset.itemKey, 'second')
+
 // A wide deep clone constructs edges once without invoking sibling searches or public mutation methods.
 const wide = document.createElement('view')
 for (let index = 0; index < 100; index++) {

@@ -154,7 +154,7 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
     assert.ok(!runtimeModules.includes('test'), 'runtime test utilities stay outside the published package')
     assert.match(h5AppPath, /\/src\/runtime\/h5\/app\.ts$/)
     assert.equal(packageJson.dependencies['@tarojs/shared'], taroPackage.version)
-    assert.equal(packageJson.dependencies['@tailwindcss/vite'], '4.3.3')
+    assert.equal(packageJson.dependencies['@tailwindcss/vite'], '4.3.4')
     for (const name of ['helper', 'taro', 'api', 'components', 'router']) {
         assert.equal(packageJson.dependencies[`@tarojs/${name}`], undefined)
     }

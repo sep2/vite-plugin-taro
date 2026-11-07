@@ -1,5 +1,5 @@
 {
-    "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
+    "$schema": "https://biomejs.dev/schemas/2.6.6/schema.json",
     "vcs": {
         "enabled": true,
         "clientKind": "git",
@@ -76,5 +76,27 @@
             "cssModules": true,
             "tailwindDirectives": true
         }
-    }
+    },
+    "markdown": {
+        "formatter": {
+            "enabled": false
+        }
+    },
+    "yaml": {
+        "formatter": {
+            "enabled": false
+        }
+    },
+    "overrides": [
+        {
+            "includes": ["**/*.test.ts"],
+            "linter": {
+                "rules": {
+                    "correctness": {
+                        "noComponentHookFactories": "off"
+                    }
+                }
+            }
+        }
+    ]
 }

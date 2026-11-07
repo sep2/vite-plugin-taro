@@ -6,19 +6,19 @@ pnpm applies one combined patch to each package version. We maintain **25 featur
 
 | Package | Ordered feature patches | Purpose |
 | --- | --- | --- |
-| `@tarojs/plugin-html@4.3.1` | `01-html-elements` | Populate upstream HTML inline/block element sets and share their pure classifications and semantic classes between templates and native DOM hosts. |
-| `@tarojs/plugin-framework-react@4.3.1` | `01-react19-root-api` | Use React 19 concurrent roots for App and standalone native-component entries; make standalone native-component setup explicitly synchronous with `flushSync`. |
+| `@tarojs/plugin-html@4.3.2` | `01-html-elements` | Populate upstream HTML inline/block element sets and share their pure classifications and semantic classes between templates and native DOM hosts. |
+| `@tarojs/plugin-framework-react@4.3.2` | `01-react19-root-api` | Use React 19 concurrent roots for App and standalone native-component entries; make standalone native-component setup explicitly synchronous with `flushSync`. |
 | | `02-mini-app-page-rendering` | Create custom App containers as logical roots and place Page children in an opaque outlet inside the singleton React App. |
 | | `03-h5-router-container` | Give H5 Page children a dedicated `taro_router` container so routing CSS does not target unrelated App siblings. |
 | | `04-page-prerender` | Deduplicate queued and rendered Page identities for caller-controlled prerendering. Preserve the original queue, render/unmount flow, mount signature and native update scheduling. |
 | | `05-page-host-context` | Select the existing Mini Page root's host type and present native Pages through root updates. |
-| `@tarojs/react@4.3.1` | `01-react19-reconciler` | Target the pinned React 19 reconciler contract directly: concurrent roots, commit updates, scoped event priorities, error callbacks and distinct synchronous callback/work flushing. Remove legacy render APIs and align declarations. |
+| `@tarojs/react@4.3.2` | `01-react19-reconciler` | Target the pinned React 19 reconciler contract directly: concurrent roots, commit updates, scoped event priorities, error callbacks and distinct synchronous callback/work flushing. Remove legacy render APIs and align declarations. |
 | | `02-renderer-host` | Delegate node creation, form classification and commit boundaries through VPT's private renderer-host import, and expose the generic host type. |
 | | `03-page-host-context` | Delegate Page-root type and child host-context selection to required host callbacks. |
 | | `04-event-handler-replacement` | Add replacement React callbacks before removing their predecessors, preserving continuous native subscriptions and logical handler order. |
 | | `05-style-update-batching` | Expose a synchronous style-prop boundary so the WX DOM host serializes and forwards the final logical style once. |
 | | `06-development-element-attributes` | Omit direct React-element host attributes during development, preserving React 19 Fast Refresh and production output. |
-| `@tarojs/runtime@4.3.1` | `01-mini-app-page-rendering` | Construct the App host as a scheduler, derive initial reset paths from the root prefix, and stop App serialization at the Page outlet. |
+| `@tarojs/runtime@4.3.2` | `01-mini-app-page-rendering` | Construct the App host as a scheduler, derive initial reset paths from the root prefix, and stop App serialization at the Page outlet. |
 | | `02-page-lifecycle` | Support object-or-factory Page data and caller-owned Page mounting with Taro lifecycle ordering and teardown. |
 | | `03-delegate-dom` | Delegate DOM presentation and context lookup/invalidation to the selected host, and create replacement text through ownerDocument. Taro retains logical state, event identities and mutation records; template defaults retain payload preparation and epoch-based context caching. |
 | | `04-clone-delegation` | Construct clones through existing presentation delegates, preserving fresh identity, parent links and dynamic style accessors. |
@@ -76,11 +76,11 @@ Subscription notifications carry Taro’s lowercase logical event names: `region
 
 `12-native-event-targets` keeps template target lookup in `TaroEvent.getTargetElement(target, useTargetDataset)`, including Alipay’s separate bubbling-target dataset. WX and TT DOM hosts return null from this lookup so the existing getters use SDK records directly. Native event datasets are authoritative even with missing, duplicate or changed IDs; target identity follows the SDK records. Lazy target caches, detail-field merging, event normalization, bubbling batches and controlled-input handling remain shared. WX creation performs no SID dataset write, and dataset attributes use the SDK setter directly. Logical SID allocation, the event index and `getElementById` remain available. Native target lookup is O(1); dataset copying and detail merging retain their O(D) and O(K) costs for D dataset entries and K detail fields.
 
-Taro 4.3.1 supplies the shared listener, event-data and style-key contracts: unmatched listener removal preserves registered handlers ([#19529](https://github.com/NervJS/taro/pull/19529)); unresolved event indexes retain platform datasets and distinct target identities ([#19528](https://github.com/NervJS/taro/pull/19528)); style reads and removals prefer stored property keys ([#19530](https://github.com/NervJS/taro/pull/19530)). Cross-platform regression tests verify these contracts alongside VPT's delegates.
+Taro 4.3.2 supplies the shared listener, event-data and style-key contracts: unmatched listener removal preserves registered handlers ([#19529](https://github.com/NervJS/taro/pull/19529)); unresolved event indexes retain platform datasets and distinct target identities ([#19528](https://github.com/NervJS/taro/pull/19528)); style reads and removals prefer stored property keys ([#19530](https://github.com/NervJS/taro/pull/19530)). Cross-platform regression tests verify these contracts alongside VPT's delegates.
 
 Upstream insertion validation ([#19551](https://github.com/NervJS/taro/pull/19551)) checks reference membership before detaching nodes or consuming fragments. Valid self-insertion and self-replacement preserve identity without mutations. The node-move regressions cover invalid references, unchanged source/destination trees, event indexes, observer records and presentation queues. Reference validation and same-parent moves retain O(N) array searches for N siblings.
 
-`04-clone-delegation` initializes text through the document factory and forwards copied attributes, each nonempty completed style and each cloned child through host-replaced delegates. It captures the default template delegates before host installation: those functions prepare incremental payloads and are skipped during clone construction, including scheduler-root clones. Default-template attributes use a direct shallow copy; native attributes are copied and delegated in the same loop. Cloning constructs parent/child relationships directly, retaining the source's ID lookup and avoiding public mutation observer records and sibling searches. Every clone has its own sid, native handle and handler state. Dynamic style accessors are recreated on the new Style object. Construction is linear in cloned nodes, attributes, dataset keys and style entries, plus the selected host's work. Ordinary mutation delegates retain their existing behavior.
+`04-clone-delegation` initializes text through the document factory and forwards copied attributes, each nonempty completed style and each cloned child through host-replaced delegates. It captures the default template delegates before host installation: those functions prepare incremental payloads and are skipped during clone construction, including scheduler-root clones. Default-template attributes use a direct shallow copy; native attributes are copied and delegated in the same loop. Cloning constructs parent/child relationships directly, retaining the source's ID lookup and avoiding public mutation observer records and sibling searches. Every clone has its own sid, native handle and handler state. Dataset attribute write order is copied independently so removing colliding dataset aliases restores each clone's remaining value. Dynamic style accessors are recreated on the new Style object. Construction is linear in cloned nodes, attributes, dataset keys and style entries, plus the selected host's work. Ordinary mutation delegates retain their existing behavior.
 
 `vite-plugin-taro-runtime/runtime/tt-document` exposes Taro's existing `bom/document.js` factory directly. Its native DOM declarations live in the runtime package's `types/tt-document.d.ts`.
 
@@ -138,7 +138,7 @@ pnpm build:plugin
 To work on one package:
 
 ```sh
-pnpm patches:build @tarojs/runtime@4.3.1
+pnpm patches:build @tarojs/runtime@4.3.2
 ```
 
 The composer:
@@ -163,13 +163,13 @@ For example, editing the runtime's first feature (Bash example; use an absolute 
 repo="$PWD"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-pnpm patch @tarojs/runtime@4.3.1 --ignore-existing --edit-dir "$work/package"
+pnpm patch @tarojs/runtime@4.3.2 --ignore-existing --edit-dir "$work/package"
 git -C "$work/package" init --quiet --object-format=sha1
 git -C "$work/package" -c core.autocrlf=false add --force --all
 
 # For a later feature, apply all earlier feature files here with git apply --index.
 base="$(git -C "$work/package" write-tree)"
-feature="$repo/patches/series/@tarojs__runtime@4.3.1/01-mini-app-page-rendering.patch"
+feature="$repo/patches/series/@tarojs__runtime@4.3.2/01-mini-app-page-rendering.patch"
 git -C "$work/package" apply --index "$feature"
 
 # Edit the extracted package files now. For a new feature, omit the preceding apply.
@@ -179,7 +179,7 @@ git -C "$work/package" diff --cached --binary --full-index \
   --no-color --no-ext-diff --no-textconv --no-renames \
   --src-prefix=a/ --dst-prefix=b/ "$base" -- > "$feature"
 
-pnpm patches:build @tarojs/runtime@4.3.1
+pnpm patches:build @tarojs/runtime@4.3.2
 pnpm install
 ```
 

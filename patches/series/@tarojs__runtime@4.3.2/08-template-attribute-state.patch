@@ -12,10 +12,10 @@ index c159224fb0ce38ec8cba64f9f3debb6285821ff5..06c95ed23c1b2c038f502b20ddb7470a
      /**
       * 逻辑属性、ID/dataset 和 mutation 记录更新后调用，尚未转换模板属性别名。
 diff --git a/dist/dom/element.js b/dist/dom/element.js
-index 1463d9d9c758024f7292af3f5dd118cd51cff1ad..a7e01b91304a50f330c226b8909a3b45b080f736 100644
+index 27ed9bdab87dfaab81cfa6af3e2dd2ff3d1971dd..cb344f3e09ea00dbdbd3c68948c9080a88255b49 100644
 --- a/dist/dom/element.js
 +++ b/dist/dom/element.js
-@@ -89,9 +89,13 @@ class TaroElement extends TaroNode {
+@@ -90,9 +90,13 @@ class TaroElement extends TaroNode {
      blur() {
          this.setAttribute(FOCUS, false);
      }
@@ -30,7 +30,7 @@ index 1463d9d9c758024f7292af3f5dd118cd51cff1ad..a7e01b91304a50f330c226b8909a3b45
          if (qualifiedName !== STYLE && MutationObserver.hasObservers) {
              MutationObserver.record({
                  target: this,
-@@ -177,7 +181,7 @@ class TaroElement extends TaroNode {
+@@ -179,7 +183,7 @@ class TaroElement extends TaroNode {
          }
      }
      removeAttribute(qualifiedName) {

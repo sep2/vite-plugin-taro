@@ -1,8 +1,8 @@
 diff --git a/dist/dom/element.js b/dist/dom/element.js
-index 6821983296d82aa6c9f67cddbaf5159676f0ae03..daea28644e1e15d3bd0ced11bcb59bed62649f49 100644
+index 2276f2b57845484d0e5dbf172021097d14439c35..b6dbc5735c6d475b51f3f8004937f050e81e7fb8 100644
 --- a/dist/dom/element.js
 +++ b/dist/dom/element.js
-@@ -21,7 +21,7 @@ class TaroElement extends TaroNode {
+@@ -22,7 +22,7 @@ class TaroElement extends TaroNode {
          let target = this;
          // eslint-disable-next-line no-cond-assign
          while ((target = target.parentNode)) {
@@ -11,7 +11,7 @@ index 6821983296d82aa6c9f67cddbaf5159676f0ae03..daea28644e1e15d3bd0ced11bcb59bed
              if (!isArray(listeners)) {
                  continue;
              }
-@@ -276,7 +276,7 @@ class TaroElement extends TaroNode {
+@@ -281,7 +281,7 @@ class TaroElement extends TaroNode {
      }
      dispatchEvent(event) {
          const cancelable = event.cancelable;
@@ -38,7 +38,7 @@ index 4b8fac8181991d29ca3f5c06e676243f67e4cb68..38342f6e9312998212b17c3b3ed1bea9
      removeEventListener(type: string, handler: EventHandler): void;
      /**
 diff --git a/dist/dom/event-target.js b/dist/dom/event-target.js
-index de066ca2492f61f675fd793dc585cf160fd6dfa6..7414d12c4679afa560338e6cd62995a9fdab7aba 100644
+index 21c6e3b486224159083d243671f4f27e65dc4af3..ee1d03a7644d02e87ab935662e209cc8cfbd07d2 100644
 --- a/dist/dom/event-target.js
 +++ b/dist/dom/event-target.js
 @@ -1,8 +1,15 @@
@@ -59,7 +59,7 @@ index de066ca2492f61f675fd793dc585cf160fd6dfa6..7414d12c4679afa560338e6cd62995a9
      }
      addEventListener(type, handler, options) {
          type = type.toLowerCase();
-@@ -61,7 +68,7 @@ class TaroEventTarget {
+@@ -56,7 +63,7 @@ class TaroEventTarget {
          if (!handler) {
              return;
          }
@@ -68,7 +68,7 @@ index de066ca2492f61f675fd793dc585cf160fd6dfa6..7414d12c4679afa560338e6cd62995a9
          if (!isArray(handlers)) {
              return;
          }
-@@ -89,13 +96,13 @@ class TaroEventTarget {
+@@ -84,13 +91,13 @@ class TaroEventTarget {
       */
      delegateEventListener(_type, _subscribed) { }
      isAnyEventBinded() {

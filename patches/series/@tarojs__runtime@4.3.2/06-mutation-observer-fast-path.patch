@@ -67,10 +67,10 @@ index 2bd6a91145ee0aae2c58838b36cfb9c6572c6f3e..68454f0ba5b0e8ee3d2231ea2b04c108
          recordMutation(record);
      }
 diff --git a/dist/dom/element.js b/dist/dom/element.js
-index 968cab19cc6e92cc789797a23bb4b330202a688e..1463d9d9c758024f7292af3f5dd118cd51cff1ad 100644
+index 5690fbf94c4c88d6a27c49e519e4cfac775c94a3..27ed9bdab87dfaab81cfa6af3e2dd2ff3d1971dd 100644
 --- a/dist/dom/element.js
 +++ b/dist/dom/element.js
-@@ -92,7 +92,7 @@ class TaroElement extends TaroNode {
+@@ -93,7 +93,7 @@ class TaroElement extends TaroNode {
      setAttribute(qualifiedName, value) {
          process.env.NODE_ENV !== 'production' && warn(isString(value) && value.length > PROPERTY_THRESHOLD, `元素 ${this.nodeName} 的 ${qualifiedName} 属性值数据量过大，可能会影响渲染性能。考虑降低图片转为 base64 的阈值或在 CSS 中使用 base64。`);
          const isPureView = this.nodeName === VIEW && !isHasExtractProp(this) && !this.isAnyEventBinded();
@@ -79,7 +79,7 @@ index 968cab19cc6e92cc789797a23bb4b330202a688e..1463d9d9c758024f7292af3f5dd118cd
              MutationObserver.record({
                  target: this,
                  type: "attributes" /* MutationRecordType.ATTRIBUTES */,
-@@ -178,12 +178,14 @@ class TaroElement extends TaroNode {
+@@ -180,12 +180,14 @@ class TaroElement extends TaroNode {
      }
      removeAttribute(qualifiedName) {
          const isStaticView = this.nodeName === VIEW && isHasExtractProp(this) && !this.isAnyEventBinded();
@@ -101,10 +101,10 @@ index 968cab19cc6e92cc789797a23bb4b330202a688e..1463d9d9c758024f7292af3f5dd118cd
              this.style.cssText = '';
          }
 diff --git a/dist/dom/node.js b/dist/dom/node.js
-index f000eb8bd9e5f377fd08d06d67b0a53dd9f5703e..fe8af69963ef1d38c520ecd920021e116d46e600 100644
+index 1c0bed2551264edf31123dc8d2b03d7ebc29b0a4..3d6f6cddc83b352c5fc18028ea1a30f93a4ddeaa 100644
 --- a/dist/dom/node.js
 +++ b/dist/dom/node.js
-@@ -106,8 +106,13 @@ class TaroNode extends TaroEventTarget {
+@@ -114,8 +114,13 @@ class TaroNode extends TaroEventTarget {
       */
      // eslint-disable-next-line accessor-pairs
      set textContent(text) {
@@ -120,7 +120,7 @@ index f000eb8bd9e5f377fd08d06d67b0a53dd9f5703e..fe8af69963ef1d38c520ecd920021e11
          // Handle old children' data structure & ref
          while (this.firstChild) {
              this.removeChild(this.firstChild, { doUpdate: false });
-@@ -117,17 +122,16 @@ class TaroNode extends TaroEventTarget {
+@@ -125,17 +130,16 @@ class TaroNode extends TaroEventTarget {
          }
          else {
              const newText = this.ownerDocument.createTextNode(text);
@@ -144,7 +144,7 @@ index f000eb8bd9e5f377fd08d06d67b0a53dd9f5703e..fe8af69963ef1d38c520ecd920021e11
      }
      /**
       * @doc https://developer.mozilla.org/zh-CN/docs/Web/API/Node/insertBefore
-@@ -175,18 +179,20 @@ class TaroNode extends TaroEventTarget {
+@@ -183,18 +187,20 @@ class TaroNode extends TaroEventTarget {
          // Its default implementation prepares template payloads; native hosts can replace it before any serialization work.
          this.delegateChildInsertion(newChild, refChild, index, isReplace, previousIndex);
          this.delegateContextInvalidation();
@@ -177,7 +177,7 @@ index f000eb8bd9e5f377fd08d06d67b0a53dd9f5703e..fe8af69963ef1d38c520ecd920021e11
          return newChild;
      }
      /**
-@@ -230,7 +236,7 @@ class TaroNode extends TaroEventTarget {
+@@ -242,7 +248,7 @@ class TaroNode extends TaroEventTarget {
       */
      removeChild(child, options = {}) {
          const { cleanRef, doUpdate } = options;
