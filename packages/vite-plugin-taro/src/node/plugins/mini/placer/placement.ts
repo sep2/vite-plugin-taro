@@ -68,10 +68,12 @@ type PackedSubpackage = SubpackageLocation & {
  * transition sets; its worst case is O(CBT), while practical graphs have few bins and sparse transition membership.
  */
 export function createPlacement({
+    automaticSubpackages,
     chunks,
     planningBudgetBytes,
     getAdditionalModuleBytes
 }: {
+    automaticSubpackages: boolean
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
     planningBudgetBytes: number
     getAdditionalModuleBytes(moduleId: string): number
@@ -86,7 +88,7 @@ export function createPlacement({
         )
     )
 
-    const mainChunkIds = findMainChunkIds(chunkById)
+    const mainChunkIds = automaticSubpackages ? findMainChunkIds(chunkById) : new Set(chunkById.keys())
     const transitionsByChunk = collectTransitionsByChunk({ chunks: chunkById, mainChunkIds: mainChunkIds })
     const placeableChunks = [...chunkById]
         .filter(([chunkId]) => !mainChunkIds.has(chunkId))

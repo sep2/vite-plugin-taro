@@ -96,7 +96,7 @@ export function createPlacementRolldownOptions() {
  * performs one whole-state transition, so stale graph state, duplicate planning, and partially reset generations are
  * unrepresentable.
  */
-export function createMiniPlacementPlugin(): MiniPlacementPlugin {
+export function createMiniPlacementPlugin(automaticSubpackages: boolean): MiniPlacementPlugin {
     // This one mutable cell is the output-generation state machine described above; hooks replace it atomically by phase.
     let state: PlacementState = { phase: 'idle' }
 
@@ -134,6 +134,7 @@ export function createMiniPlacementPlugin(): MiniPlacementPlugin {
                 state = {
                     phase: 'planned',
                     placement: createPlacement({
+                        automaticSubpackages,
                         chunks: meta.chunks,
                         planningBudgetBytes: miniSubpackagePlanningBudget,
                         getAdditionalModuleBytes: (moduleId) =>

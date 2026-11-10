@@ -578,7 +578,7 @@ test('builds a routed H5 application through the public plugin entry', async () 
     )
 })
 
-test('builds XHS APIs, lazy packages, native components, and conditional sources end to end', async () => {
+test('builds XHS APIs, deferred main-package modules, native components, and conditional sources end to end', async () => {
     await inspectFixtureBuild(
         {
             options: {
@@ -668,14 +668,15 @@ test('builds XHS APIs, lazy packages, native components, and conditional sources
             assert.doesNotMatch(javascript, /wrong target marker|process\.env\.TARO_ENV/)
             const feature = chunks.find((chunk) => chunk.code.includes('XHS lazy feature marker'))
             assert.ok(feature)
-            const root = /^(sub\/p_[a-f0-9]{8})\//.exec(feature.fileName)?.[1]
-            assert.ok(root)
-            assert.deepEqual(parseJsonAsset(output, 'app.json').subPackages, [{ root, pages: [] }])
-            assert.ok(
-                String(requireAsset(output, 'common/vpt-transport.js').source).includes(
-                    `require.async(${JSON.stringify(`../${feature.fileName}`)})`
-                )
+            assert.match(feature.fileName, /^common\/.+\.js$/)
+            assert.equal(
+                output.some((entry) => entry.fileName.startsWith('sub/')),
+                false
             )
+            assert.equal(parseJsonAsset(output, 'app.json').subPackages, undefined)
+            const transport = String(requireAsset(output, 'common/vpt-transport.js').source)
+            assert.ok(transport.includes(`require(${JSON.stringify(`./${path.posix.basename(feature.fileName)}`)})`))
+            assert.doesNotMatch(transport, /require\.async/)
             assert.match(String(requireAsset(output, 'base.xhsml').source), /xhs:for=|p="{{p}}"/)
             assert.match(
                 String(requireAsset(output, 'pages/home/index.xhsml').source),

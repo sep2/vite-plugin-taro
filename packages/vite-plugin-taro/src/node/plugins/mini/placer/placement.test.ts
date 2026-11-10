@@ -28,6 +28,7 @@ function createTestPlacement(chunks: Readonly<Record<string, TestChunk>>): TestP
     return {
         chunks: renderedChunks,
         placement: createPlacement({
+            automaticSubpackages: true,
             chunks: renderedChunks,
             planningBudgetBytes: packageBudgetBytes,
             getAdditionalModuleBytes: (moduleId) => bytesByModuleId.get(moduleId) ?? 0
@@ -91,6 +92,26 @@ function sortedLocations(output: TestPlacement): readonly (readonly [string, Pac
         .map(([chunkId, chunk]) => [chunkId, output.placement.getPackageLocation(chunk)] as const)
         .sort(([left], [right]) => left.localeCompare(right))
 }
+
+test('keeps nested lazy chunks and shared dependencies in main when automatic subpackages are disabled', () => {
+    const chunks = {
+        'entry.js': renderedChunk('entry.js', { isEntry: true, dynamicImports: ['feature.js'] }),
+        'feature.js': renderedChunk('feature.js', { imports: ['shared.js'], dynamicImports: ['nested.js'] }),
+        'nested.js': renderedChunk('nested.js', { imports: ['shared.js'] }),
+        'shared.js': renderedChunk('shared.js', {})
+    }
+    const placement = createPlacement({
+        automaticSubpackages: false,
+        chunks,
+        planningBudgetBytes: packageBudgetBytes,
+        getAdditionalModuleBytes: () => assert.fail('Main-package chunks do not need package-size estimates')
+    })
+    for (const [id, chunk] of Object.entries(chunks)) {
+        assert.deepEqual(placement.getPackageLocation(chunk), { kind: 'main' })
+        assert.equal(placement.getPhysicalChunkId(chunk), id)
+    }
+    assert.deepEqual(packageMembers({ chunks, placement }), [])
+})
 
 test('keeps every entry static chunk closure in main', () => {
     const output = createTestPlacement({

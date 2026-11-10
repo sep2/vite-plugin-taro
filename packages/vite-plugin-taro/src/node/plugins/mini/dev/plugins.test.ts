@@ -20,6 +20,7 @@ const contract = {
         appJson: {},
         projectConfigJson: {}
     },
+    automaticSubpackages: true,
     define: {},
     taro: {
         hostPath: '/runtime/host.ts',

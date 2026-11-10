@@ -185,6 +185,7 @@ function createMiniOutputPlugin(): Plugin {
         },
         async renderChunk(code, chunk, outputOptions, meta) {
             placement ??= createPlacement({
+                automaticSubpackages: true,
                 chunks: meta.chunks,
                 planningBudgetBytes: planningBudgetBytes,
                 getAdditionalModuleBytes: (moduleId) => (largeLazyModuleIds.has(moduleId) ? 1_000_000 : 0)

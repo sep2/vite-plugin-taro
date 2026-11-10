@@ -27,6 +27,7 @@ export function createAliMiniContract(vptOptions: VptOptions): MiniContract {
 
     return {
         options: vptOptions,
+        automaticSubpackages: true,
         define: {},
         taro: {
             env: 'alipay',

@@ -60,6 +60,8 @@ export type OverrideContract = Readonly<{
 /** Complete input consumed by the shared Mini Program pipeline. */
 export type MiniContract = {
     options: VptOptions
+    /** Places lazy chunks in native subpackages; false keeps code in main with deferred SystemJS execution. */
+    automaticSubpackages: boolean
     /** Build-time expressions supplied by the target, overriding shared defaults. */
     define: Record<string, string>
     taro: TaroContract

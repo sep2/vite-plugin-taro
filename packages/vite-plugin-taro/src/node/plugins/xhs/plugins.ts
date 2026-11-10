@@ -24,6 +24,7 @@ export function createXhsMiniContract(options: VptOptions): MiniContract {
 
     return {
         options,
+        automaticSubpackages: false,
         define: {},
         taro: {
             env: 'xhs',

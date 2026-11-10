@@ -18,6 +18,7 @@ const options: VptOptions = {
 
 test('binds XHS native APIs, template rendering, CSS, and both HMR transports', () => {
     const contract = createXhsMiniContract({ ...options, renderer: 'dom' })
+    assert.equal(contract.automaticSubpackages, false)
     assert.equal(contract.taro.env, 'xhs')
     assert.match(contract.taro.hostPath, /mini[/\\]template[/\\]template-host\.(?:ts|js)$/)
     assert.match(contract.taro.componentsReactPath, /plugin-platform-xhs[/\\]components-react\.js$/)

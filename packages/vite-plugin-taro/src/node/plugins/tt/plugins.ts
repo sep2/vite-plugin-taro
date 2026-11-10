@@ -24,6 +24,7 @@ export function createTtMiniContract(options: VptOptions): MiniContract {
 
     return {
         options,
+        automaticSubpackages: true,
         define: {
             // We don't use taro's tt dom impl, vpt has it own dom host.
             'tt.__$enableTTDom$__': 'false'

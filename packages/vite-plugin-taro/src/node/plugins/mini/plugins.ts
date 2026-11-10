@@ -25,7 +25,7 @@ type MiniResolver = ReturnType<typeof createResolver>
 export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] {
     const resolver = createResolver(contract)
 
-    const placement = createMiniPlacementPlugin()
+    const placement = createMiniPlacementPlugin(contract.automaticSubpackages)
 
     const styles = createMiniStylePlugin(contract, resolver.entries)
 

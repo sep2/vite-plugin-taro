@@ -18,6 +18,7 @@ export function createWxMiniContract(options: VptOptions): MiniContract {
 
     return {
         options,
+        automaticSubpackages: true,
         define: {},
         taro: {
             env: 'weapp',

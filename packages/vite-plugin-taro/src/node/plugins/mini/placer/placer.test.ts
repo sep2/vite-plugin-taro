@@ -55,6 +55,7 @@ async function buildFixture({ modules, input, additionalBytes }: BuildFixture): 
         },
         renderChunk(_code, _chunk, _outputOptions, meta) {
             placement ??= createPlacement({
+                automaticSubpackages: true,
                 chunks: meta.chunks,
                 planningBudgetBytes: planningBudgetBytes,
                 getAdditionalModuleBytes: (moduleId) => additionalBytes?.[moduleId] ?? 0
@@ -108,7 +109,7 @@ function moduleId(fileName: string): string {
 }
 
 test('leaves application grouping and asset naming to Vite and Rolldown', () => {
-    const { config } = createMiniPlacementPlugin()
+    const { config } = createMiniPlacementPlugin(true)
     assert.ok(typeof config === 'function')
     const resolved: ReturnType<typeof config> = Reflect.apply(config, null, [{}])
     assert.ok(resolved && 'build' in resolved)
@@ -131,7 +132,7 @@ test('rejects placement services and chunk delivery outside their lifecycle phas
     })
     const chunk = output.chunks[0]
     assert.ok(chunk)
-    const plugin = createMiniPlacementPlugin()
+    const plugin = createMiniPlacementPlugin(true)
 
     assert.throws(() => plugin.getPackageLocation(chunk), /placement is unavailable/)
     assert.throws(() => plugin.getPhysicalChunkId(chunk), /placement is unavailable/)
