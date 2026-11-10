@@ -1,5 +1,22 @@
 # vite-plugin-taro
 
+## 0.8.8
+
+### 变更
+
+- 847f00b0：更新 Vite 至 `8.3.7`、Rolldown 至 `1.2.18`、Tailwind CSS 至 `4.3.5`、React 插件至 `^6.3.0`，同步构建工具与类型依赖。
+- 847f00b0：更新小程序样式转换依赖 `@weapp-tailwindcss/postcss` 至 `4.0.2`。
+
+### 升级说明
+
+从 `0.8.7` 升级到 `0.8.8`，所有目标的应用同步更新插件、Vite 和 Rolldown：
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.8.8 vite@8.3.7 rolldown@1.2.18
+```
+
+如项目在 overrides 或 resolutions 中固定了 Vite、Rolldown 版本，同步改为 `8.3.7` 和 `1.2.18`；引用直接依赖的 `$rolldown` 配置保持不变。运行时随插件自动升级到 `0.8.8`。安装后重启开发服务器并重新构建应用；小程序项目在开发者工具中重新编译。
+
 ## 0.8.7
 
 ### 修复

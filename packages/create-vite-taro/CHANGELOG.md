@@ -1,5 +1,27 @@
 # create-vite-taro
 
+## 0.8.8
+
+### 变更
+
+- 847f00b0：默认模板更新 Vite 至 `8.3.7`、Rolldown 至 `1.2.18`，与插件的构建依赖保持一致。
+
+### 升级说明
+
+生成器从 `0.8.7` 升级到 `0.8.8`，使用新版模板创建项目：
+
+```sh
+pnpm create vite-taro@0.8.8 my-app
+```
+
+新项目自动使用 `0.8.8` 版插件与运行时。已有项目同步升级构建依赖：
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.8.8 vite@8.3.7 rolldown@1.2.18
+```
+
+如项目在 overrides 或 resolutions 中固定了 Vite、Rolldown 版本，同步改为 `8.3.7` 和 `1.2.18`；引用直接依赖的 `$rolldown` 配置保持不变。安装后重启开发服务器并重新构建应用。
+
 ## 0.8.7
 
 ### 变更

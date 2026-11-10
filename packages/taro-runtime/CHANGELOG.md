@@ -1,5 +1,21 @@
 # vite-plugin-taro-runtime
 
+## 0.8.8
+
+### 变更
+
+本包无面向用户的变更。
+
+### 升级说明
+
+从 `0.8.7` 升级到 `0.8.8`：运行时随 `vite-plugin-taro@0.8.8` 自动升级。应用同步更新插件及其构建依赖：
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.8.8 vite@8.3.7 rolldown@1.2.18
+```
+
+如应用直接声明了运行时依赖，同步执行 `pnpm add --save-exact vite-plugin-taro-runtime@0.8.8`。插件与运行时统一使用 `0.8.8`，升级后重启开发服务器并重新构建应用。
+
 ## 0.8.7
 
 ### 变更
