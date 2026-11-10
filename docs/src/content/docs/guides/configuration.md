@@ -19,7 +19,10 @@ target: 'wx'
 | `zfb` | 支付宝小程序 |
 | `tb`  | 淘宝小程序   |
 | `tt`  | 抖音小程序   |
+| `xhs` | 小红书小程序 |
 | `h5`  | Web 应用     |
+
+小红书产物根目录的 `package.json` 声明 `type: 'commonjs'`，开发者工具据此编译原生 JavaScript 模块。
 
 ## `renderer`
 
@@ -190,7 +193,7 @@ appJson: {
 
 即使传入这些字段，vpt 也会用构建结果替换它们。
 
-`appJson` 接受普通 JSON 对象，按当前目标的原生配置原样输出，不在微信、支付宝、淘宝和抖音之间翻译字段。字段名称和取值以对应平台文档为准。
+`appJson` 接受普通 JSON 对象，按当前目标的原生配置原样输出，不在微信、支付宝、淘宝、抖音和小红书之间翻译字段。字段名称和取值以对应平台文档为准。
 
 ### 支付宝与淘宝自定义 Tabs
 
@@ -218,7 +221,7 @@ projectConfigJson: {
 }
 ```
 
-微信写入 `project.config.json`，支付宝和淘宝写入 `mini.project.json`，抖音写入 `project.config.json`。
+微信、抖音和小红书写入 `project.config.json`，支付宝和淘宝写入 `mini.project.json`。
 
 小程序监听构建（`build:... --watch`）会自动关闭生成配置中的开发者工具热重载：
 
@@ -227,11 +230,11 @@ projectConfigJson: {
 | 微信         | `setting.compileHotReLoad`                            |
 | 支付宝、淘宝 | `developOptions.hotReload`                            |
 | 抖音         | 顶层 `compileHotReload` 和 `setting.compileHotReLoad` |
+| 小红书       | `setting.compileHotReload`                           |
 
 ## `projectPrivateConfigJson`
 
-可选。提供时写入对应平台的私有配置文件，不与 `projectConfigJson` 合并。微信和抖音监听构建会强制设置私有配置中的
-`setting.compileHotReLoad: false`，避免覆盖共享配置的关闭设置；其余字段及支付宝私有配置原样输出：
+可选。提供时写入对应平台的私有配置文件。
 
 ```ts
 projectPrivateConfigJson: {
@@ -241,12 +244,11 @@ projectPrivateConfigJson: {
 }
 ```
 
-微信写入 `project.private.config.json`；支付宝和淘宝写入 `.mini-ide/project-ide.json`；抖音写入
-`project.private.config.json`；H5 构建忽略该选项。
+微信、抖音和小红书写入 `project.private.config.json`；支付宝和淘宝写入 `.mini-ide/project-ide.json`；H5 构建忽略该选项。
 
 ## `sitemapJson`
 
-可选。微信构建仅在提供该选项时生成 `sitemap.json`；支付宝、淘宝、抖音和 H5 忽略它：
+可选。微信构建仅在提供该选项时生成 `sitemap.json`；支付宝、淘宝、抖音、小红书和 H5 忽略它：
 
 ```ts
 sitemapJson: {
@@ -374,7 +376,7 @@ H5 需要项目根目录下的 `index.html`，其中包含挂载节点：
 
 ### 小程序中的 `globalThis`
 
-微信（`wx`）、支付宝（`zfb`）、淘宝（`tb`）和抖音（`tt`）均支持直接使用 `globalThis`。vpt 自动提供统一的全局对象绑定，无需手动导入、配置
+微信（`wx`）、支付宝（`zfb`）、淘宝（`tb`）、抖音（`tt`）和小红书（`xhs`）均支持直接使用 `globalThis`。vpt 自动提供统一的全局对象绑定，无需手动导入、配置
 `define` 或添加 `globalThis` polyfill。
 
 安装在全局对象上的 API 也可通过裸标识符访问，同名局部变量遵循正常的 JavaScript 作用域规则。

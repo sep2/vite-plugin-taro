@@ -1,6 +1,6 @@
 ---
 title: 小程序开发热更新
-description: 微信、支付宝、淘宝与抖音小程序的开发更新模式、配置和验证范围。
+description: 微信、支付宝、淘宝、抖音与小红书小程序的开发更新模式、配置和验证范围。
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components'
@@ -17,6 +17,7 @@ pnpm dev:wx
 pnpm dev:zfb
 pnpm dev:tb
 pnpm dev:tt
+pnpm dev:xhs
 ```
 
     </TabItem>
@@ -27,6 +28,7 @@ npm run dev:wx
 npm run dev:zfb
 npm run dev:tb
 npm run dev:tt
+npm run dev:xhs
 ```
 
     </TabItem>
@@ -37,12 +39,13 @@ yarn dev:wx
 yarn dev:zfb
 yarn dev:tb
 yarn dev:tt
+yarn dev:xhs
 ```
 
     </TabItem>
 </Tabs>
 
-等待构建完成，在对应开发者工具中打开生成目录：微信 `dist/wx`、支付宝 `dist/zfb`、淘宝 `dist/tb`、抖音 `dist/tt`。
+等待构建完成，在对应开发者工具中打开生成目录：微信 `dist/wx`、支付宝 `dist/zfb`、淘宝 `dist/tb`、抖音 `dist/tt`、小红书 `dist/xhs`。
 
 保存 JavaScript、TypeScript、React 组件或样式后，当前开发者工具会自动显示更新。
 
@@ -84,6 +87,7 @@ pnpm build:wx --watch
 pnpm build:zfb --watch
 pnpm build:tb --watch
 pnpm build:tt --watch
+pnpm build:xhs --watch
 ```
 
     </TabItem>
@@ -94,6 +98,7 @@ npm run build:wx -- --watch
 npm run build:zfb -- --watch
 npm run build:tb -- --watch
 npm run build:tt -- --watch
+npm run build:xhs -- --watch
 ```
 
     </TabItem>
@@ -104,6 +109,7 @@ yarn build:wx --watch
 yarn build:zfb --watch
 yarn build:tb --watch
 yarn build:tt --watch
+yarn build:xhs --watch
 ```
 
     </TabItem>
