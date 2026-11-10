@@ -1,5 +1,21 @@
 # vite-plugin-taro-runtime
 
+## 0.8.9
+
+### 变更
+
+- e2ede48f：内置 `@tarojs/plugin-platform-xhs@1.2.2` 的运行时、React 组件和平台元数据，提供小红书平台导出，并将平台声明中的组件依赖定位到本包内置类型。
+
+### 升级说明
+
+从 `0.8.8` 升级到 `0.8.9`：运行时随 `vite-plugin-taro@0.8.9` 自动升级。应用升级插件：
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.8.9
+```
+
+如应用直接声明了运行时依赖，同步执行 `pnpm add --save-exact vite-plugin-taro-runtime@0.8.9`。插件与运行时统一使用 `0.8.9`；XHS 平台依赖由运行时提供。安装后重启开发服务器并重新构建应用。
+
 ## 0.8.8
 
 ### 变更

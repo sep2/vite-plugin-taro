@@ -1,5 +1,24 @@
 # create-vite-taro
 
+## 0.8.9
+
+### 变更
+
+- e2ede48f：默认模板新增小红书 `dev:xhs`、`build:xhs` 命令、`VITE_VPT_XIAOHONGSHU_APP_ID` 环境变量、平台类型和共享及私有项目配置。
+- e2ede48f：适配小红书导航栏与设备信息；启用 `tabBar.custom` 时使用模板的 React 标签栏。
+
+### 升级说明
+
+生成器从 `0.8.8` 升级到 `0.8.9`，使用新版模板创建项目：
+
+```sh
+pnpm create vite-taro@0.8.9 my-app
+```
+
+新项目自动使用 `0.8.9` 版插件与运行时。开发小红书项目时，在 `.env.local` 设置 `VITE_VPT_XIAOHONGSHU_APP_ID`，运行 `pnpm dev:xhs` 或 `pnpm build:xhs`，并将 `dist/xhs` 导入小红书开发者工具。
+
+已有项目执行 `pnpm add -D --save-exact vite-plugin-taro@0.8.9`。接入小红书时参考新版模板补充目标选择、App ID、项目配置和命令；其他目标保持原配置。
+
 ## 0.8.8
 
 ### 变更

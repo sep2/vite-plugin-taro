@@ -1,5 +1,28 @@
 # vite-plugin-taro
 
+## 0.8.9
+
+### 变更
+
+- e2ede48f：新增小红书 `xhs` 目标，支持 XHSML/SJS 模板、原生 API 与组件、CSS、共享及私有项目配置，以及 DevTools 和解释器热更新。构建输出声明 CommonJS 模块作用域；页面使用原生对象形式的初始数据，在 onLoad 阶段挂载 React。
+- e2ede48f：开发模式按 Vite 项目根目录解析相对输出路径。
+- 07e5004b：XHS 的动态导入代码保留在主包，通过 SystemJS 按需执行；其他目标沿用各自的自动分包策略。
+- 9b8a6006：XHS 分享回调按页面或组件配置显式启用。
+
+### 升级说明
+
+从 `0.8.8` 升级到 `0.8.9`：
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.8.9
+```
+
+运行时随插件自动升级到 `0.8.9`。现有目标保持原配置；安装后重启开发服务器并重新构建应用。
+
+接入小红书时设置 `target: 'xhs'`、`renderer: 'template'`，通过 `projectConfigJson` 配置小红书 App ID，通过 `projectPrivateConfigJson` 配置本地开发者工具选项，并将构建目录导入小红书开发者工具。XHS 页面统一采用 `prerender: false`，在 onLoad 阶段挂载 React。动态导入保持延迟执行，相关代码计入主包体积。
+
+需要小红书分享功能的页面按需设置 `enableShareAppMessage`、`enableShareChat` 或 `enableShareTimeline` 并提供对应回调；分享回调的配套要求遵循小红书平台规则。
+
 ## 0.8.8
 
 ### 变更
