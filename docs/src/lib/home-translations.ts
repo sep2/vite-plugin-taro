@@ -4,7 +4,7 @@ export const homeTranslations = {
         'VPT - Modern tooling for WeChat, Alipay, Taobao, and TikTok Mini Programs',
     '使用 Vite 8、React 19 和 Taro 4 构建微信、支付宝、淘宝、抖音小程序与 Web 应用。':
         'Build WeChat, Alipay, Taobao, TikTok Mini Programs, and Web apps with Vite 8, React 19, and Taro 4.',
-    '— 微信 · 支付宝 · 淘宝 · 抖音 · Web —': '— WeChat · Alipay · Taobao · TikTok · Web —',
+    '微信 · 支付宝 · 淘宝 · 抖音 · 小红书 · Web': 'WeChat · Alipay · Taobao · TikTok · Xiaohongshu · Web',
     '极致的渲染性能 · 开发者工具热更新': 'Exceptional rendering performance · DevTools hot updates',
     快速开始: 'Get started',
     '查看 GitHub': 'View on GitHub',
