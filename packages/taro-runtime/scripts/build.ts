@@ -9,9 +9,10 @@ const distRoot = path.join(packageRoot, 'dist')
 const runtimeCjsFilePattern = /^index\.cjs\.(?:d\.ts|js(?:\.map)?)$/
 const platformModules = ['runtime', 'components-react', 'runtime-utils'] as const
 const platformPackages = [
-    '@tarojs/plugin-platform-weapp',
-    '@tarojs/plugin-platform-alipay',
-    '@tarojs/plugin-platform-tt'
+    { dependency: '@tarojs/plugin-platform-weapp', declarations: 'dist/types' },
+    { dependency: '@tarojs/plugin-platform-alipay', declarations: 'dist/types' },
+    { dependency: '@tarojs/plugin-platform-tt', declarations: 'dist/types' },
+    { dependency: '@tarojs/plugin-platform-xhs', declarations: 'types/src' }
 ] as const
 
 build()
@@ -154,7 +155,7 @@ function copyHtmlRuntime(): void {
  * runtime-facing modules. dist/index.js is the upstream CLI platform plugin, which VPT never executes; shipping it would add dead
  * package weight, while executing it would require reintroducing @tarojs/service and the compiler dependency graph.
  */
-function copyPlatformPackage(dependency: (typeof platformPackages)[number]): void {
+function copyPlatformPackage({ dependency, declarations }: (typeof platformPackages)[number]): void {
     const dependencyDist = resolveDependencyDist(dependency)
     const outputRoot = resolveOutputRoot(dependency)
     mkdirSync(outputRoot, { recursive: true })
@@ -163,7 +164,7 @@ function copyPlatformPackage(dependency: (typeof platformPackages)[number]): voi
         copyFileSync(path.join(dependencyDist, `${moduleName}.js`), path.join(outputRoot, `${moduleName}.js`))
         copyFileSync(path.join(dependencyDist, `${moduleName}.js.map`), path.join(outputRoot, `${moduleName}.js.map`))
     })
-    cpSync(path.join(dependencyDist, 'types'), path.join(outputRoot, 'types'), { recursive: true })
+    cpSync(resolveDependencyPath(dependency, declarations), path.join(outputRoot, 'types'), { recursive: true })
 }
 
 /**

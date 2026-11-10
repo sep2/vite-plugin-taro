@@ -110,6 +110,17 @@
             "import": "./dist/plugin-platform-tt/runtime-utils.js",
             "default": "./dist/plugin-platform-tt/runtime-utils.js"
         },
+        "./plugin-platform-xhs/runtime": "./dist/plugin-platform-xhs/runtime.js",
+        "./plugin-platform-xhs/components-react": {
+            "types": "./dist/plugin-platform-xhs/types/components-react.d.ts",
+            "import": "./dist/plugin-platform-xhs/components-react.js",
+            "default": "./dist/plugin-platform-xhs/components-react.js"
+        },
+        "./plugin-platform-xhs/runtime-utils": {
+            "types": "./dist/plugin-platform-xhs/types/runtime-utils.d.ts",
+            "import": "./dist/plugin-platform-xhs/runtime-utils.js",
+            "default": "./dist/plugin-platform-xhs/runtime-utils.js"
+        },
         "./plugin-platform-h5/runtime/apis": {
             "types": "./dist/plugin-platform-h5/runtime/apis/index.d.ts",
             "import": "./dist/plugin-platform-h5/runtime/apis/index.js",
@@ -132,6 +143,7 @@
         "./dist/plugin-platform-weapp/runtime.js",
         "./dist/plugin-platform-alipay/runtime.js",
         "./dist/plugin-platform-tt/runtime.js",
+        "./dist/plugin-platform-xhs/runtime.js",
         "**/*.css",
         "**/*.css.js",
         "**/*.scss",
@@ -187,6 +199,7 @@
         "@tarojs/plugin-platform-h5": "4.3.2",
         "@tarojs/plugin-platform-tt": "4.3.2",
         "@tarojs/plugin-platform-weapp": "4.3.2",
+        "@tarojs/plugin-platform-xhs": "1.2.2",
         "@tarojs/react": "4.3.2",
         "@tarojs/router": "4.3.2",
         "@tarojs/runtime": "4.3.2",

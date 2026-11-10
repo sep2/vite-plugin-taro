@@ -15,7 +15,7 @@ import { resolveTaroRuntime, resolveVptRuntime } from '../../node/utils/packages
 const require = createRequire(import.meta.url)
 const rendererPath = resolveTaroRuntime('react')
 
-for (const target of ['wx', 'zfb', 'tt'] as const) {
+for (const target of ['wx', 'zfb', 'tt', 'xhs'] as const) {
     for (const mode of ['development', 'production'] as const) {
         test(`${target} ${mode}: React 19 roots, commits, errors and native event priorities`, async (t) => {
             await runFixture(t, target, mode)
@@ -55,7 +55,7 @@ test('published renderer and declarations expose only the supported React 19 ren
     assert.match(hostDeclarations, /batchStyleUpdate\(element: Element, update: \(\) => void\): void/)
 })
 
-async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: string): Promise<void> {
+async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt' | 'xhs', mode: string): Promise<void> {
     const config = await resolveConfig(
         {
             configFile: false,
@@ -70,7 +70,7 @@ async function runFixture(t: TestContext, target: 'wx' | 'zfb' | 'tt', mode: str
         'build'
     )
     const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), 'react19-renderer-fixture.js')
-    const platform = { wx: 'weapp', zfb: 'alipay', tt: 'tt' }[target]
+    const platform = { wx: 'weapp', zfb: 'alipay', tt: 'tt', xhs: 'xhs' }[target]
     const capsuleSource = await readFile(path.join(path.dirname(entry), '../mini/capsule/page.ts'), 'utf8')
     const routes = new Map([
         ['test:page-first-frame.ts', 'pages/first-frame'],

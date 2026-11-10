@@ -1,6 +1,6 @@
 # VPT
 
-基于 Vite 8、React 19、Taro、TypeScript 和 Tailwind CSS，一套代码运行于微信、支付宝、淘宝、抖音小程序和 Web。
+基于 Vite 8、React 19、Taro、TypeScript 和 Tailwind CSS，一套代码运行于微信、支付宝、淘宝、抖音、小红书小程序和 Web。
 
 [文档](https://vpt.js.org) · [GitHub](https://github.com/sep2/vite-plugin-taro)
 
@@ -18,6 +18,7 @@ pnpm install
 | 支付宝 | `pnpm dev:zfb` | `pnpm build:zfb` | `dist/zfb` |
 | 淘宝 | `pnpm dev:tb` | `pnpm build:tb` | `dist/tb` |
 | 抖音 | `pnpm dev:tt` | `pnpm build:tt` | `dist/tt` |
+| 小红书 | `pnpm dev:xhs` | `pnpm build:xhs` | `dist/xhs` |
 | Web | `pnpm dev:h5` | `pnpm build:h5` | `dist/h5` |
 
 监听文件变化并自动重新构建生产版本：`pnpm build:wx --watch`。

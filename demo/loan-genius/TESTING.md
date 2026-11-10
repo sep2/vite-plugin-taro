@@ -15,7 +15,7 @@ pnpm --filter loan-genius test
 
 - `write-fixture-source.test.ts`：原子发布源文件，确保并发读取只看到完整内容；保留故意注入的语法错误，并在发布失败时清理临时文件。
 - `hmr-fixture.test.ts`：停止 Vite 时等待进程退出并关闭日志句柄；强制终止用例仅在非 Windows 平台运行。
-- `native-target.test.ts`：实际构建 TT、TB 产物，检查原生配置、App ID、模板和样式；通过模拟 API 验证抖音、支付宝和淘宝的导航栏布局、缓存与 Android 判断。
+- `native-target.test.ts`：实际构建 TT、TB、XHS 产物，检查原生配置、App ID、模板和样式；通过模拟 API 验证抖音、小红书、支付宝和淘宝的导航栏布局、缓存与 Android 判断。
 
 Node 测试不等同于开发者工具中的渲染和 HMR 验证。
 
@@ -26,6 +26,7 @@ pnpm build:loan-genius:wx
 pnpm build:loan-genius:zfb
 pnpm build:loan-genius:tb
 pnpm build:loan-genius:tt
+pnpm build:loan-genius:xhs
 pnpm build:loan-genius:h5
 ```
 
@@ -93,8 +94,9 @@ pnpm test:loan-genius:watch-restart
 | 支付宝（ZFB） | 构建检查；渲染和 HMR 状态保留需在支付宝开发者工具中验证。                          |
 | 淘宝（TB）    | Node 测试覆盖构建产物和模拟原生 API；渲染和 HMR 状态保留需在淘宝开发者工具中验证。 |
 | 抖音（TT）    | Node 测试覆盖构建产物和模拟原生 API；渲染和 HMR 状态保留需在抖音开发者工具中验证。 |
+| 小红书（XHS） | Node 测试覆盖构建产物、共享与私有配置和模拟原生 API；渲染和 HMR 状态保留需在小红书开发者工具中验证。 |
 | Web（H5）     | 构建检查；浏览器交互需手动验证。                                                   |
 
-自动化 IDE HMR 套件仅覆盖 WX，不代表已验证支付宝、淘宝、抖音或海外 TikTok 小程序兼容性。
+自动化 IDE HMR 套件仅覆盖 WX，不代表已验证支付宝、淘宝、抖音、小红书或海外 TikTok 小程序兼容性。
 
 抖音验证时使用 `interpreter` HMR，不要复制微信 Skyline 设置。异步通用分包需要基础库 **2.86.1+**；原生样式热重载需要开发者工具 **4.1.4+**、基础库 **2.98.0.0+**，并同时开启顶层 `compileHotReload` 和 `setting.autoCompile`。完整配置见[开发热更新指南](https://vpt.js.org/guides/hot-module-replacement/)。

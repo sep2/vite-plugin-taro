@@ -354,7 +354,7 @@ for (const renderer of ['template', 'dom'] as const) {
     })
 }
 
-for (const target of ['wx', 'zfb', 'tb', 'tt'] as const) {
+for (const target of ['wx', 'zfb', 'tb', 'tt', 'xhs'] as const) {
     test(`builds HTML-only ${target} pages with mapped native templates and CSS`, async () => {
         await inspectFixtureBuild(
             {
@@ -382,7 +382,9 @@ for (const target of ['wx', 'zfb', 'tb', 'tt'] as const) {
                 const template = String(
                     requireAsset(
                         output,
-                        { wx: 'base.wxml', zfb: 'base.axml', tb: 'base.axml', tt: 'base.ttml' }[target]
+                        { wx: 'base.wxml', zfb: 'base.axml', tb: 'base.axml', tt: 'base.ttml', xhs: 'base.xhsml' }[
+                            target
+                        ]
                     ).source
                 )
                 for (const name of ['navigator', 'checkbox', 'radio', 'input', 'web-view']) {
@@ -391,13 +393,13 @@ for (const target of ['wx', 'zfb', 'tb', 'tt'] as const) {
                 const css = output
                     .filter(
                         (item): item is OutputAsset =>
-                            item.type === 'asset' && /\.(?:wxss|acss|ttss)$/.test(item.fileName)
+                            item.type === 'asset' && /\.(?:wxss|acss|ttss|css)$/.test(item.fileName)
                     )
                     .map((item) => String(item.source))
                     .join('\n')
                 assert.match(css, /\.h5-div\.card\{color:red\}/)
                 assert.match(css, /\.h5-span,\.h5-a\{display:inline\}/)
-                const extension = { wx: 'wxss', zfb: 'acss', tb: 'acss', tt: 'ttss' }[target]
+                const extension = { wx: 'wxss', zfb: 'acss', tb: 'acss', tt: 'ttss', xhs: 'css' }[target]
                 const appCss = String(requireAsset(output, `assets/global.${extension}`).source)
                 const pageCss = String(requireAsset(output, `pages/home/index.${extension}`).source)
                 assert.doesNotMatch(appCss, /\.card/)
@@ -409,7 +411,7 @@ for (const target of ['wx', 'zfb', 'tb', 'tt'] as const) {
     })
 }
 
-for (const target of ['wx', 'zfb', 'tb', 'tt'] as const) {
+for (const target of ['wx', 'zfb', 'tb', 'tt', 'xhs'] as const) {
     for (const cssCodeSplit of [undefined, true, false]) {
         test(`builds ${target} App, Page, shared CSS Modules and lazy styles with cssCodeSplit=${cssCodeSplit ?? 'default'}`, async () => {
             await inspectFixtureBuild(
@@ -438,7 +440,7 @@ for (const target of ['wx', 'zfb', 'tb', 'tt'] as const) {
                     }
                 },
                 (output) => {
-                    const extension = { wx: 'wxss', zfb: 'acss', tb: 'acss', tt: 'ttss' }[target]
+                    const extension = { wx: 'wxss', zfb: 'acss', tb: 'acss', tt: 'ttss', xhs: 'css' }[target]
                     const appCss = String(requireAsset(output, `assets/global.${extension}`).source)
                     const homeCss = String(requireAsset(output, `pages/home/index.${extension}`).source)
                     const accountCss = String(requireAsset(output, `pages/account/index.${extension}`).source)
@@ -572,6 +574,121 @@ test('builds a routed H5 application through the public plugin entry', async () 
             // These APIs are named H5 exports, not properties on the default Taro object.
             assert.doesNotMatch(javascript, /\.\s*(?:setNavigationBarTitle|showToast)\s*\(/)
             assert.doesNotMatch(javascript, /stale\/route|virtual:taro/)
+        }
+    )
+})
+
+test('builds XHS APIs, lazy packages, native components, and conditional sources end to end', async () => {
+    await inspectFixtureBuild(
+        {
+            options: {
+                ...createOptions('xhs'),
+                projectPrivateConfigJson: { setting: { urlCheck: false } }
+            },
+            build: { minify: true },
+            files: {
+                'src/app.tsx': `
+                    import { CustomWrapper, View } from 'virtual:taro/components'
+                    export default function App({ children }) {
+                        return <CustomWrapper><View>{children}</View></CustomWrapper>
+                    }
+                `,
+                'src/pages/home/index.tsx': `
+                    import { lazy, Suspense } from 'react'
+                    import Taro from 'virtual:taro/api'
+                    import { View, Button } from 'virtual:taro/components'
+                    import { defineNativeComponent } from 'virtual:taro/native'
+                    import './index.css'
+                    const Card = defineNativeComponent<{ count: number }>(() => import('../../native/card/index.js'))
+                    const Feature = lazy(() => import('./feature'))
+                    export default function Home() {
+                        // #ifdef xhs
+                        const label = 'XHS-only marker'
+                        // #else
+                        const label = 'wrong target marker'
+                        // #endif
+                        return <View>
+                            <Button onClick={() => Taro.showToast({ title: label })}>{label}</Button>
+                            <Card count={1} />
+                            <Suspense fallback={null}><Feature /></Suspense>
+                        </View>
+                    }
+                `,
+                'src/pages/home/index.css': '.card { color: red; }',
+                'src/pages/home/feature.tsx': `
+                    export default function Feature() {
+                        return <div>XHS lazy feature marker</div>
+                    }
+                `,
+                'src/native/card/index.js': 'Component({ properties: { count: Number } })',
+                'src/native/card/index.json': '{"component":true}',
+                'src/native/card/index.xhsml': '<view>{{count}}</view>',
+                'src/native/card/index.css': '.card { color: blue; }'
+            }
+        },
+        (output) => {
+            for (const name of [
+                'app.js',
+                'app.json',
+                'app.css',
+                'assets/global.css',
+                'base.xhsml',
+                'utils.sjs',
+                'comp.js',
+                'comp.json',
+                'comp.xhsml',
+                'custom-wrapper.js',
+                'custom-wrapper.json',
+                'custom-wrapper.xhsml',
+                'pages/home/index.js',
+                'pages/home/index.json',
+                'pages/home/index.xhsml',
+                'pages/home/index.css',
+                'project.config.json'
+            ]) {
+                assert.ok(
+                    output.some((entry) => entry.fileName === name),
+                    name
+                )
+            }
+            assertNativeShells(output)
+            assertPageRegistration(output, 'xhs', 'pages/home/index', false)
+            assert.deepEqual(parseJsonAsset(output, 'package.json'), { type: 'commonjs' })
+            assert.deepEqual(parseJsonAsset(output, 'project.private.config.json'), { setting: { urlCheck: false } })
+            const modules = collectModuleIds(output)
+            assert.ok(modules.some((id) => id.endsWith('/plugin-platform-xhs/runtime.js')))
+            assert.ok(modules.some((id) => id.endsWith('/plugin-platform-xhs/components-react.js')))
+            assert.equal(
+                modules.some((id) => /plugin-platform-(?:weapp|alipay|tt|h5)\//.test(id)),
+                false
+            )
+            const chunks = output.filter((entry): entry is OutputChunk => entry.type === 'chunk')
+            const javascript = chunks.map((chunk) => chunk.code).join('\n')
+            assert.match(javascript, /XHS-only marker/)
+            assert.doesNotMatch(javascript, /wrong target marker|process\.env\.TARO_ENV/)
+            const feature = chunks.find((chunk) => chunk.code.includes('XHS lazy feature marker'))
+            assert.ok(feature)
+            const root = /^(sub\/p_[a-f0-9]{8})\//.exec(feature.fileName)?.[1]
+            assert.ok(root)
+            assert.deepEqual(parseJsonAsset(output, 'app.json').subPackages, [{ root, pages: [] }])
+            assert.ok(
+                String(requireAsset(output, 'common/vpt-transport.js').source).includes(
+                    `require.async(${JSON.stringify(`../${feature.fileName}`)})`
+                )
+            )
+            assert.match(String(requireAsset(output, 'base.xhsml').source), /xhs:for=|p="{{p}}"/)
+            assert.match(
+                String(requireAsset(output, 'pages/home/index.xhsml').source),
+                /<comp i="{{app}}" p="{{page}}"/
+            )
+            assert.match(String(requireAsset(output, 'pages/home/index.css').source), /color:red/)
+            assert.equal(String(requireAsset(output, 'components/card/index.xhsml').source), '<view>{{count}}</view>')
+            assert.equal(String(requireAsset(output, 'components/card/index.css').source), '.card { color: blue; }')
+            assert.deepEqual(parseJsonAsset(output, 'pages/home/index.json').usingComponents, {
+                card: '/components/card/index',
+                comp: '../../comp',
+                'custom-wrapper': '../../custom-wrapper'
+            })
         }
     )
 })

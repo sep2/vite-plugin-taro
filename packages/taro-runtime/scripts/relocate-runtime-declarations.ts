@@ -5,6 +5,7 @@ import path from 'node:path'
 const declarationAliases: Readonly<Record<string, string>> = {
     '@tarojs/api': 'vite-plugin-taro-runtime/api',
     '@tarojs/components': 'vite-plugin-taro-runtime/components',
+    '@tarojs/components/mini': 'vite-plugin-taro-runtime/components',
     '@tarojs/components/dist/components': 'vite-plugin-taro-runtime/components/dist/components',
     '@tarojs/router': 'vite-plugin-taro-runtime/router',
     '@tarojs/runtime': 'vite-plugin-taro-runtime/runtime/mini',

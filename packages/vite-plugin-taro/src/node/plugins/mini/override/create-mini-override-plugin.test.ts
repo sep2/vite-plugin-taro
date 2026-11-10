@@ -12,6 +12,7 @@ import vpt from '../../../vpt.ts'
 import { createAliMiniContract } from '../../ali/plugins.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
 import { createWxMiniContract } from '../../wx/plugins.ts'
+import { createXhsMiniContract } from '../../xhs/plugins.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { createMiniWatchPlugin } from '../watch/create-mini-watch-plugin.ts'
 import { createMiniOverridePlugin } from './create-mini-override-plugin.ts'
@@ -19,7 +20,8 @@ import { createMiniOverridePlugin } from './create-mini-override-plugin.ts'
 const miniContracts = {
     wx: createWxMiniContract,
     zfb: createAliMiniContract,
-    tt: createTtMiniContract
+    tt: createTtMiniContract,
+    xhs: createXhsMiniContract
 } as const
 
 for (const command of ['build', 'serve'] as const) {
@@ -125,7 +127,7 @@ test('preserves output when the contract has no rules', async () => {
     assert.deepEqual(bundle, { 'untouched.txt': { type: 'asset', source: 'not JSON' } })
 })
 
-for (const target of ['wx', 'zfb', 'tt'] as const) {
+for (const target of ['wx', 'zfb', 'tt', 'xhs'] as const) {
     for (const renderer of [undefined, 'template', 'dom'] as const) {
         test(`${target}: composes renderer=${renderer} JSON overrides across build and serve`, async () => {
             const appJson = Object.freeze({
@@ -150,7 +152,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
             })
             assert.match(
                 contract.taro.hostPath,
-                target !== 'zfb' && renderer === 'dom'
+                (target === 'wx' || target === 'tt') && renderer === 'dom'
                     ? /runtime[/\\](?:wx|tt)[/\\]renderer-host\.(?:ts|js)$/
                     : /runtime[/\\]mini[/\\]template[/\\]template-host\.(?:ts|js)$/
             )
@@ -219,7 +221,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
     }
 }
 
-for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
+for (const target of ['wx', 'zfb', 'tt', 'xhs', 'h5'] as const) {
     for (const hotReload of [true, false, undefined]) {
         test(`${target}: overrides handle hotReload=${hotReload} without changing unrelated configuration`, async (context) => {
             const root = await fs.mkdtemp(path.join(projectTempDir, 'vpt-mini-watch-project-'))
@@ -252,12 +254,15 @@ for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
                 wx: { ...projectConfig, setting: { ...setting, compileHotReLoad: false } },
                 zfb: { ...projectConfig, developOptions: { ...developOptions, hotReload: false } },
                 tt: { ...projectConfig, compileHotReload: false, setting: { ...setting, compileHotReLoad: false } },
+                xhs: { ...projectConfig, setting: { ...setting, compileHotReload: false } },
                 h5: projectConfig
             }[target]
             const expectedPrivate =
-                target === 'wx' || target === 'tt'
-                    ? { ...privateConfig, setting: { ...setting, compileHotReLoad: false } }
-                    : privateConfig
+                target === 'xhs'
+                    ? { ...privateConfig, setting: { ...setting, compileHotReload: false } }
+                    : target === 'wx' || target === 'tt'
+                      ? { ...privateConfig, setting: { ...setting, compileHotReLoad: false } }
+                      : privateConfig
             const expectedFiles: Readonly<Record<string, VptJsonObject>> = {
                 [projectFile]: expectedProject,
                 [privateFile]: expectedPrivate,
@@ -352,12 +357,11 @@ for (const target of ['wx', 'zfb', 'tt', 'h5'] as const) {
     }
 }
 
-for (const target of ['wx', 'zfb', 'tt'] as const) {
+for (const target of ['wx', 'zfb', 'tt', 'xhs'] as const) {
     test(`${target}: public plugin disables hot reload on every watch build and restores configured settings in dev`, {
         timeout: 30_000
     }, async (context) => {
         const root = await createTestProject('watch-')
-        context.after(() => fs.rm(root, { recursive: true, force: true }))
         const input = path.join(root, 'app.tsx')
         await fs.writeFile(input, 'export default function App() { return null }\n')
         const originalFiles = createProjectConfigFixture(target, true)
@@ -433,7 +437,7 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
 
 /** Native schemas stay separate so the public integration test catches field spelling and file ownership mistakes. */
 function createProjectConfigFixture(
-    target: 'wx' | 'zfb' | 'tt',
+    target: 'wx' | 'zfb' | 'tt' | 'xhs',
     hotReload: boolean
 ): Readonly<Record<string, VptJsonObject>> {
     switch (target) {
@@ -456,6 +460,16 @@ function createProjectConfigFixture(
                     developOptions: Object.freeze({ hotReload, skipTranspile: true, sourcemap: false })
                 }),
                 '.mini-ide/project-ide.json': Object.freeze({ ignoreHttpDomainCheck: true })
+            }
+        case 'xhs':
+            return {
+                'project.config.json': Object.freeze({
+                    appid: 'fixture',
+                    setting: Object.freeze({ compileHotReload: hotReload, minified: false })
+                }),
+                'project.private.config.json': Object.freeze({
+                    setting: Object.freeze({ compileHotReload: hotReload, urlCheck: false })
+                })
             }
         case 'tt':
             return {

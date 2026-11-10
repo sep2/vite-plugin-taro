@@ -8,8 +8,8 @@ import { miniTaroRuntimeId } from '../mini/module/module.ts'
 import { createClientTaroPlugin } from './client-taro.ts'
 
 /** Bundles the real Mini facade, shared CommonJS backend, platform adapter, and React hooks. */
-async function bundleMiniApi(source: string, target: 'wx' | 'zfb' | 'tb' | 'tt'): Promise<string> {
-    const platform = { wx: 'weapp', zfb: 'alipay', tb: 'alipay', tt: 'tt' }[target]
+async function bundleMiniApi(source: string, target: 'wx' | 'zfb' | 'tb' | 'tt' | 'xhs'): Promise<string> {
+    const platform = { wx: 'weapp', zfb: 'alipay', tb: 'alipay', tt: 'tt', xhs: 'xhs' }[target]
     const aliases: ReadonlyMap<string, string> = new Map([
         ['@tarojs/runtime', miniTaroRuntimeId],
         ['@tarojs/api', resolveTaroRuntime('api')]
@@ -61,7 +61,7 @@ async function bundleMiniApi(source: string, target: 'wx' | 'zfb' | 'tb' | 'tt')
     return chunk.code
 }
 
-for (const target of ['wx', 'zfb', 'tb', 'tt'] as const) {
+for (const target of ['wx', 'zfb', 'tb', 'tt', 'xhs'] as const) {
     test(`converts dynamic inline sizes through the real ${target} Taro facade`, async () => {
         const code = await bundleMiniApi(
             `
@@ -91,6 +91,7 @@ for (const target of ['wx', 'zfb', 'tb', 'tt'] as const) {
             wx: {},
             my: {},
             tt: {},
+            xhs: {},
             navigator: {},
             getApp: () => ({}),
             getCurrentPages: () => []
@@ -112,7 +113,7 @@ for (const target of ['wx', 'zfb', 'tb', 'tt'] as const) {
         runInNewContext(
             `globalThis.global = globalThis;\n${code}
             assert.equal(typeof fixture.probe, 'function')
-            assert.equal(fixture.options.miniGlobal, ${{ wx: 'wx', zfb: 'my', tb: 'my', tt: 'tt' }[target]})
+            assert.equal(fixture.options.miniGlobal, ${{ wx: 'wx', zfb: 'my', tb: 'my', tt: 'tt', xhs: 'xhs' }[target]})
         `,
             {
                 assert,
@@ -120,6 +121,7 @@ for (const target of ['wx', 'zfb', 'tb', 'tt'] as const) {
                 wx: {},
                 my: {},
                 tt: {},
+                xhs: {},
                 navigator: {},
                 getApp: () => ({}),
                 getCurrentPages: () => []
@@ -160,7 +162,7 @@ for (const target of ['wx', 'zfb', 'tb', 'tt'] as const) {
                 assert.equal(navigation.errMsg, 'navigateTo:ok')
                 Taro.navigateTo = () => Promise.resolve({ errMsg: 'replacement-navigation' })
                 assert.equal((await navigateTo({ url: '/ignored' })).errMsg, 'replacement-navigation')
-                assert.equal(Taro.getEnv(), ${JSON.stringify({ wx: 'WEAPP', zfb: 'ALIPAY', tb: 'ALIPAY', tt: 'TT' }[target])})
+                assert.equal(Taro.getEnv(), ${JSON.stringify({ wx: 'WEAPP', zfb: 'ALIPAY', tb: 'ALIPAY', tt: 'TT', xhs: 'xhs' }[target])})
                 Taro.addInterceptor(chain => {
                     assert.equal(chain.requestParams.url, '/fixture')
                     // This request-local option verifies both exported functions share the same interceptor chain.
@@ -233,6 +235,7 @@ for (const target of ['wx', 'zfb', 'tb', 'tt'] as const) {
             wx: native,
             my: native,
             tt: native,
+            xhs: native,
             navigator: {},
             getApp: () => ({}),
             getCurrentPages: () => [],

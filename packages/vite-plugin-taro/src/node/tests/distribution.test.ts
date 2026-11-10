@@ -17,8 +17,8 @@ const runtimePackageDistRoot = path.resolve(path.dirname(runtimePackageEntry), '
 const runtimePackageRoot = path.resolve(runtimePackageDistRoot, '..')
 const runtimePackageRequire = createRequire(runtimePackageEntry)
 const compilerSizeLimit = 2_250_000
-// Includes modular APIs, eager components, router, declarations and source maps.
-const runtimePackageSizeLimit = 5_050_000
+// Includes modular APIs, eager components, router, four Mini adapters, declarations, and source maps.
+const runtimePackageSizeLimit = 5_080_000
 const runtimeCjsFilePattern = /^index\.cjs\.(?:d\.ts|js(?:\.map)?)$/
 
 const platformJavaScriptFiles: ReadonlyArray<readonly [dependencyId: string, outputPath: string]> = [
@@ -30,7 +30,10 @@ const platformJavaScriptFiles: ReadonlyArray<readonly [dependencyId: string, out
     ['@tarojs/plugin-platform-alipay/dist/runtime-utils.js', 'plugin-platform-alipay/runtime-utils.js'],
     ['@tarojs/plugin-platform-tt/dist/runtime.js', 'plugin-platform-tt/runtime.js'],
     ['@tarojs/plugin-platform-tt/dist/components-react.js', 'plugin-platform-tt/components-react.js'],
-    ['@tarojs/plugin-platform-tt/dist/runtime-utils.js', 'plugin-platform-tt/runtime-utils.js']
+    ['@tarojs/plugin-platform-tt/dist/runtime-utils.js', 'plugin-platform-tt/runtime-utils.js'],
+    ['@tarojs/plugin-platform-xhs/dist/runtime.js', 'plugin-platform-xhs/runtime.js'],
+    ['@tarojs/plugin-platform-xhs/dist/components-react.js', 'plugin-platform-xhs/components-react.js'],
+    ['@tarojs/plugin-platform-xhs/dist/runtime-utils.js', 'plugin-platform-xhs/runtime-utils.js']
 ]
 
 function resolveAdapterDependencyRoot(dependency: string): string {
@@ -61,7 +64,7 @@ async function assertFilesCopied(
                     String(output)
                         .replaceAll('vite-plugin-taro-runtime/runtime/mini', '@tarojs/runtime')
                         .replaceAll('vite-plugin-taro-runtime/', '@tarojs/'),
-                    String(source)
+                    String(source).replaceAll('@tarojs/components/mini', '@tarojs/components')
                 )
             } else {
                 assert.deepEqual(output, source)
@@ -262,7 +265,8 @@ test('ships Mini activation capsules with separate VPT integration and template 
         'create-template-host.js',
         'create-template-page.js',
         'prerender-to-data.js',
-        'template-host.js'
+        'template-host.js',
+        'with-page-root-property.js'
     ])
 })
 
@@ -310,6 +314,9 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
         './plugin-platform-tt/runtime',
         './plugin-platform-tt/components-react',
         './plugin-platform-tt/runtime-utils',
+        './plugin-platform-xhs/runtime',
+        './plugin-platform-xhs/components-react',
+        './plugin-platform-xhs/runtime-utils',
         './plugin-platform-h5/runtime/apis',
         './plugin-platform-h5/definition.json'
     ])
@@ -393,6 +400,8 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
     assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-weapp'], taroPackage.version)
     assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-alipay'], taroPackage.version)
     assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-tt'], taroPackage.version)
+    assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-xhs'], '1.2.2')
+    assert.equal(packageJson.dependencies['@tarojs/plugin-platform-xhs'], undefined)
     assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-h5'], taroPackage.version)
 
     const runtimeOutputRoot = path.join(runtimePackageDistRoot, 'runtime')
@@ -427,6 +436,10 @@ test('builds exact size-bounded Taro runtime and platform artifacts into the run
     await assertDirectoryCopied(
         path.join(resolveAdapterDependencyRoot('@tarojs/plugin-platform-tt'), 'dist', 'types'),
         path.join(runtimePackageDistRoot, 'plugin-platform-tt', 'types')
+    )
+    await assertDirectoryCopied(
+        path.join(resolveAdapterDependencyRoot('@tarojs/plugin-platform-xhs'), 'types', 'src'),
+        path.join(runtimePackageDistRoot, 'plugin-platform-xhs', 'types')
     )
     await assertDirectoryCopied(
         path.join(resolveAdapterDependencyRoot('@tarojs/plugin-platform-h5'), 'dist', 'runtime', 'apis'),

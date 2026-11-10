@@ -8,6 +8,10 @@ interface TabBarProps {
 }
 
 export function TabBar({ activePath }: TabBarProps) {
+    if (import.meta.env.VITE_VPT_TARGET === 'xhs') {
+        return null
+    }
+
     return (
         <View className="flex h-[calc(4rem+env(safe-area-inset-bottom))] w-full shrink-0 flex-row border-t border-divider bg-surface-subtle pb-[env(safe-area-inset-bottom)]">
             {tabPages.map(({ path, label, icon }) => {

@@ -10,60 +10,91 @@ import { build } from 'vite'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(import.meta.url)
 
-test('builds Loan Genius as a native TT project without WeChat or Alipay configuration', async () => {
-    // Vite config reads the environment; restore this test-process state after the real build completes.
-    const previousEnv = process.env
-    process.env = { ...previousEnv, VITE_VPT_TARGET: 'tt', VITE_VPT_TIKTOK_APP_ID: 'tt-loan-fixture' }
-    try {
-        const result = await build({ root, logLevel: 'silent', build: { write: false } })
-        assert.ok(!Array.isArray(result) && 'output' in result)
-        const assets = new Map(
-            result.output
-                .filter((output) => output.type === 'asset')
-                .map((asset) => [asset.fileName, String(asset.source)])
-        )
-        const app = JSON.parse(assets.get('app.json')!)
-        assert.deepEqual(app.pages, [
-            'pages/calculator/index',
-            'pages/calculator/monthly-payments/index',
-            'pages/calculator/history/index'
-        ])
-        assert.deepEqual(app.window, { navigationStyle: 'custom' })
-        for (const key of [
-            'renderer',
-            'rendererOptions',
-            'componentFramework',
-            'lazyCodeLoading',
-            'useDynamicPlugins'
-        ]) {
-            assert.equal(app[key], undefined, key)
+for (const target of ['tt', 'xhs'] as const) {
+    test(`builds Loan Genius as a native ${target.toUpperCase()} project`, async () => {
+        const templateExtension = target === 'tt' ? 'ttml' : 'xhsml'
+        const styleExtension = target === 'tt' ? 'ttss' : 'css'
+        // Vite config reads the environment; restore this test-process state after the real build completes.
+        const previousEnv = process.env
+        process.env = {
+            ...previousEnv,
+            VITE_VPT_TARGET: target,
+            VITE_VPT_TIKTOK_APP_ID: 'tt-loan-fixture',
+            VITE_VPT_XIAOHONGSHU_APP_ID: 'xhs-loan-fixture'
         }
-        for (const page of app.pages) {
-            assert.ok(assets.has(`${page}.ttml`), page)
-            assert.ok(assets.has(`${page}.ttss`), page)
+        try {
+            const result = await build({ root, logLevel: 'silent', build: { write: false } })
+            assert.ok(!Array.isArray(result) && 'output' in result)
+            const assets = new Map(
+                result.output
+                    .filter((output) => output.type === 'asset')
+                    .map((asset) => [asset.fileName, String(asset.source)])
+            )
+            const app = JSON.parse(assets.get('app.json')!)
+            assert.deepEqual(app.pages, [
+                'pages/calculator/index',
+                'pages/calculator/monthly-payments/index',
+                'pages/calculator/history/index'
+            ])
+            assert.deepEqual(app.window, { navigationStyle: 'custom' })
+            for (const key of [
+                'renderer',
+                'rendererOptions',
+                'componentFramework',
+                'lazyCodeLoading',
+                'useDynamicPlugins'
+            ]) {
+                assert.equal(app[key], undefined, key)
+            }
+            for (const page of app.pages) {
+                assert.ok(assets.has(`${page}.${templateExtension}`), page)
+                assert.ok(assets.has(`${page}.${styleExtension}`), page)
+            }
+            assert.ok(assets.has(`base.${templateExtension}`))
+            assert.ok(assets.has('utils.sjs'))
+            assert.ok(assets.has(`app.${styleExtension}`))
+            assert.ok(assets.has(`assets/global.${styleExtension}`))
+            if (target === 'xhs') {
+                assert.deepEqual(JSON.parse(assets.get('package.json')!), { type: 'commonjs' })
+            }
+            assert.deepEqual(
+                JSON.parse(assets.get('project.config.json')!),
+                target === 'tt'
+                    ? {
+                          appid: 'tt-loan-fixture',
+                          projectname: '房贷计算器',
+                          miniprogramRoot: './',
+                          compileHotReload: true,
+                          setting: { urlCheck: false, es6: false, postcss: false, minified: false, autoCompile: true }
+                      }
+                    : {
+                          appid: 'xhs-loan-fixture',
+                          description: '房贷计算器',
+                          miniprogramRoot: './',
+                          compileType: 'miniprogram',
+                          libVersion: '3.152.1',
+                          setting: {
+                              urlCheck: false,
+                              es6: false,
+                              postcss: false,
+                              minified: false,
+                              enhance: false,
+                              compileHotReload: true
+                          }
+                      }
+            )
+            assert.equal(assets.has('sitemap.json'), false)
+            assert.deepEqual(JSON.parse(assets.get('project.private.config.json')!), { setting: { urlCheck: false } })
+            assert.equal(assets.has('mini.project.json'), false)
+            assert.equal(
+                [...assets.keys()].some((name) => /\.(?:wxml|wxss|wxs|axml|acss)$/.test(name)),
+                false
+            )
+        } finally {
+            process.env = previousEnv
         }
-        assert.ok(assets.has('base.ttml'))
-        assert.ok(assets.has('utils.sjs'))
-        assert.ok(assets.has('app.ttss'))
-        assert.ok(assets.has('assets/global.ttss'))
-        assert.deepEqual(JSON.parse(assets.get('project.config.json')!), {
-            appid: 'tt-loan-fixture',
-            projectname: '房贷计算器',
-            miniprogramRoot: './',
-            compileHotReload: true,
-            setting: { urlCheck: false, es6: false, postcss: false, minified: false, autoCompile: true }
-        })
-        assert.equal(assets.has('sitemap.json'), false)
-        assert.deepEqual(JSON.parse(assets.get('project.private.config.json')!), { setting: { urlCheck: false } })
-        assert.equal(assets.has('mini.project.json'), false)
-        assert.equal(
-            [...assets.keys()].some((name) => /\.(?:wxml|wxss|wxs|axml|acss)$/.test(name)),
-            false
-        )
-    } finally {
-        process.env = previousEnv
-    }
-})
+    })
+}
 
 test('builds Loan Genius as a native Taobao project with its own App ID', async () => {
     // Vite reads process environment during config evaluation; this build owns and restores its target selection.
@@ -123,8 +154,9 @@ test('builds Loan Genius as a native Taobao project with its own App ID', async 
     }
 })
 
-for (const target of ['tt', 'zfb', 'tb'] as const) {
+for (const target of ['tt', 'xhs', 'zfb', 'tb'] as const) {
     test(`${target}: navigation and Android detection use the selected native APIs`, async () => {
+        const usesSystemInfo = target === 'tt' || target === 'xhs'
         // Compile the real source with its target define; only the native API/component boundary is mocked at execution.
         const result = await build({
             root,
@@ -171,7 +203,7 @@ for (const target of ['tt', 'zfb', 'tb'] as const) {
                     calls.push('system')
                     return { platform, system, screenWidth: 390, statusBarHeight: 44, titleBarHeight: 44 }
                 },
-                ...(target === 'tt'
+                ...(usesSystemInfo
                     ? {
                           getMenuButtonBoundingClientRect() {
                               calls.push('menu')
@@ -208,15 +240,15 @@ for (const target of ['tt', 'zfb', 'tb'] as const) {
             const content = Children.only(element.props.children)
             assert.ok(isValidElement<StyledProps>(content))
             assert.equal(content.props.style.top, '44px')
-            assert.equal(content.props.style.padding, target === 'tt' ? '6px 10px' : '6px 16px')
+            assert.equal(content.props.style.padding, usesSystemInfo ? '6px 10px' : '6px 16px')
             const side = Children.toArray(content.props.children)[0]
             assert.ok(isValidElement<StyledProps>(side))
-            assert.equal(side.props.style.flexBasis, target === 'tt' ? '88px' : '44px')
-            assert.equal(side.props.style.width, target === 'tt' ? '88px' : '44px')
+            assert.equal(side.props.style.flexBasis, usesSystemInfo ? '88px' : '44px')
+            assert.equal(side.props.style.width, usesSystemInfo ? '88px' : '44px')
             NavigationBar({ children: 'Loan Genius' })
-            assert.deepEqual(calls, target === 'tt' ? ['system', 'menu'] : ['system'])
+            assert.deepEqual(calls, usesSystemInfo ? ['system', 'menu'] : ['system'])
             assert.equal(isAndroid(), android)
-            assert.deepEqual(calls, target === 'tt' ? ['system', 'menu', 'system'] : ['system', 'device'])
+            assert.deepEqual(calls, usesSystemInfo ? ['system', 'menu', 'system'] : ['system', 'device'])
         }
     })
 }

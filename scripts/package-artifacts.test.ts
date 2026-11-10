@@ -178,6 +178,8 @@ test('public packages preserve their published entrypoints and scaffold dependen
         const config = readFileSync(path.join(projectPath, 'vite.config.ts'), 'utf8')
         assert.match(config, /env\.VITE_VPT_TIKTOK_APP_ID\b/)
         assert.match(config, /env\.VITE_VPT_TAOBAO_APP_ID\b/)
+        assert.match(config, /env\.VITE_VPT_XIAOHONGSHU_APP_ID\b/)
+        assert.match(env, /^VITE_VPT_XIAOHONGSHU_APP_ID=/m)
         const templateEnv = readFileSync(path.join(generatorRoot, 'templates/default/_env.local'), 'utf8')
         assert.match(templateEnv, /^VITE_VPT_TAOBAO_APP_ID=/m)
         // Scaffolding generates only the WeChat App ID; all other template environment values are preserved.
@@ -213,6 +215,8 @@ test('public packages preserve their published entrypoints and scaffold dependen
         assert.equal(project.scripts['build:tb'], 'cross-env VITE_VPT_TARGET=tb vite build')
         assert.equal(project.scripts['dev:tt'], 'cross-env VITE_VPT_TARGET=tt vite')
         assert.equal(project.scripts['build:tt'], 'cross-env VITE_VPT_TARGET=tt vite build')
+        assert.equal(project.scripts['dev:xhs'], 'cross-env VITE_VPT_TARGET=xhs vite')
+        assert.equal(project.scripts['build:xhs'], 'cross-env VITE_VPT_TARGET=xhs vite build')
     })
 
     const manifestGenerator = createManifestGenerator(root, generatorRoot)

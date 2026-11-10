@@ -1,7 +1,7 @@
 import { replaceExactlyOnce } from './skeleton-utils.ts'
 
 /** Threads a Page root through recursive template scopes without serializing it into the App's compact tree. */
-export function buildRecursiveBaseTemplate(source: string, directive: 'a' | 'tt'): string {
+export function buildRecursiveBaseTemplate(source: string, directive: 'a' | 'tt' | 'xhs'): string {
     const recursiveData = 'data="{{i:item}}"'
     if (!source.includes(recursiveData)) {
         throw new Error('Recursive base templates must recurse through compact child data')

@@ -42,6 +42,37 @@ test('enables the filesystem policy only for physical watch builds, including pr
     }
 })
 
+test('preserves XHS shared and private project configuration during startup cleanup', async (context) => {
+    const root = createMemoryTestProject(context)
+    const outDir = path.join(root, 'dist')
+    await fs.mkdir(outDir)
+    const projectConfig = path.join(outDir, 'project.config.json')
+    const privateConfig = path.join(outDir, 'project.private.config.json')
+    const obsoleteFile = path.join(outDir, 'old.js')
+    await fs.writeFile(projectConfig, '{"appid":"xhs-fixture"}')
+    await fs.writeFile(privateConfig, '{"setting":{"urlCheck":false}}')
+    await fs.writeFile(obsoleteFile, 'obsolete')
+    await resolveConfig(
+        {
+            root,
+            configFile: false,
+            plugins: [
+                createMiniWatchPlugin({
+                    output: {
+                        projectConfigFilename: 'project.config.json',
+                        projectPrivateConfigFilename: 'project.private.config.json'
+                    }
+                })
+            ],
+            build: { watch: {}, outDir }
+        },
+        'build'
+    )
+    assert.equal(await fs.readFile(projectConfig, 'utf8'), '{"appid":"xhs-fixture"}')
+    assert.equal(await fs.readFile(privateConfig, 'utf8'), '{"setting":{"urlCheck":false}}')
+    await assert.rejects(fs.access(obsoleteFile), { code: 'ENOENT' })
+})
+
 test('closing a failed watcher never publishes a successful completion marker', async (context) => {
     const root = await fs.mkdtemp(path.join(projectTempDir, 'vpt-mini-watch-error-'))
     context.after(() => fs.rm(root, { recursive: true, force: true }))

@@ -542,6 +542,9 @@ importers:
       '@tarojs/plugin-platform-weapp':
         specifier: 4.3.2
         version: 4.3.2(@tarojs/service@4.3.2(supports-color@7.2.0))(@tarojs/shared@4.3.2)
+      '@tarojs/plugin-platform-xhs':
+        specifier: 1.2.2
+        version: 1.2.2(@tarojs/components@4.3.2(@tarojs/helper@4.3.2(supports-color@7.2.0))(@types/react@19.3.0)(postcss@8.5.32))(@tarojs/service@4.3.2(supports-color@7.2.0))(@tarojs/shared@4.3.2)
       '@tarojs/react':
         specifier: 4.3.2
         version: 4.3.2(patch_hash=8934cc7bf82139cb88e35b6210b48efb4d2d2758851e87986da22f3ce1c8bb97)(react@19.3.1)
@@ -2708,6 +2711,13 @@ packages:
     peerDependencies:
       '@tarojs/service': 4.3.2
       '@tarojs/shared': 4.3.2
+
+  '@tarojs/plugin-platform-xhs@1.2.2':
+    resolution: {integrity: sha512-sr0/8naXbjrGm1g8AjKnyBhS+DW3NK6dR7xkosAOJJp19t8yTZEJW0mTuEuerSCJKvwR3cqsAFiSlVwTc2lGwQ==}
+    peerDependencies:
+      '@tarojs/components': '>=3'
+      '@tarojs/service': '>=3'
+      '@tarojs/shared': '>=3'
 
   '@tarojs/react@4.3.2':
     resolution: {integrity: sha512-tgZY0CFgJhph1atNA6PgjoAA+wgNigCuDkFgZU4KsU+O90ZV7nKr0Pfd+EcjFzdVYaYT4R2kGO7pUOeguCpziw==}
@@ -5418,6 +5428,10 @@ packages:
     resolution: {integrity: sha512-+4zXKdx7UnO+1jaN4l2lHVD+mFvnlZQP/6ljaJVb4SZiwIKeUnrT5l0gkT8z+n4hKpC+jpOv6O9R+gLtag7pSA==}
     engines: {node: '>=10.0.0'}
 
+  webpack-sources@3.2.3:
+    resolution: {integrity: sha512-/DyMEOrDgLKKIG0fmvtz+4dUX/3Ghozwgm6iPp8KRhvn+eQf9+Q7GWxVNMk3+uCPWfdXYC4ExGBckIXdFEfH1w==}
+    engines: {node: '>=10.13.0'}
+
   webpack-sources@3.5.1:
     resolution: {integrity: sha512-jyuiGJdtvY434z5bUZrjz67v76/ePNvFZTp9Mdz29IlH4+GPsgyGjiv0fKI+M7BdkU6ADjulUcKAd3tUK3WlEw==}
     engines: {node: '>=10.13.0'}
@@ -7384,6 +7398,13 @@ snapshots:
     dependencies:
       '@tarojs/service': 4.3.2(supports-color@7.2.0)
       '@tarojs/shared': 4.3.2
+
+  '@tarojs/plugin-platform-xhs@1.2.2(@tarojs/components@4.3.2(@tarojs/helper@4.3.2(supports-color@7.2.0))(@types/react@19.3.0)(postcss@8.5.32))(@tarojs/service@4.3.2(supports-color@7.2.0))(@tarojs/shared@4.3.2)':
+    dependencies:
+      '@tarojs/components': 4.3.2(@tarojs/helper@4.3.2(supports-color@7.2.0))(@types/react@19.3.0)(postcss@8.5.32)
+      '@tarojs/service': 4.3.2(supports-color@7.2.0)
+      '@tarojs/shared': 4.3.2
+      webpack-sources: 3.2.3
 
   '@tarojs/react@4.3.2(patch_hash=8934cc7bf82139cb88e35b6210b48efb4d2d2758851e87986da22f3ce1c8bb97)(react@19.3.1)':
     dependencies:
@@ -10671,6 +10692,8 @@ snapshots:
       clone-deep: 4.0.1
       flat: 5.0.2
       wildcard: 2.0.1
+
+  webpack-sources@3.2.3: {}
 
   webpack-sources@3.5.1: {}
 

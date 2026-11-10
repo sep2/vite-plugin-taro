@@ -2,7 +2,7 @@
     "name": "vite-plugin-taro",
     "version": "0.8.8",
     "author": "sep2",
-    "description": "Vite 8 plugin for building one React/Taro codebase for WeChat, Alipay, Taobao, TikTok, and H5 targets.",
+    "description": "Vite 8 plugin for building one React/Taro codebase for WeChat, Alipay, Taobao, TikTok, Xiaohongshu, and H5 targets.",
     "type": "module",
     "repository": {
         "type": "git",
@@ -52,6 +52,7 @@
         "alipay",
         "taobao",
         "tiktok",
+        "xiaohongshu",
         "mini-program",
         "react"
     ],

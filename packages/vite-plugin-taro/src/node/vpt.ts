@@ -8,6 +8,7 @@ import { createDepsPlugin } from './plugins/deps/create-deps-plugin.ts'
 import { createH5TargetPlugins } from './plugins/h5/plugins.ts'
 import { createTtMiniPlugins } from './plugins/tt/plugins.ts'
 import { createWxMiniPlugins } from './plugins/wx/plugins.ts'
+import { createXhsMiniPlugins } from './plugins/xhs/plugins.ts'
 
 /** Creates the Vite plugins for one Taro target. */
 export default function vpt(options: VptOptions): PluginOption[] {
@@ -19,6 +20,7 @@ export default function vpt(options: VptOptions): PluginOption[] {
         ...(options.target === 'wx' ? createWxMiniPlugins(options) : []),
         ...(options.target === 'zfb' || options.target === 'tb' ? createAliMiniPlugins(options) : []),
         ...(options.target === 'tt' ? createTtMiniPlugins(options) : []),
+        ...(options.target === 'xhs' ? createXhsMiniPlugins(options) : []),
         ...(options.target === 'h5' ? createH5TargetPlugins(options) : [])
     ]
 }

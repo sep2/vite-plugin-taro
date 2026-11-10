@@ -15,7 +15,7 @@ export type VptAppConfig = VptJsonObject
 export type VptPageConfig = VptJsonObject
 
 /** Build target handled by this plugin. */
-export type VptTarget = 'wx' | 'zfb' | 'tb' | 'tt' | 'h5'
+export type VptTarget = 'wx' | 'zfb' | 'tb' | 'tt' | 'xhs' | 'h5'
 
 /** Selects one implemented Mini Program development update mechanism. */
 export type VptHmrOptions = Readonly<{
@@ -39,7 +39,7 @@ export type VptPageOption = {
     /**
      * Optional native Page configuration for the selected target.
      *
-     * Use WeChat keys for WX, Alipay keys for ZFB, Taobao keys for TB, TikTok keys for TT, and Taro/WeChat keys for H5. The plugin preserves these
+     * Use WeChat keys for WX, Alipay keys for ZFB, Taobao keys for TB, TikTok keys for TT, Xiaohongshu keys for XHS, and Taro/WeChat keys for H5. The plugin preserves these
      * fields in the Page runtime capsule and `<path>.json`, adding generated native-component registrations separately.
      * It does not translate configuration names between platforms.
      */
@@ -47,7 +47,7 @@ export type VptPageOption = {
 
     /**
      * Synchronously render the page through native data factories, including WX Skyline first-frame ShareElement draws.
-     * TT always uses ordinary mounting with object-form initial Page data.
+     * TT and XHS use ordinary mounting with object-form initial Page data.
      */
     prerender?: boolean
 }
@@ -57,7 +57,7 @@ export interface VptOptions {
     /**
      * Platform produced by the current Vite invocation.
      *
-     * Use `wx` for WeChat, `zfb` for Alipay, `tb` for Taobao, `tt` for TikTok Mini Programs, or `h5` for a browser application.
+     * Use `wx` for WeChat, `zfb` for Alipay, `tb` for Taobao, `tt` for TikTok Mini Programs, `xhs` for Xiaohongshu, or `h5` for a browser application.
      * The selected target controls Taro module resolution, conditional compilation, runtime bootstrapping, style processing,
      * and output generation.
      */
@@ -66,7 +66,7 @@ export interface VptOptions {
     /**
      * Mini Program renderer. Defaults to `template`.
      * `dom` enables native rendering on WX and TT, with template fallback when unavailable.
-     * ZFB and TB use templates; H5 uses the browser.
+     * ZFB, TB, and XHS use templates; H5 uses the browser.
      */
     renderer?: 'template' | 'dom'
 
@@ -95,7 +95,7 @@ export interface VptOptions {
     /**
      * Native application configuration for the selected target.
      *
-     * Use WeChat keys for WX, Alipay keys for ZFB, Taobao keys for TB, TikTok keys for TT, and Taro/WeChat keys for H5. The plugin preserves the supplied
+     * Use WeChat keys for WX, Alipay keys for ZFB, Taobao keys for TB, TikTok keys for TT, Xiaohongshu keys for XHS, and Taro/WeChat keys for H5. The plugin preserves the supplied
      * configuration for runtime specialization and `app.json`; it does not translate configuration names between platforms. The plugin always
      * derives `pages` from {@link pages}; caller-provided `pages`, `subPackages`, and `subpackages` values are discarded because
      * the build pipeline owns page order and generated package placement.
@@ -106,9 +106,9 @@ export interface VptOptions {
      * Native development-tool project configuration. Mini Program watch builds disable native hot reload in output:
      * WX forces `setting.compileHotReLoad: false`; ZFB forces `developOptions.hotReload: false`; TT forces top-level
      * `compileHotReload: false` and `setting.compileHotReLoad: false`, preserving `setting.autoCompile`.
-     * Other builds write it without merging.
+     * XHS forces `setting.compileHotReload: false`. Other builds write it without merging.
      *
-     * WX and TT emit `project.config.json`; ZFB and TB emit `mini.project.json`; H5 ignores it. Supply the schema
+     * WX, TT, and XHS emit `project.config.json`; ZFB and TB emit `mini.project.json`; H5 ignores it. Supply the schema
      * expected by the selected target rather than sharing one project's platform-specific values across invocations. ZFB must
      * use format 2 with `compileOptions.globalObjectMode: 'enable'` because the upstream Taro runtime reads the platform `global`;
      * its Taro-style ES6 output also relies on `compileOptions.transpile` for the developer tool's final syntax conversion.
@@ -116,10 +116,10 @@ export interface VptOptions {
     projectConfigJson: VptJsonObject
 
     /**
-     * Local development-tool preferences. WX and TT watch builds force `setting.compileHotReLoad: false` in emitted
-     * preferences; ZFB preferences and other builds are written without merging.
+     * Local development-tool preferences. WX and TT watch builds force `setting.compileHotReLoad: false`;
+     * XHS watch builds force `setting.compileHotReload: false`. Other builds preserve the supplied preferences.
      *
-     * WX and TT emit `project.private.config.json`; ZFB and TB emit `.mini-ide/project-ide.json`;
+     * WX, TT, and XHS emit `project.private.config.json`; ZFB and TB emit `.mini-ide/project-ide.json`;
      * H5 ignores it. TT private configuration requires TikTok DevTools 4.0.7+ and supports only its documented fields.
      * These files control local IDE behavior rather than portable application metadata. In particular, the ZFB file does not
      * associate the project with an Alipay App ID; Alipay Mini Program Studio keeps that selection in its workspace storage.
@@ -129,7 +129,7 @@ export interface VptOptions {
     /**
      * WeChat Mini Program indexing rules written to `sitemap.json` without merging.
      *
-     * The file is emitted only when this value is provided for a `wx` build. It is ignored for ZFB, TB, TT, and H5.
+     * The file is emitted only when this value is provided for a `wx` build. It is ignored for ZFB, TB, TT, XHS, and H5.
      */
     sitemapJson?: VptJsonObject
 
@@ -151,8 +151,8 @@ export interface VptOptions {
     /**
      * Selects the Mini Program development update mode. Omission uses `devtools`.
      *
-     * This option affects only `vite serve` for `wx`, `zfb`, `tb`, and `tt` targets and never changes H5 or production output.
-     * Prefer `interpreter` on TB and TT; native DevTools patch execution requires verification in their IDEs.
+     * This option affects only `vite serve` for `wx`, `zfb`, `tb`, `tt`, and `xhs` targets and never changes H5 or production output.
+     * Prefer `interpreter` on TB, TT, and XHS; native DevTools patch execution requires verification in their IDEs.
      */
     hmr?: VptHmrOptions
 }

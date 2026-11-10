@@ -39,7 +39,7 @@ function resolveRefreshConfig(target: VptOptions['target'], command: 'serve' | '
     )
 }
 
-for (const target of ['wx', 'zfb', 'tb', 'tt', 'h5'] as const) {
+for (const target of ['wx', 'zfb', 'tb', 'tt', 'xhs', 'h5'] as const) {
     for (const command of ['serve', 'build'] as const) {
         test(`${target} ${command}: only Mini development redirects Refresh globals`, async () => {
             const config = await resolveRefreshConfig(target, command)

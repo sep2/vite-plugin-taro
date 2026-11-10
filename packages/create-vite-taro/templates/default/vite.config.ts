@@ -64,7 +64,8 @@ function createPageJson(target: VptTarget): VptJsonObject {
                 titlePenetrate: 'YES'
             }
         }
-        case 'tt': {
+        case 'tt':
+        case 'xhs': {
             return {
                 navigationStyle: 'custom',
                 navigationBarTextStyle: 'black'
@@ -121,6 +122,20 @@ function createAppJson(target: VptTarget): VptJsonObject {
                 window: {
                     transparentTitle: 'always',
                     titlePenetrate: 'YES'
+                }
+            }
+        }
+        case 'xhs': {
+            return {
+                tabBar: {
+                    color: '#667085',
+                    selectedColor: '#26734d',
+                    backgroundColor: '#f8fbf4',
+                    list: tabPages.map(({ path, label }) => ({ pagePath: path, text: label }))
+                },
+                window: {
+                    navigationStyle: 'custom',
+                    navigationBarTextStyle: 'black'
                 }
             }
         }
@@ -199,6 +214,22 @@ function createProjectConfigJson(target: VptTarget, appId: string | undefined): 
                 }
             }
         }
+        case 'xhs': {
+            return {
+                appid: appId,
+                description: 'vpt-project',
+                miniprogramRoot: './',
+                compileType: 'miniprogram',
+                libVersion: '3.152.1',
+                setting: {
+                    es6: false,
+                    postcss: false,
+                    minified: false,
+                    enhance: false,
+                    compileHotReload: true
+                }
+            }
+        }
         case 'tt': {
             return {
                 appid: appId,
@@ -222,7 +253,9 @@ function createProjectConfigJson(target: VptTarget, appId: string | undefined): 
 
 function createProjectPrivateConfigJson(target: VptTarget): VptJsonObject {
     switch (target) {
-        case 'wx': {
+        case 'wx':
+        case 'tt':
+        case 'xhs': {
             return {
                 setting: {
                     urlCheck: false
@@ -235,13 +268,6 @@ function createProjectPrivateConfigJson(target: VptTarget): VptJsonObject {
                 ignoreHttpDomainCheck: true,
                 ignoreCertificateDomainCheck: true,
                 ignoreWebViewDomainCheck: true
-            }
-        }
-        case 'tt': {
-            return {
-                setting: {
-                    urlCheck: false
-                }
             }
         }
         default:
@@ -263,6 +289,9 @@ function getAppId(env: Record<string, string>, target: VptTarget): string {
         case 'tt': {
             return env.VITE_VPT_TIKTOK_APP_ID ?? ''
         }
+        case 'xhs': {
+            return env.VITE_VPT_XIAOHONGSHU_APP_ID ?? ''
+        }
         default: {
             return ''
         }
@@ -274,11 +303,18 @@ function getTarget(env: Record<string, string>): VptTarget {
 
     const target = env[targetEnvName]
 
-    if (target === 'wx' || target === 'zfb' || target === 'tb' || target === 'tt' || target === 'h5') {
+    if (
+        target === 'wx' ||
+        target === 'zfb' ||
+        target === 'tb' ||
+        target === 'tt' ||
+        target === 'xhs' ||
+        target === 'h5'
+    ) {
         return target
     }
 
-    throw new Error(`${targetEnvName} must be "wx", "zfb", "tb", "tt", or "h5".`)
+    throw new Error(`${targetEnvName} must be "wx", "zfb", "tb", "tt", "xhs", or "h5".`)
 }
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))

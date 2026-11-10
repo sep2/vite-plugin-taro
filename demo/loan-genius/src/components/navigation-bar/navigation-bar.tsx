@@ -47,7 +47,7 @@ function px(value: number): string {
 
 const isWechatTarget = import.meta.env.VITE_VPT_TARGET === 'wx'
 const isAlipayTarget = import.meta.env.VITE_VPT_TARGET === 'zfb' || import.meta.env.VITE_VPT_TARGET === 'tb'
-const isTtTarget = import.meta.env.VITE_VPT_TARGET === 'tt'
+const usesSystemInfo = import.meta.env.VITE_VPT_TARGET === 'tt' || import.meta.env.VITE_VPT_TARGET === 'xhs'
 
 function getAlipayNavigationBarMetrics(systemInfo: AlipaySystemInfo): NavigationBarMetrics {
     const { statusBarHeight, titleBarHeight } = systemInfo
@@ -87,11 +87,11 @@ function getNavigationBarMetricsCached(): NavigationBarMetrics {
         return cachedNavigationBarMetrics
     }
 
-    // TT exposes window metrics through getSystemInfoSync, not WeChat's getWindowInfo.
-    const windowInfo = isTtTarget ? Taro.getSystemInfoSync() : Taro.getWindowInfo()
-    const statusBarHeight = isWechatTarget || isTtTarget ? (windowInfo.statusBarHeight ?? 44) : 0
+    // TT and XHS expose window metrics through their synchronous system-info API.
+    const windowInfo = usesSystemInfo ? Taro.getSystemInfoSync() : Taro.getWindowInfo()
+    const statusBarHeight = isWechatTarget || usesSystemInfo ? (windowInfo.statusBarHeight ?? 44) : 0
     const menuButtonMetrics =
-        isWechatTarget || isTtTarget
+        isWechatTarget || usesSystemInfo
             ? Taro.getMenuButtonBoundingClientRect()
             : {
                   height: 32,

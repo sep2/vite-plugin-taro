@@ -76,9 +76,10 @@ export async function createMiniDevHost({
         logMiniError(server.config.logger, `${contract.options.target} HMR ${action.kind} failed`, error)
     )
 
+    // Native files use Vite's project-relative output directory, independently of the process working directory.
+    const outDir = path.resolve(server.config.root, server.config.build.outDir)
     // Modes return declarative effects; this host alone owns physical writes, event dispatch, and journal publication ordering.
-    const writeFile = (fileName: string, source: string) =>
-        writeDevelopmentFile(server.config.build.outDir, fileName, source)
+    const writeFile = (fileName: string, source: string) => writeDevelopmentFile(outDir, fileName, source)
 
     const journal = new PatchJournal((publication) => dispatchModeAction(hmrMode.publish?.(publication)))
 

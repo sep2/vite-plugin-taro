@@ -3,6 +3,7 @@ import Taro from 'virtual:taro/api'
 const isWechatTarget = import.meta.env.VITE_VPT_TARGET === 'wx'
 const isAlipayTarget = import.meta.env.VITE_VPT_TARGET === 'zfb' || import.meta.env.VITE_VPT_TARGET === 'tb'
 const isTtTarget = import.meta.env.VITE_VPT_TARGET === 'tt'
+const isXhsTarget = import.meta.env.VITE_VPT_TARGET === 'xhs'
 
 interface NavigationBarMetrics {
     height: number
@@ -86,10 +87,10 @@ function getNavigationBarMetricsCached(): NavigationBarMetrics {
         return cachedNavigationBarMetrics
     }
 
-    // TT exposes its window metrics through getSystemInfoSync rather than WeChat's getWindowInfo.
-    const windowInfo = isTtTarget ? Taro.getSystemInfoSync() : Taro.getWindowInfo()
+    // TT and XHS expose window metrics through getSystemInfoSync.
+    const windowInfo = isTtTarget || isXhsTarget ? Taro.getSystemInfoSync() : Taro.getWindowInfo()
     const screenWidth = windowInfo.screenWidth || 375
-    const statusBarHeight = isWechatTarget || isTtTarget ? (windowInfo.statusBarHeight ?? 44) : 0
+    const statusBarHeight = isWechatTarget || isTtTarget || isXhsTarget ? (windowInfo.statusBarHeight ?? 44) : 0
     const menuButtonMetrics = getMenuButtonMetrics(screenWidth)
 
     cachedNavigationBarMetrics = getNavigationBarMetrics(screenWidth, statusBarHeight, menuButtonMetrics)
