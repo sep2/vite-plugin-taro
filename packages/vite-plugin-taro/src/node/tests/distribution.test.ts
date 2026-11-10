@@ -154,7 +154,7 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
     assert.ok(!runtimeModules.includes('test'), 'runtime test utilities stay outside the published package')
     assert.match(h5AppPath, /\/src\/runtime\/h5\/app\.ts$/)
     assert.equal(packageJson.dependencies['@tarojs/shared'], taroPackage.version)
-    assert.equal(packageJson.dependencies['@tailwindcss/vite'], '4.3.4')
+    assert.equal(packageJson.dependencies['@tailwindcss/vite'], '4.3.5')
     for (const name of ['helper', 'taro', 'api', 'components', 'router']) {
         assert.equal(packageJson.dependencies[`@tarojs/${name}`], undefined)
     }
@@ -180,7 +180,7 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
     assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-h5'], undefined)
     assert.equal(packageJson.devDependencies['@tailwindcss-mangle/engine'], '0.2.0')
     assert.equal(packageJson.devDependencies['@weapp-core/escape'], '8.0.0')
-    assert.equal(packageJson.devDependencies['@weapp-tailwindcss/postcss'], '4.0.1')
+    assert.equal(packageJson.devDependencies['@weapp-tailwindcss/postcss'], '4.0.2')
     assert.equal(packageJson.devDependencies['weapp-tailwindcss'], undefined)
     assert.equal(packageJson.dependencies['weapp-tailwindcss'], undefined)
     assert.doesNotMatch(compiler, /from\s*['"]weapp-tailwindcss/)
