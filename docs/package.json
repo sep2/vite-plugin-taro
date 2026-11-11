@@ -4,12 +4,12 @@
     "type": "module",
     "version": "0.0.1",
     "scripts": {
-        "dev": "cross-env ASTRO_TELEMETRY_DISABLED=1 astro dev",
-        "start": "cross-env ASTRO_TELEMETRY_DISABLED=1 astro dev",
-        "build": "cross-env ASTRO_TELEMETRY_DISABLED=1 astro build",
-        "preview": "cross-env ASTRO_TELEMETRY_DISABLED=1 astro preview",
-        "test": "cross-env ASTRO_TELEMETRY_DISABLED=1 node --test scripts/*.test.ts",
-        "astro": "cross-env ASTRO_TELEMETRY_DISABLED=1 astro"
+        "dev": "ASTRO_TELEMETRY_DISABLED=1 astro dev",
+        "start": "ASTRO_TELEMETRY_DISABLED=1 astro dev",
+        "build": "ASTRO_TELEMETRY_DISABLED=1 astro build",
+        "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview",
+        "test": "ASTRO_TELEMETRY_DISABLED=1 node --test scripts/*.test.ts",
+        "astro": "ASTRO_TELEMETRY_DISABLED=1 astro"
     },
     "dependencies": {
         "@astrojs/markdown-remark": "^7.3.6",
@@ -26,7 +26,6 @@
     },
     "devDependencies": {
         "@types/canvas-confetti": "^1.9.0",
-        "@types/mdast": "^4.0.4",
-        "cross-env": "^10.1.0"
+        "@types/mdast": "^4.0.4"
     }
 }
