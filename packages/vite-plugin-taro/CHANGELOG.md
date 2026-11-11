@@ -1,5 +1,24 @@
 # vite-plugin-taro
 
+## 0.8.10
+
+### 修复
+
+- b932fed7：编译器、原生插件、MagicString、开发引擎及 HMR 运行时统一复用 Vite 所属的 Rolldown 实例，保证编译边界使用同一套 API。
+- 08b968df：H5 根据 App 的 `tabBar` 配置初始化 Taro 标签栏布局，支持内置标签栏及自定义标签栏（[#49](https://github.com/sep2/vite-plugin-taro/issues/49)）。
+
+### 升级说明
+
+从 `0.8.9` 升级到 `0.8.10`：
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.8.10
+```
+
+运行时随插件自动升级到 `0.8.10`。已有项目先删除 `overrides` 或 `resolutions` 中为 VPT 添加的 Rolldown 条目；若直接依赖 Rolldown 仅用于 VPT，执行 `pnpm remove -D rolldown`。项目自身调用 Rolldown API 时保留所需直接依赖，VPT 使用 Vite 所属的编译器实例。重新安装依赖、重启开发服务器并重新构建应用。
+
+H5 内置标签栏使用 `appJson.tabBar.list` 注册标签页。使用自定义 React 标签栏的项目同时设置 `appJson.tabBar.custom: true`，通过 `Taro.switchTab()` 切换已注册标签页，以保留页面实例与 React 状态。
+
 ## 0.8.9
 
 ### 变更

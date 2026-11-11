@@ -1,5 +1,24 @@
 # create-vite-taro
 
+## 0.8.10
+
+### 修复
+
+- b932fed7：默认模板由应用直接管理 Vite 和 VPT，Rolldown 交由工具链依赖管理。
+- 1e8d3f24：默认模板为 H5 配置 `tabBar.custom: true` 并注册标签页，使用自定义 React 标签栏切换页面时保留计数器等页面状态。
+
+### 升级说明
+
+生成器从 `0.8.9` 升级到 `0.8.10`，使用新版模板创建项目：
+
+```sh
+pnpm create vite-taro@0.8.10 my-app
+```
+
+新项目自动使用 `0.8.10` 版插件与运行时。已有项目执行 `pnpm add -D --save-exact vite-plugin-taro@0.8.10`；删除 `overrides` 或 `resolutions` 中为 VPT 添加的 Rolldown 条目，并执行 `pnpm remove -D rolldown` 移除仅为 VPT 添加的直接依赖。项目自身调用 Rolldown API 时保留所需直接依赖。
+
+已有模板项目在 `vite.config.ts` 的 `createAppJson()` 中为 H5 返回 `tabBar: { custom: true, list: tabPages.map(({ path, label }) => ({ pagePath: path, text: label })) }`，保留各页面的 React `<TabBar>` 及其 `Taro.switchTab()` 调用。重新安装依赖、重启开发服务器并重新构建 H5。
+
 ## 0.8.9
 
 ### 变更
