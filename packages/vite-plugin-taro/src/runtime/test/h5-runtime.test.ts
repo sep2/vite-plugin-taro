@@ -9,6 +9,29 @@ import {
     recordCall
 } from './runtime-entry-test-utils.ts'
 
+// All startup scenarios execute the same compiled entry with isolated application state.
+const appBundle = bundleRuntimeEntry({
+    entry: 'h5/app.ts',
+    mocks: {
+        './taro-runtime.ts': `
+        const harness = globalThis.harness
+        export const window = harness.window
+        export const createReactApp = harness.createReactApp
+        export const createHashHistory = harness.createHashHistory
+        export const handleAppMount = harness.handleAppMount
+        export const handleAppMountWithTabbar = harness.handleAppMountWithTabbar
+        export const createRouter = harness.createRouter
+    `,
+        react: 'export default globalThis.harness.React',
+        'react-dom/client': 'export default globalThis.harness.ReactDOM',
+        '\0vpt:app-component': 'export default globalThis.harness.AppComponent'
+    },
+    defines: {
+        __VPT_H5_APP_CONFIG__: 'globalThis.harness.config',
+        __VPT_H5_ROUTES__: 'globalThis.harness.routes'
+    }
+})
+
 for (const tabBar of [
     undefined,
     {
@@ -51,29 +74,7 @@ for (const tabBar of [
             handleAppMountWithTabbar: recordCall(calls, 'handleAppMountWithTabbar', undefined),
             createRouter: recordCall(calls, 'createRouter', undefined)
         }
-        const code = await bundleRuntimeEntry({
-            entry: 'h5/app.ts',
-            mocks: {
-                './taro-runtime.ts': `
-                const harness = globalThis.harness
-                export const window = harness.window
-                export const createReactApp = harness.createReactApp
-                export const createHashHistory = harness.createHashHistory
-                export const handleAppMount = harness.handleAppMount
-                export const handleAppMountWithTabbar = harness.handleAppMountWithTabbar
-                export const createRouter = harness.createRouter
-            `,
-                react: 'export default globalThis.harness.React',
-                'react-dom/client': 'export default globalThis.harness.ReactDOM',
-                '\0vpt:app-component': 'export default globalThis.harness.AppComponent'
-            },
-            defines: {
-                __VPT_H5_APP_CONFIG__: 'globalThis.harness.config',
-                __VPT_H5_ROUTES__: 'globalThis.harness.routes'
-            }
-        })
-
-        executeRuntimeEntry(code, createExecutionContext(harness))
+        executeRuntimeEntry(await appBundle, createExecutionContext(harness))
 
         assert.strictEqual(browserWindow.__taroAppConfig, config)
         assert.strictEqual(config.routes, routes)
