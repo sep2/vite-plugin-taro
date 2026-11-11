@@ -91,6 +91,26 @@ test('preserves H5 configuration, route overrides, and escaped paths without sou
     assert.equal(result.map, null)
 })
 
+test('preserves tabbar configuration for the H5 router mount', () => {
+    const tabBar = {
+        color: '#666666',
+        selectedColor: '#0088ff',
+        backgroundColor: '#ffffff',
+        list: [
+            { pagePath: 'pages/home/index', text: 'Home' },
+            { pagePath: 'pages/about/index', text: 'About' }
+        ]
+    }
+    const result = transformH5App({
+        code: source,
+        id,
+        options: { ...options, appJson: { ...options.appJson, tabBar } },
+        projectRoot
+    })
+    const observed: unknown = Function(`${result.code}\nreturn config.tabBar`)()
+    assert.deepEqual(observed, tabBar)
+})
+
 test('rejects an H5 App missing its specialization placeholders', () => {
     assert.throws(
         () =>

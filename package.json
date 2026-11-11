@@ -22,6 +22,7 @@
         "build:template:tt": "node scripts/build-template.ts tt",
         "build:template:xhs": "node scripts/build-template.ts xhs",
         "build:template:h5": "node scripts/build-template.ts h5",
+        "preview:template:h5": "node packages/vite-plugin-taro/node_modules/vite/bin/vite.js preview --outDir dist/h5",
         "build:native-comp-demo:wx": "pnpm --filter native-comp-demo build-wx",
         "build:native-comp-demo:zfb": "pnpm --filter native-comp-demo build-zfb",
         "build:native-comp-demo:tt": "pnpm --filter native-comp-demo build-tt",

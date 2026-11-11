@@ -9,63 +9,84 @@ import {
     recordCall
 } from './runtime-entry-test-utils.ts'
 
-test('boots the H5 App with one shared config and ordered router dependencies', async () => {
-    // This mutable journal captures the startup protocol across the bundled H5 entry boundary.
-    const calls: Call[] = []
-    const config: { routes?: unknown } = {}
-    const routes = [{ path: '/pages/home/index' }]
-    const browserWindow: Record<string, unknown> = {}
-    const app = { kind: 'app' }
-    const history = { kind: 'history' }
-    const AppComponent = { kind: 'AppComponent' }
-    const React = { kind: 'React' }
-    const ReactDOM = { kind: 'ReactDOM' }
-    const harness = {
-        config,
-        routes,
-        window: browserWindow,
-        AppComponent,
-        React,
-        ReactDOM,
-        createReactApp: recordCall(calls, 'createReactApp', app),
-        createHashHistory: recordCall(calls, 'createHashHistory', history),
-        handleAppMount: recordCall(calls, 'handleAppMount', undefined),
-        createRouter: recordCall(calls, 'createRouter', undefined)
+for (const tabBar of [
+    undefined,
+    {
+        list: [
+            { pagePath: 'pages/home/index', text: 'Home' },
+            { pagePath: 'pages/about/index', text: 'About' }
+        ]
+    },
+    {
+        custom: true,
+        list: [
+            { pagePath: 'pages/home/index', text: 'Home' },
+            { pagePath: 'pages/about/index', text: 'About' }
+        ]
     }
-    const code = await bundleRuntimeEntry({
-        entry: 'h5/app.ts',
-        mocks: {
-            './taro-runtime.ts': `
+]) {
+    const mountHandler = tabBar ? 'handleAppMountWithTabbar' : 'handleAppMount'
+    test(`boots the H5 App with ${mountHandler} and custom=${tabBar?.custom === true}`, async () => {
+        // This mutable journal captures the startup protocol across the bundled H5 entry boundary.
+        const calls: Call[] = []
+        // The entry attaches routes to this shared configuration during startup.
+        const config: { routes?: unknown; tabBar?: typeof tabBar } = { tabBar }
+        const routes = [{ path: '/pages/home/index' }]
+        const browserWindow: Record<string, unknown> = {}
+        const app = { kind: 'app' }
+        const history = { kind: 'history' }
+        const AppComponent = { kind: 'AppComponent' }
+        const React = { kind: 'React' }
+        const ReactDOM = { kind: 'ReactDOM' }
+        const harness = {
+            config,
+            routes,
+            window: browserWindow,
+            AppComponent,
+            React,
+            ReactDOM,
+            createReactApp: recordCall(calls, 'createReactApp', app),
+            createHashHistory: recordCall(calls, 'createHashHistory', history),
+            handleAppMount: recordCall(calls, 'handleAppMount', undefined),
+            handleAppMountWithTabbar: recordCall(calls, 'handleAppMountWithTabbar', undefined),
+            createRouter: recordCall(calls, 'createRouter', undefined)
+        }
+        const code = await bundleRuntimeEntry({
+            entry: 'h5/app.ts',
+            mocks: {
+                './taro-runtime.ts': `
                 const harness = globalThis.harness
                 export const window = harness.window
                 export const createReactApp = harness.createReactApp
                 export const createHashHistory = harness.createHashHistory
                 export const handleAppMount = harness.handleAppMount
+                export const handleAppMountWithTabbar = harness.handleAppMountWithTabbar
                 export const createRouter = harness.createRouter
             `,
-            react: 'export default globalThis.harness.React',
-            'react-dom/client': 'export default globalThis.harness.ReactDOM',
-            '\0vpt:app-component': 'export default globalThis.harness.AppComponent'
-        },
-        defines: {
-            __VPT_H5_APP_CONFIG__: 'globalThis.harness.config',
-            __VPT_H5_ROUTES__: 'globalThis.harness.routes'
-        }
+                react: 'export default globalThis.harness.React',
+                'react-dom/client': 'export default globalThis.harness.ReactDOM',
+                '\0vpt:app-component': 'export default globalThis.harness.AppComponent'
+            },
+            defines: {
+                __VPT_H5_APP_CONFIG__: 'globalThis.harness.config',
+                __VPT_H5_ROUTES__: 'globalThis.harness.routes'
+            }
+        })
+
+        executeRuntimeEntry(code, createExecutionContext(harness))
+
+        assert.strictEqual(browserWindow.__taroAppConfig, config)
+        assert.strictEqual(config.routes, routes)
+        assert.deepEqual(
+            calls.map(({ name }) => name),
+            ['createReactApp', 'createHashHistory', mountHandler, 'createRouter']
+        )
+        assert.deepEqual(calls[0]?.args, [AppComponent, React, ReactDOM, config])
+        assert.deepEqual(calls[1]?.args, [{ window: browserWindow }])
+        assert.deepEqual(calls[2]?.args, [config, history])
+        assert.deepEqual(calls[3]?.args, [history, app, config, React])
     })
-
-    executeRuntimeEntry(code, createExecutionContext(harness))
-
-    assert.strictEqual(browserWindow.__taroAppConfig, config)
-    assert.strictEqual(config.routes, routes)
-    assert.deepEqual(
-        calls.map(({ name }) => name),
-        ['createReactApp', 'createHashHistory', 'handleAppMount', 'createRouter']
-    )
-    assert.deepEqual(calls[0]?.args, [AppComponent, React, ReactDOM, config])
-    assert.deepEqual(calls[1]?.args, [{ window: browserWindow }])
-    assert.deepEqual(calls[2]?.args, [config, history])
-    assert.deepEqual(calls[3]?.args, [history, app, config, React])
-})
+}
 
 test('preserves H5 runtime facade side-effect order and export identities', async () => {
     // This mutable trace proves CSS initialization remains ahead of the framework and router facades.
@@ -74,6 +95,7 @@ test('preserves H5 runtime facade side-effect order and export identities', asyn
     const createHashHistory = () => undefined
     const createRouter = () => undefined
     const handleAppMount = () => undefined
+    const handleAppMountWithTabbar = () => undefined
     const browserWindow = {}
     const harness = {
         events,
@@ -81,6 +103,7 @@ test('preserves H5 runtime facade side-effect order and export identities', asyn
         createHashHistory,
         createRouter,
         handleAppMount,
+        handleAppMountWithTabbar,
         window: browserWindow
     }
     const exports = await importRuntimeFacade({
@@ -98,6 +121,7 @@ test('preserves H5 runtime facade side-effect order and export identities', asyn
                 export const createHashHistory = globalThis.harness.createHashHistory
                 export const createRouter = globalThis.harness.createRouter
                 export const handleAppMount = globalThis.harness.handleAppMount
+                export const handleAppMountWithTabbar = globalThis.harness.handleAppMountWithTabbar
             `,
             'vite-plugin-taro-runtime/runtime/h5': `
                 globalThis.harness.events.push('runtime')
@@ -112,5 +136,6 @@ test('preserves H5 runtime facade side-effect order and export identities', asyn
     assert.strictEqual(exports.createHashHistory, createHashHistory)
     assert.strictEqual(exports.createRouter, createRouter)
     assert.strictEqual(exports.handleAppMount, handleAppMount)
+    assert.strictEqual(exports.handleAppMountWithTabbar, handleAppMountWithTabbar)
     assert.strictEqual(exports.window, browserWindow)
 })
