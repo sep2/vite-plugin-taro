@@ -17,7 +17,7 @@ test('homepage renderer charts use saved observations and precede the App layout
         /import result from '\.\.\/\.\.\/\.\.\/demo\/benchmark-demo\/results\/wechat-devtools\.json'/
     )
     assert.ok(homepage.indexOf('<RendererBenchmarkShowcase />') < homepage.indexOf('<AppViewShowcase />'))
-    assert.match(component, /const multiplier = result\.geometricMeanSpeedup\.toFixed\(1\)/)
+    assert.match(component, /const multiplier = Math\.floor\(result\.geometricMeanSpeedup\)/)
     assert.match(component, /<strong>\{multiplier\}<small>倍<\/small><\/strong>/)
     assert.match(component, /Math\.max\(item\.dom\.median, item\.template\.median\)/)
     assert.match(component, /item\.dom\.median \/ item\.scale \* 100/)

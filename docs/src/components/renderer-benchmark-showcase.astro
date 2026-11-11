@@ -16,7 +16,7 @@ const charts = result.summary
     .filter(({ id }) => Object.hasOwn(labels, id))
     .map((item) => ({ ...item, title: labels[item.id], scale: Math.max(item.dom.median, item.template.median) }))
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
-const multiplier = result.geometricMeanSpeedup.toFixed(1)
+const multiplier = Math.floor(result.geometricMeanSpeedup)
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
 const source = 'https://github.com/sep2/vite-plugin-taro/tree/main/demo/benchmark-demo'
 // biome-ignore lint/correctness/noUnusedVariables: Rendered by the Astro template.
