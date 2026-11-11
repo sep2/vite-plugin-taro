@@ -16,7 +16,7 @@ type TabButtonProps = {
     onClick(): void
 }
 
-for (const target of ['xhs', 'tt'] as const) {
+for (const target of ['xhs', 'tt', 'h5'] as const) {
     test(`the ${target} starter uses its target's tab presentation`, async () => {
         const result = await build({
             root: templateRoot,

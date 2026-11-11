@@ -198,6 +198,11 @@ test('public packages preserve their published entrypoints and scaffold dependen
         assert.match(config, /list: tabPages\.map\(\(\{ path, label \}\) => \(\{ pagePath: path, text: label \}\)\)/)
         assert.match(config, /custom: true/)
         assert.match(config, /customize: true/)
+        // H5 caches custom tab pages only when they are registered in the router's tabbar configuration.
+        assert.match(
+            config,
+            /case 'h5':\s*\{\s*return \{\s*tabBar: \{\s*custom: true,[\s\S]*?list: tabPages\.map\(\(\{ path, label \}\) => \(\{ pagePath: path, text: label \}\)\)/
+        )
         assert.match(config, /disableABTest: true/)
         assert.match(config, /componentFramework: 'glass-easel',\s+glassEaselWebview: true/)
         assert.match(config, /window:\s*\{\s*glassEaselWebview: true/)

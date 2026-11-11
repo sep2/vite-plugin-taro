@@ -154,6 +154,17 @@ function createAppJson(target: VptTarget): VptJsonObject {
                 }
             }
         }
+        case 'h5': {
+            return {
+                tabBar: {
+                    custom: true,
+                    color: '#667085',
+                    selectedColor: '#26734d',
+                    backgroundColor: '#f8fbf4',
+                    list: tabPages.map(({ path, label }) => ({ pagePath: path, text: label }))
+                }
+            }
+        }
         default: {
             return {}
         }
