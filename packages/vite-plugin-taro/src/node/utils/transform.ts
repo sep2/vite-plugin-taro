@@ -1,5 +1,5 @@
-import { RolldownMagicString } from 'rolldown'
 import type { Rolldown } from 'vite'
+import { RolldownMagicString } from './vite-rolldown.ts'
 
 export type AstTransformResult = {
     code: string

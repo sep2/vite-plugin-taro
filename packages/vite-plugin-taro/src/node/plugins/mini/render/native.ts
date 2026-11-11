@@ -34,10 +34,11 @@ import type {
     VariableDeclaration
 } from '@oxc-project/types'
 import { isReferenceIdentifier, ScopeTracker, walk } from 'oxc-walker'
-import { type ExistingRawSourceMap, RolldownMagicString } from 'rolldown'
-import { parseSync } from 'rolldown/utils'
+import type { ExistingRawSourceMap } from 'rolldown'
 import type { Rolldown } from 'vite'
+import { parseSync } from 'vite'
 import type { AstTransformResult } from '../../../utils/transform.ts'
+import { RolldownMagicString } from '../../../utils/vite-rolldown.ts'
 import { resolveLogicalChunkReference, resolvePhysicalChunkReference } from '../module/chunk-path.ts'
 import { classifyMiniModule, miniBootstrapId } from '../module/module.ts'
 

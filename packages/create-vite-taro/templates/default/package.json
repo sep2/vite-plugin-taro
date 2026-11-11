@@ -29,11 +29,9 @@
         "@types/react-dom": "^19.3.0",
         "typescript": "^7.0.2",
         "cross-env": "^10.1.0",
-        "rolldown": "1.2.18",
         "vite": "8.3.7"
     },
     "overrides": {
-        "@types/react": "$@types/react",
-        "rolldown": "$rolldown"
+        "@types/react": "$@types/react"
     }
 }

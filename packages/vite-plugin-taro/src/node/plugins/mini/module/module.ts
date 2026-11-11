@@ -1,8 +1,8 @@
 import path from 'node:path'
-import { RUNTIME_MODULE_ID } from 'rolldown'
 import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { packageRequire, resolveTaroRuntime, resolveVptRuntime } from '../../../utils/packages.ts'
+import { RUNTIME_MODULE_ID } from '../../../utils/vite-rolldown.ts'
 
 /** Initializes SystemJS, transport and polyfills before application capsules. */
 export const miniBootstrapId = resolveVptRuntime('mini/amphibious/bootstrap')

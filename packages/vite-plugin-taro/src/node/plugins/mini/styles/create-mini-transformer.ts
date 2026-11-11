@@ -3,8 +3,8 @@ import { splitCandidateTokens } from '@tailwindcss-mangle/engine'
 import { escape as escapeClassName, MappingChars2String } from '@weapp-core/escape'
 import { createStyleHandler, type IStyleHandlerOptions, postcssHtmlTransform } from '@weapp-tailwindcss/postcss'
 import { type WalkerEnter, walk } from 'oxc-walker'
-import { RolldownMagicString } from 'rolldown'
-import { parseSync } from 'rolldown/utils'
+import { parseSync } from 'vite'
+import { RolldownMagicString } from '../../../utils/vite-rolldown.ts'
 
 const cssPreflight = {
     border: '0 solid',

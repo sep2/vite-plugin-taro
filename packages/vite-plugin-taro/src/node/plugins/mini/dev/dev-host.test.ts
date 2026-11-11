@@ -49,7 +49,7 @@ async function importDevHost(dev: SyntheticDev): Promise<CreateMiniDevHost> {
     Reflect.set(globalThis, devHostHarnessKey, { dev })
     const hooks = registerHooks({
         resolve(specifier, context, nextResolve) {
-            if (specifier === 'rolldown/experimental' && context.parentURL === devHostUrl) {
+            if (specifier === '../../../utils/vite-rolldown.ts' && context.parentURL === devHostUrl) {
                 return { shortCircuit: true, url: mockUrl }
             }
             return nextResolve(specifier, context)

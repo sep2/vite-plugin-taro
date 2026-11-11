@@ -1,10 +1,10 @@
 import path from 'node:path'
 import type { OutputOptions, Plugin, RolldownOptions } from 'rolldown'
-import { build } from 'rolldown'
-import { type DevEngine, viteReporterPlugin } from 'rolldown/experimental'
+import type { DevEngine } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
+import { build, rolldownRuntimePath, viteReporterPlugin } from '../../../utils/vite-rolldown.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import type { MiniHmrMode } from './hmr-mode.ts'
 import { replaceViteTransformPlugin } from './replace-vite-transform-plugin.ts'
@@ -157,6 +157,7 @@ const bundleRuntimeSource = memoize(async function bundleRuntimeSource(runtimeFi
     // Keep this build ordinary: a lexical parameter below supplies the shared global to every bundled runtime module.
     const result = await build({
         input: runtimeFile,
+        resolve: { alias: { 'rolldown/experimental/runtime': rolldownRuntimePath } },
         output: {
             format: 'iife',
             // The combined physical runtime owns final minification, so minifying this embedded source would duplicate work.

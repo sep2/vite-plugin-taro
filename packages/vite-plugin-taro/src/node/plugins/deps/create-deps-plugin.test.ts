@@ -4,16 +4,15 @@ import path from 'node:path'
 import test, { mock } from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'rolldown'
-import { createLogger, resolveConfig, rolldownVersion, version as viteVersion } from 'vite'
+import { createLogger, resolveConfig, version as viteVersion } from 'vite'
 import { createMemoryTestProject } from '../../tests/create-memory-test-project.ts'
 import { packageRequire } from '../../utils/packages.ts'
 import { createDepsPlugin, warnDependencyVersions } from './create-deps-plugin.ts'
 
-const dependencyNames = ['vite', 'rolldown', 'vite-plugin-taro-runtime'] as const
+const dependencyNames = ['vite', 'vite-plugin-taro-runtime'] as const
 const pluginVersion = (packageRequire('vite-plugin-taro/package.json') as Readonly<{ version: string }>).version
 const installedVersions = {
     vite: viteVersion,
-    rolldown: rolldownVersion,
     'vite-plugin-taro-runtime': pluginVersion
 }
 
@@ -45,7 +44,6 @@ test('warns for an installed runtime that does not export its package.json', asy
                 name: 'vite-plugin-taro',
                 version: pluginVersion,
                 exports: { './package.json': './package.json' },
-                dependencies: { rolldown: rolldownVersion },
                 peerDependencies: { vite: viteVersion }
             })
         ),
@@ -98,8 +96,6 @@ test('warns when the installed runtime is newer than the plugin', () => {
 
 test('reports all mismatched dependency versions without blocking any warning', () => {
     const warn = mock.fn<(message: string) => void>()
-    assert.doesNotThrow(() =>
-        warnDependencyVersions({ vite: '0.0.0', rolldown: '0.0.0', 'vite-plugin-taro-runtime': '0.0.0' }, { warn })
-    )
-    assert.equal(warn.mock.callCount(), 3)
+    assert.doesNotThrow(() => warnDependencyVersions({ vite: '0.0.0', 'vite-plugin-taro-runtime': '0.0.0' }, { warn }))
+    assert.equal(warn.mock.callCount(), 2)
 })

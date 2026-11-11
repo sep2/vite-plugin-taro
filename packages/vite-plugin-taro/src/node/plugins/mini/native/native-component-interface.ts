@@ -1,10 +1,9 @@
 import path from 'node:path'
 import type { ExistingRawSourceMap } from 'rolldown'
-import { RolldownMagicString } from 'rolldown'
-import { parseAst } from 'rolldown/parseAst'
 import type { ESTree } from 'rolldown/utils'
-import { normalizePath } from 'vite'
+import { normalizePath, parseAst } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
+import { RolldownMagicString } from '../../../utils/vite-rolldown.ts'
 import { clientTaroNativeId } from '../../client/constant.ts'
 
 export type NativeComponentDefinition = {

@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = fileURLToPath(new URL('../', import.meta.url))
 const temporaryRoot = path.join(repoRoot, 'packages/vite-plugin-taro/tmp')
 const targets = ['wx', 'zfb', 'tb', 'tt', 'xhs', 'h5'] as const
-const dependencies = ['react', 'react-dom', 'vite', 'rolldown', 'vite-plugin-taro']
+const dependencies = ['react', 'react-dom', 'vite', 'vite-plugin-taro']
 const templateEnv = 'VITE_VPT_WECHAT_APP_ID=wx0000000000000000\nVITE_VPT_TIKTOK_APP_ID=testAppId\n'
 const localEnv = 'VITE_VPT_WECHAT_APP_ID=wx1234567890abcdef\nVITE_VPT_TIKTOK_APP_ID=localAppId\n'
 

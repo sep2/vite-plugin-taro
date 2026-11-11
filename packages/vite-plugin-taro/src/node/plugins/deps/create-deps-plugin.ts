@@ -1,13 +1,12 @@
 import { findPackageJSON } from 'node:module'
-import { type Logger, type Plugin, rolldownVersion, version as viteVersion } from 'vite'
+import { type Logger, type Plugin, version as viteVersion } from 'vite'
 import { packageRequire } from '../../utils/packages.ts'
 
-const dependencyNames = ['vite', 'rolldown', 'vite-plugin-taro-runtime'] as const
+const dependencyNames = ['vite', 'vite-plugin-taro-runtime'] as const
 
 type DependencyVersions = Readonly<Record<(typeof dependencyNames)[number], string>>
 type VptPackageJson = Readonly<{
     version: string
-    dependencies: Readonly<{ rolldown: string }>
     peerDependencies: Readonly<{ vite: string }>
 }>
 
@@ -18,7 +17,6 @@ const runtimePackageJson = packageRequire(findPackageJSON('vite-plugin-taro-runt
 }>
 const testedVersions: DependencyVersions = {
     vite: packageJson.peerDependencies.vite,
-    rolldown: packageJson.dependencies.rolldown,
     // VPT and its runtime share a fixed release group; workspace:* is not a version to compare against.
     'vite-plugin-taro-runtime': packageJson.version
 }
@@ -31,7 +29,6 @@ export function createDepsPlugin(): Plugin {
             warnDependencyVersions(
                 {
                     vite: viteVersion,
-                    rolldown: rolldownVersion,
                     'vite-plugin-taro-runtime': runtimePackageJson.version
                 },
                 logger

@@ -1,6 +1,6 @@
 import type { RolldownPluginOption } from 'rolldown'
-import { viteTransformPlugin } from 'rolldown/experimental'
 import type { DevEnvironment } from 'vite'
+import { viteTransformPlugin } from '../../../utils/vite-rolldown.ts'
 
 type TransformConfig = Pick<DevEnvironment['config'], 'root' | 'tsconfig' | 'consumer' | 'oxc'>
 

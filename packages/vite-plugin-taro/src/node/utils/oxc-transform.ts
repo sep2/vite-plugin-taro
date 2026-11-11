@@ -1,8 +1,8 @@
 import { type WalkerEnter, walk } from 'oxc-walker'
-import { RolldownMagicString } from 'rolldown'
-import { parseSync } from 'rolldown/utils'
+import { parseSync } from 'vite'
 import { normalizeModuleId } from './modules.ts'
 import type { AstTransformResult } from './transform.ts'
+import { RolldownMagicString } from './vite-rolldown.ts'
 
 type OxcTransformOptions = {
     code: string

@@ -45,7 +45,7 @@ try {
     }
     // Keep Tailwind's automatic source discovery inside the generated application.
     execFileSync('git', ['init', '--quiet', project], { cwd: repoRoot, stdio: 'pipe', timeout: 25_000 })
-    for (const name of ['react', 'react-dom', 'vite', 'rolldown', 'vite-plugin-taro']) {
+    for (const name of ['react', 'react-dom', 'vite', 'vite-plugin-taro']) {
         const source = path.dirname(packageRequire.resolve(`${name}/package.json`))
         const destination = path.join(project, 'node_modules', name)
         mkdirSync(path.dirname(destination), { recursive: true })

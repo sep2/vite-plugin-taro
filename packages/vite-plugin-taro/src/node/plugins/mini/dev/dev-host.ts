@@ -1,6 +1,6 @@
 import path from 'node:path'
 import colors from 'picocolors'
-import { type DevEngine, type DevOptions, dev } from 'rolldown/experimental'
+import type { DevEngine, DevOptions } from 'rolldown/experimental'
 import { asyncScheduler } from 'rxjs'
 import type { ViteDevServer } from 'vite'
 import {
@@ -9,6 +9,7 @@ import {
     runtimeControlEvent,
     runtimeReportEvent
 } from '../../../../runtime/mini/dev/hmr-protocol.ts'
+import { dev } from '../../../utils/vite-rolldown.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import type { MiniStylePlugin } from '../styles/plugins.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'

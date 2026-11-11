@@ -1,10 +1,11 @@
 import path from 'node:path'
-import { build, type OutputOptions, type RenderedChunk } from 'rolldown'
+import type { OutputOptions, RenderedChunk } from 'rolldown'
 import { type Plugin, transformWithOxc } from 'vite'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { createExactModuleIdFilter } from '../../../utils/modules.ts'
 import { resolveVptRuntime } from '../../../utils/packages.ts'
+import { build } from '../../../utils/vite-rolldown.ts'
 import { rolldownRuntimeId, vptGlobalBindingId } from '../module/module.ts'
 import type { MiniPlacementPlugin } from '../placer/placer.ts'
 

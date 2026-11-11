@@ -18,8 +18,9 @@ import type {
     VariableDeclaration
 } from '@oxc-project/types'
 import { ScopeTracker, walk } from 'oxc-walker'
-import { type ExistingRawSourceMap, RolldownMagicString } from 'rolldown'
-import { parseSync } from 'rolldown/utils'
+import type { ExistingRawSourceMap } from 'rolldown'
+import { parseSync } from 'vite'
+import { RolldownMagicString } from '../../../../utils/vite-rolldown.ts'
 import { StringEditor } from './string-editor.ts'
 
 export type SystemJsOutputFormat = 'system-register' | 'commonjs-registration'
