@@ -15,6 +15,7 @@ const { createMiniStylePlugin, transformers, projections } = await importObserve
 /** Observe real projections and transformers at their module boundaries, without a production injection API. */
 async function importObservedPlugin() {
     const pluginUrl = new URL('./plugins.ts', import.meta.url).href
+    const serviceUrl = new URL('./create-mini-style-service.ts', import.meta.url).href
     const transformerUrl = new URL('./create-mini-transformer.ts', import.meta.url).href
     const projectorUrl = new URL('./project-mini-styles.ts', import.meta.url).href
     // These test-only journals expose ownership snapshots and transformer instances for assertions and one-shot failures.
@@ -37,7 +38,7 @@ async function importObservedPlugin() {
     const hooks = registerHooks({
         resolve(specifier, context, nextResolve) {
             if (
-                context.parentURL === pluginUrl &&
+                context.parentURL === serviceUrl &&
                 (specifier === './create-mini-transformer.ts' || specifier === './project-mini-styles.ts')
             ) {
                 return { url: observerUrl, shortCircuit: true }
@@ -87,7 +88,7 @@ async function createStyleFixture(
     logger.error = (message) => {
         errors.push(message)
     }
-    await Reflect.apply(configResolved, {}, [{ build: { minify: false }, plugins: [cssPost], logger }])
+    await Reflect.apply(configResolved, {}, [{ root, build: { minify: false }, plugins: [cssPost], logger }])
     const transformer = transformers.at(-1)!
     const css = testContext.mock.method(transformer, 'transformStylesheet')
     const javaScript = testContext.mock.method(transformer, 'transformJavaScript')

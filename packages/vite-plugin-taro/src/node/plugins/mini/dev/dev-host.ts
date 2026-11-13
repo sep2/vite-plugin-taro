@@ -11,7 +11,7 @@ import {
 } from '../../../../runtime/mini/dev/hmr-protocol.ts'
 import { dev } from '../../../utils/vite-rolldown.ts'
 import type { MiniContract } from '../mini-contract.ts'
-import type { MiniStylePlugin } from '../styles/plugins.ts'
+import type { MiniStyleService } from '../styles/create-mini-style-service.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
 import { hmrInfoFileName, renderDevelopmentAppStyle, renderHmrInfo, writeDevelopmentFile } from './hmr-files.ts'
 import type { MiniHmrAction, MiniHmrMode } from './hmr-mode.ts'
@@ -55,7 +55,7 @@ const hmrBatchMilliseconds = 16
  * It replaces Vite's browser-oriented `bundledDev.listen()` because a Mini Program cannot execute Vite's browser module graph;
  * its engine must write a native project and either replace complete output or deliver environment-valid patches.
  *
- * The shared style plugin carries the resolver's immutable App/Page cascade policy while Rolldown remains authoritative for
+ * The shared style service carries the resolver's immutable App/Page cascade policy while Rolldown remains authoritative for
  * every live import edge. Keeping those responsibilities in the same serialized host transaction prevents JavaScript factories,
  * physical native styles, and Rolldown's published frontier from describing different source generations.
  */
@@ -67,7 +67,7 @@ export async function createMiniDevHost({
 }: {
     server: ViteDevServer
     contract: Pick<MiniContract, 'options' | 'styles'>
-    styles: MiniStylePlugin
+    styles: Pick<MiniStyleService, 'finalizeUpdate'>
     hmrMode: MiniHmrMode
 }): Promise<MiniDevHost> {
     const bundledDev = getBundledDev(server)

@@ -8,7 +8,7 @@ import { memoize } from '../../../utils/memoize.ts'
 import { createExactModuleIdFilter } from '../../../utils/modules.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { miniPageCapsuleId, pageComponentId, rolldownRuntimeId } from '../module/module.ts'
-import type { MiniStylePlugin } from '../styles/plugins.ts'
+import type { MiniStyleService } from '../styles/create-mini-style-service.ts'
 import { createMiniViteClientPlugin } from './create-mini-vite-client-plugin.ts'
 import { createMiniDevHost, type MiniDevHost } from './dev-host.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
@@ -29,7 +29,10 @@ export function isMiniClientEnvironment(environment: Readonly<{ name: string }>)
  * The shared style pipeline already owns the resolver's ordered App/Page cascade policy, so the host does not reconstruct it
  * from unrelated Rolldown shell and bootstrap entries.
  */
-export function createMiniDevelopmentPlugin(contract: MiniContract, styles: MiniStylePlugin): PluginOption[] {
+export function createMiniDevelopmentPlugin(
+    contract: MiniContract,
+    styles: Pick<MiniStyleService, 'finalizeUpdate'>
+): PluginOption[] {
     // Resolve once so plugins, journal effects, entry banners, and runtime bundling cannot disagree about the active mechanism.
     const hmrMode = createMiniHmrMode(contract.options.hmr, contract.runtime)
     const reset = hmrMode.reset?.()

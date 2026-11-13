@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { access, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
-import { type BuildOptions, build, normalizePath, type Plugin } from 'vite'
+import { type BuildOptions, build, normalizePath, type Plugin, resolveConfig } from 'vite'
 import { createMemoryBuildProject } from '../../../tests/create-memory-build-project.ts'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import type { MiniContract } from '../mini-contract.ts'
@@ -24,6 +24,7 @@ function createSourceFixture(files: Readonly<Record<string, string>>, entryName:
 
 test('handles physical and ignored query fragments before watcher cleanup', async () => {
     const styles = createMiniStylePlugin(contract, createMiniStyleEntries('/src/app.js', []))
+    await resolveConfig({ configFile: false, plugins: [styles], logLevel: 'silent' }, 'build')
     const transformHook = styles.transform
     assert.ok(transformHook)
     const transform = typeof transformHook === 'function' ? transformHook : transformHook.handler
@@ -49,6 +50,7 @@ test('invalidates Tailwind compiler dependencies through the HMR hook', async ()
     const source = ['@import "tailwindcss";', '@import "./theme.css";', '@source inline("bg-brand");'].join('\n')
     await writeFile(themeId, '@theme { --color-brand: #123456; }')
     const styles = createMiniStylePlugin(contract, createMiniStyleEntries(path.join(root, 'app.ts'), []))
+    await resolveConfig({ root, configFile: false, plugins: [styles], logLevel: 'silent' }, 'build')
     const transformHook = styles.transform
     const hotUpdateHook = styles.hotUpdate
     assert.ok(transformHook)

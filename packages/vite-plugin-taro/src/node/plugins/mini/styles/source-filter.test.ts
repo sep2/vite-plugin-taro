@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { build } from 'rolldown'
-import { isCSSRequest, normalizePath, type Plugin } from 'vite'
+import { createLogger, isCSSRequest, normalizePath, type Plugin, resolveConfig } from 'vite'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import { wrapPluginTransform } from '../../../utils/vite.ts'
 import { createMiniStylePlugin } from './plugins.ts'
@@ -38,6 +38,7 @@ test('native stylesheet dispatch matches Vite for extensions, virtual styles, an
     ]
     const sourceIds = new Set(ids)
     const styles = createMiniStylePlugin(contract, createMiniStyleEntries('/fixture/app.js', []))
+    await resolveConfig({ configFile: false, plugins: [styles], logLevel: 'silent' }, 'build')
     assert.ok(styles.transform && typeof styles.transform === 'object')
     assert.equal(styles.transform.order, 'pre')
     // Record real JS dispatches without emulating Rolldown's filter evaluation.
@@ -58,8 +59,8 @@ test('native stylesheet dispatch matches Vite for extensions, virtual styles, an
                 resolveId: (id) => (sourceIds.has(id) ? id : undefined),
                 load(id) {
                     assert.ok(sourceIds.has(id))
-                    // All IDs carry JS to test dispatch without preprocessors. Ignored requests deliberately contain a
-                    // Tailwind marker: entering compilation would fail because this plain Rolldown context has no Vite root.
+                    // All IDs carry JS to test dispatch without preprocessors. Ignored requests carry a Tailwind marker;
+                    // correct filtering leaves their code untouched and never starts the Tailwind compiler.
                     const marker = ignoredIds.has(id) ? '/* @import "tailwindcss"; */' : ''
                     return { code: `${marker}\nglobalThis.styleFixture = true`, moduleType: 'js' }
                 }
@@ -81,12 +82,17 @@ test('ordinary CSS clears retained Tailwind candidates while raw requests leave 
     const styles = createMiniStylePlugin(contract, createMiniStyleEntries(entryId, []))
     // Model Vite's successful post-CSS boundary without materializing source files or browser output.
     const cssPost: Plugin = { name: 'vite:css-post', transform: (code) => ({ code, map: null }) }
+    const config = styles.config
     const configResolved = styles.configResolved
     const buildStart = styles.buildStart
     const transform = styles.transform
     assert.ok(typeof configResolved === 'function' && typeof buildStart === 'function')
     assert.ok(transform && typeof transform === 'object')
-    await Reflect.apply(configResolved, {}, [{ build: { minify: false }, plugins: [cssPost] }])
+    assert.ok(config && typeof config === 'object')
+    await Reflect.apply(config.handler, {}, [{}])
+    await Reflect.apply(configResolved, {}, [
+        { root, build: { minify: false }, plugins: [cssPost], logger: createLogger('silent') }
+    ])
     const capture = cssPost.transform
     assert.ok(typeof capture === 'function')
     const graph = new Map([

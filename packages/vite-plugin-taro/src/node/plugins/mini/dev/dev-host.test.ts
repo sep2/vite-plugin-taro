@@ -9,7 +9,7 @@ import { createLogger, createServer } from 'vite'
 import { createMemoryTestProject } from '../../../tests/create-memory-test-project.ts'
 import { resolveVptRuntime } from '../../../utils/packages.ts'
 import type { MiniContract } from '../mini-contract.ts'
-import type { MiniStylePlugin } from '../styles/plugins.ts'
+import type { MiniStyleService } from '../styles/create-mini-style-service.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
 import { hmrEndpointPath } from './hmr-protocol.ts'
 import type { BundledDev } from './mini-dev-options.ts'
@@ -163,8 +163,7 @@ test('reduces synthetic engine update variants and unknown host failures without
     logger.info = (message) => {
         infos.push(message)
     }
-    const styles: MiniStylePlugin = {
-        name: 'test:synthetic-wx-styles',
+    const styles: Pick<MiniStyleService, 'finalizeUpdate'> = {
         async finalizeUpdate(artifacts, writeWxss) {
             if (styleFailure !== undefined) {
                 const failure = styleFailure
