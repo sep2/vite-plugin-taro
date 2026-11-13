@@ -1,6 +1,7 @@
 import react from '@vitejs/plugin-react'
 import type { PluginOption } from 'vite'
 import type { VptOptions } from '../options.ts'
+import { resolveOptions } from './options/resolve-options.ts'
 import { createAliMiniPlugins } from './plugins/ali/plugins.ts'
 import { createClientTaroPlugin } from './plugins/client/client-taro.ts'
 import { createConditionalDirectivePlugin } from './plugins/conditional/conditional-directives.ts'
@@ -11,7 +12,9 @@ import { createWxMiniPlugins } from './plugins/wx/plugins.ts'
 import { createXhsMiniPlugins } from './plugins/xhs/plugins.ts'
 
 /** Creates the Vite plugins for one Taro target. */
-export default function vpt(options: VptOptions): PluginOption[] {
+export default function vpt(input: VptOptions): PluginOption[] {
+    const options = resolveOptions(input)
+
     return [
         createDepsPlugin(),
         createConditionalDirectivePlugin(options.target),

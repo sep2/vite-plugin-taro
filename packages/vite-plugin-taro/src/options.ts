@@ -37,6 +37,13 @@ export type VptPageOption = {
     path: string
 
     /**
+     * Selects this page as the application entry. At most one page may set `entry: true`.
+     * The entry is placed first across all targets; other pages retain their declared order.
+     * When no page opts in, the first declared page remains the entry.
+     */
+    entry?: boolean
+
+    /**
      * Optional native Page configuration for the selected target.
      *
      * Use WeChat keys for WX, Alipay keys for ZFB, Taobao keys for TB, TikTok keys for TT, Xiaohongshu keys for XHS, and Taro/WeChat keys for H5. The plugin preserves these
@@ -87,7 +94,8 @@ export interface VptOptions {
     /**
      * Complete ordered list of application pages.
      *
-     * The declared order becomes the `pages` order in the generated `app.json`, the H5 route order, and the Page order
+     * The page marked `entry: true` is placed first, preserving the declared order of all other pages.
+     * This resolved order becomes the `pages` order in the generated `app.json`, the H5 route order, and the Page order
      * in the application style cascade. Each Page source is resolved according to its `path`.
      */
     pages: VptPageOption[]

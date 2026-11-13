@@ -233,6 +233,72 @@ function collectModuleIds(output: BuildOutput): string[] {
         .map(normalizePath)
 }
 
+test('rejects multiple entry pages through the public plugin entry', () => {
+    assert.throws(
+        () =>
+            vpt({
+                ...createOptions('wx'),
+                pages: [
+                    { path: 'pages/home/index', entry: true },
+                    { path: 'pages/profile/index', entry: true }
+                ]
+            }),
+        /Only one page may set entry: true.*pages\/home\/index, pages\/profile\/index/
+    )
+})
+
+for (const target of ['wx', 'zfb', 'tb', 'tt', 'xhs', 'h5'] as const) {
+    test(`places the explicit entry first through the public ${target} pipeline`, async () => {
+        const options: VptOptions = {
+            ...createOptions(target),
+            pages: [
+                { path: 'pages/profile/index', entry: false },
+                { path: 'pages/home/index', entry: true },
+                { path: 'pages/about/index' }
+            ]
+        }
+        const original = structuredClone(options)
+        const expected = ['pages/home/index', 'pages/profile/index', 'pages/about/index']
+        await inspectFixtureBuild(
+            {
+                options,
+                files: {
+                    'index.html': '<main id="app"></main>',
+                    'src/app.tsx': appSource,
+                    ...Object.fromEntries(
+                        options.pages.map((page) => [
+                            `src/${page.path}.tsx`,
+                            'export default function Page() { return null }'
+                        ])
+                    )
+                }
+            },
+            (output) => {
+                if (target === 'h5') {
+                    const javascript = output
+                        .filter((file): file is OutputChunk => file.type === 'chunk')
+                        .map((chunk) => chunk.code)
+                        .join('\n')
+                    const pages = /"pages":\s*(\[[^\]]*\])/.exec(javascript)
+                    assert.ok(pages?.[1], 'H5 application config includes the ordered page list')
+                    assert.deepEqual(JSON.parse(pages[1]), expected)
+                    const routes = [...javascript.matchAll(/path:\s*"(pages\/(?:home|profile|about)\/index)"/g)]
+                    assert.deepEqual(
+                        routes.map((match) => match[1]),
+                        expected
+                    )
+                } else {
+                    assert.deepEqual(parseJsonAsset(output, 'app.json').pages, expected)
+                    for (const page of options.pages) {
+                        assert.equal(Object.hasOwn(parseJsonAsset(output, `${page.path}.json`), 'entry'), false)
+                    }
+                }
+            }
+        )
+        assert.deepEqual(options, original)
+    })
+}
+
 for (const mode of ['development', 'production'] as const) {
     for (const renderer of ['template', 'dom'] as const) {
         test(`builds WX ${renderer} through the public ${mode} pipeline`, async () => {

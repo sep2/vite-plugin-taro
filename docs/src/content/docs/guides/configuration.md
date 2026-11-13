@@ -118,7 +118,20 @@ path: 'pages/profile/index'
 源码: src/pages/profile/index.tsx
 ```
 
-页面文件必须默认导出 React 组件。数组顺序决定小程序 `app.json.pages` 和 H5 路由顺序；第一项是小程序首页。
+页面文件必须默认导出 React 组件。页面顺序决定小程序 `app.json.pages`、H5 路由顺序和页面样式合并顺序；第一项是默认首页。
+
+### `pages[].entry`
+
+可选布尔值。设置 `entry: true` 将该页面作为首页，排在页面清单第一位，其余页面保持声明顺序：
+
+```ts
+pages: [
+    { path: 'pages/profile/index' },
+    { path: 'pages/home/index', entry: true }
+]
+```
+
+以上配置在所有平台生成的页面顺序为 `pages/home/index`、`pages/profile/index`。最多允许一个页面设置 `entry: true`，多个标记会报错。省略或设为 `false` 时不主动选择首页；全部页面均未标记时，使用数组第一项。
 
 ### `pages[].config`
 
