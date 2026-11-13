@@ -1,3 +1,6 @@
+/** Declares page metadata through the compile-time macro. */
+declare function defineVptPage(options: import('vite-plugin-taro').VptPageDeclaration): void
+
 declare module 'virtual:taro/api' {
     import Taro = require('vite-plugin-taro-runtime/taro')
     export = Taro

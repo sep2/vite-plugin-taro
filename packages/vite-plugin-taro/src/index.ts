@@ -6,6 +6,7 @@ export type {
     VptJsonValue,
     VptOptions,
     VptPageConfig,
+    VptPageDeclaration,
     VptPageOption,
     VptTarget
 } from './options.ts'
