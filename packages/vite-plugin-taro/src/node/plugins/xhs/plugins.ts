@@ -1,5 +1,5 @@
 import type { PluginOption } from 'vite'
-import type { VptOptions } from '../../../options.ts'
+import type { ResolvedOptions } from '../../options/resolved-options.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
@@ -7,7 +7,7 @@ import { isMiniWatchBuild } from '../mini/watch/is-mini-watch-build.ts'
 import { createXhsSkeleton } from './create-xhs-skeleton.ts'
 
 /** Creates Xiaohongshu's template compiler with object-form native Page initialization. */
-export function createXhsMiniPlugins(options: VptOptions): PluginOption[] {
+export function createXhsMiniPlugins(options: ResolvedOptions): PluginOption[] {
     return createMiniTargetPlugins(
         createXhsMiniContract({
             ...options,
@@ -18,7 +18,7 @@ export function createXhsMiniPlugins(options: VptOptions): PluginOption[] {
 }
 
 /** Binds XHS templates, CSS, native APIs, and development transports to the shared compiler. */
-export function createXhsMiniContract(options: VptOptions): MiniContract {
+export function createXhsMiniContract(options: ResolvedOptions): MiniContract {
     const projectConfigFilename = 'project.config.json'
     const projectPrivateConfigFilename = 'project.private.config.json'
 

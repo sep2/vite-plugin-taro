@@ -1,5 +1,6 @@
 import type { ResolvedConfig, Rolldown } from 'vite'
-import type { VptJsonObject, VptOptions } from '../../../options.ts'
+import type { VptJsonObject } from '../../../options.ts'
+import type { ResolvedOptions } from '../../options/resolved-options.ts'
 
 /** Taro compiler bindings selected by one Mini Program target. */
 export type TaroContract = {
@@ -59,7 +60,7 @@ export type OverrideContract = Readonly<{
 
 /** Complete input consumed by the shared Mini Program pipeline. */
 export type MiniContract = {
-    options: VptOptions
+    options: ResolvedOptions
     /** Places lazy chunks in native subpackages; false keeps code in main with deferred SystemJS execution. */
     automaticSubpackages: boolean
     /** Build-time expressions supplied by the target, overriding shared defaults. */

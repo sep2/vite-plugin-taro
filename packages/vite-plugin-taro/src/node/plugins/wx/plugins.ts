@@ -1,5 +1,5 @@
 import type { PluginOption } from 'vite'
-import type { VptOptions } from '../../../options.ts'
+import type { ResolvedOptions } from '../../options/resolved-options.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
@@ -7,12 +7,12 @@ import { isMiniWatchBuild } from '../mini/watch/is-mini-watch-build.ts'
 import { createWxSkeleton } from './create-wx-skeleton.ts'
 
 /** Adapts the shared Mini Program pipeline to the WX public target. */
-export function createWxMiniPlugins(vptOptions: VptOptions): PluginOption[] {
+export function createWxMiniPlugins(vptOptions: ResolvedOptions): PluginOption[] {
     return createMiniTargetPlugins(createWxMiniContract(vptOptions))
 }
 
 /** Binds the shared Mini Program core to WeChat runtime and output conventions. */
-export function createWxMiniContract(options: VptOptions): MiniContract {
+export function createWxMiniContract(options: ResolvedOptions): MiniContract {
     const projectConfigFilename = 'project.config.json'
     const projectPrivateConfigFilename = 'project.private.config.json'
 

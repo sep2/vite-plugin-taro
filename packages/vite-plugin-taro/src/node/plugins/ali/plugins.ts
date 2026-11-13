@@ -1,5 +1,5 @@
 import type { PluginOption } from 'vite'
-import type { VptOptions } from '../../../options.ts'
+import type { ResolvedOptions } from '../../options/resolved-options.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
@@ -9,7 +9,7 @@ import { createAliSkeleton } from './create-ali-skeleton.ts'
 import { createTbHmrPlugin } from './create-tb-hmr-plugin.ts'
 
 /** Shares the AXML compiler between Alipay and Taobao. */
-export function createAliMiniPlugins(vptOptions: VptOptions): PluginOption[] {
+export function createAliMiniPlugins(vptOptions: ResolvedOptions): PluginOption[] {
     const contract = createAliMiniContract(vptOptions)
 
     return [
@@ -20,7 +20,7 @@ export function createAliMiniPlugins(vptOptions: VptOptions): PluginOption[] {
 }
 
 /** Shares the Alipay Taro runtime and selects each target’s development transport and output settings. */
-export function createAliMiniContract(vptOptions: VptOptions): MiniContract {
+export function createAliMiniContract(vptOptions: ResolvedOptions): MiniContract {
     const projectConfigFilename = 'mini.project.json'
 
     const target = vptOptions.target

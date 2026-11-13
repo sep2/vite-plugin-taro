@@ -1,4 +1,5 @@
-import type { VptOptions, VptPageOption } from '../../../options.ts'
+import type { VptPageOption } from '../../../options.ts'
+import type { ResolvedOptions } from '../../options/resolved-options.ts'
 import { createPageComponentImportPath } from '../../utils/modules.ts'
 import { createAppConfig, getPageConfig } from '../../utils/project-config.ts'
 import { type AstTransformResult, replaceTemplate } from '../../utils/transform.ts'
@@ -13,7 +14,7 @@ export function transformH5App({
 }: {
     code: string
     id: string
-    options: VptOptions
+    options: ResolvedOptions
     projectRoot: string
     sourcemap?: boolean
 }): AstTransformResult {

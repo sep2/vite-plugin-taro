@@ -1,6 +1,6 @@
 import tailwindcss from '@tailwindcss/vite'
 import type { HtmlTagDescriptor, Plugin, PluginOption } from 'vite'
-import type { VptOptions } from '../../../options.ts'
+import type { ResolvedOptions } from '../../options/resolved-options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { createExactModuleIdFilter, toViteFileImportPath } from '../../utils/modules.ts'
 import { resolveTaroRuntime } from '../../utils/packages.ts'
@@ -10,7 +10,7 @@ import { createStencilClientAdapter } from './create-stencil-client-adapter.ts'
 import { createModuleResolver } from './resolver/module-resolver.ts'
 
 /** Creates the plugins that own the H5 target. */
-export function createH5TargetPlugins(options: VptOptions): PluginOption[] {
+export function createH5TargetPlugins(options: ResolvedOptions): PluginOption[] {
     return [
         // Vite owns final H5 CSS optimization; disabling Tailwind's extra pass avoids duplicate transformations.
         ...tailwindcss({ optimize: false }),
@@ -20,7 +20,7 @@ export function createH5TargetPlugins(options: VptOptions): PluginOption[] {
 }
 
 /** Configures H5 resolution and supplies the specialized physical application entry. */
-function createH5Plugin(options: VptOptions): Plugin {
+function createH5Plugin(options: ResolvedOptions): Plugin {
     const moduleResolver = createModuleResolver(options)
 
     return {

@@ -1,5 +1,5 @@
 import type { PluginOption } from 'vite'
-import type { VptOptions } from '../../../options.ts'
+import type { ResolvedOptions } from '../../options/resolved-options.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
@@ -7,7 +7,7 @@ import { isMiniWatchBuild } from '../mini/watch/is-mini-watch-build.ts'
 import { createTtSkeleton } from './create-tt-skeleton.ts'
 
 /** Adapts the shared Mini Program pipeline to TikTok. */
-export function createTtMiniPlugins(options: VptOptions): PluginOption[] {
+export function createTtMiniPlugins(options: ResolvedOptions): PluginOption[] {
     return createMiniTargetPlugins(
         createTtMiniContract({
             ...options,
@@ -18,7 +18,7 @@ export function createTtMiniPlugins(options: VptOptions): PluginOption[] {
 }
 
 /** Binds TT's runtime, native templates, styles, and socket transport to the shared compiler. */
-export function createTtMiniContract(options: VptOptions): MiniContract {
+export function createTtMiniContract(options: ResolvedOptions): MiniContract {
     const projectConfigFilename = 'project.config.json'
     const projectPrivateConfigFilename = 'project.private.config.json'
 

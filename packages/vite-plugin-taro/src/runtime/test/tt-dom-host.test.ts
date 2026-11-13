@@ -4,7 +4,8 @@ import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'rolldown'
 import { normalizePath, resolveConfig } from 'vite'
-import vpt from '../../index.ts'
+import vpt, { type VptOptions } from '../../index.ts'
+import { resolveOptions } from '../../node/options/resolve-options.ts'
 import { rendererHostId } from '../../node/plugins/mini/module/module.ts'
 import { createTtMiniContract } from '../../node/plugins/tt/plugins.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../node/utils/packages.ts'
@@ -24,15 +25,16 @@ for (const mode of ['development', 'production'] as const) {
                 clearImmediate(immediate)
             }
         })
-        const contract = createTtMiniContract({
+        const options: VptOptions = {
             target: 'tt',
             renderer: 'dom',
             app: 'src/app.tsx',
             pages: [],
             appJson: {},
             projectConfigJson: {}
-        })
-        const config = await resolveConfig({ configFile: false, plugins: vpt(contract.options) }, 'build')
+        }
+        const contract = createTtMiniContract(resolveOptions(options))
+        const config = await resolveConfig({ configFile: false, plugins: vpt(options) }, 'build')
         const entry = 'test:tt-dom-host-fixture'
         const hostModule = 'test:tt-dom-host'
         const modelModule = 'test:tt-native-document'
