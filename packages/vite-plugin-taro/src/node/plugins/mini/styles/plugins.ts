@@ -1,11 +1,10 @@
 import { type BuildOptions, isCSSRequest, type Plugin, type Rolldown } from 'vite'
 import { wrapPluginTransform } from '../../../utils/vite.ts'
 import type { MiniContract } from '../mini-contract.ts'
-import type { createResolver } from '../resolve/resolver.ts'
 import { createMiniStyleService, type MiniStyleService } from './create-mini-style-service.ts'
 
 /** Vite lifecycle adapter that publishes valid native CSS before patches, retaining last-good styles on CSS errors. */
-export type MiniStylePlugin = Plugin & Pick<MiniStyleService, 'finalizeUpdate'>
+export type MiniStylePlugin = Plugin & Pick<MiniStyleService, 'startBuild' | 'finalizeUpdate'>
 
 /** Vite CSS request modes that do not represent graph-owned application stylesheets. */
 const ignoredStyleQueries = ['direct', 'inline', 'inline-css', 'raw', 'style-attr', 'transform-only', 'url'] as const
@@ -15,15 +14,13 @@ const ignoredStyleQueries = ['direct', 'inline', 'inline-css', 'raw', 'style-att
  *
  * Configuration captures native output policy before reserving Vite's CSS output as an intermediate carrier.
  * configResolved constructs the service and wraps Vite's successful CSS boundary, preserving hook metadata and context.
- * Build and watch hooks supply graph contexts and invalidation events; generateBundle commits complete conversion results.
+ * The Mini buildStart hook supplies its completed entries and graph context; watch hooks supply invalidation events.
+ * generateBundle commits complete conversion results.
  * The development host uses finalizeUpdate to publish native styles before delivering patch factories.
  *
  * See createMiniStyleService for pipeline invariants, ownership, compilation phases, retained state, and the cost model.
  */
-export function createMiniStylePlugin(
-    contract: Pick<MiniContract, 'styles'>,
-    entries: ReturnType<typeof createResolver>['entries']
-): MiniStylePlugin {
+export function createMiniStylePlugin(contract: Pick<MiniContract, 'styles'>): MiniStylePlugin {
     // Late config captures the requested switch before disabling Vite's intermediate pass; configResolved supplies the
     // resolved JS-minification default. The same policy stays fixed throughout builds and HMR.
     let cssMinify: BuildOptions['cssMinify']
@@ -46,7 +43,7 @@ export function createMiniStylePlugin(
         },
         /** Resolves the output policy and installs the private Vite integration that observes fully processed module CSS. */
         configResolved(config) {
-            service = createMiniStyleService(contract, entries, {
+            service = createMiniStyleService(contract, {
                 root: config.root,
                 cssMinify: cssMinify ?? Boolean(config.build.minify),
                 cssCodeSplit,
@@ -65,10 +62,6 @@ export function createMiniStylePlugin(
                     return result
                 }
             })
-        },
-        /** Supplies exact graph roots and the graph reader used by host calls outside plugin hooks. */
-        async buildStart() {
-            await service.startBuild(this)
         },
         transform: {
             // Ordinary CSS must still clear retained state when Tailwind imports are removed.
@@ -143,6 +136,8 @@ export function createMiniStylePlugin(
         closeWatcher() {
             service.dispose()
         },
+        /** Supplies exact graph roots and the graph reader used by host calls outside plugin hooks. */
+        startBuild: (context, entries) => service.startBuild(context, entries),
         /** Publishes valid native CSS before JavaScript; CSS failures log errors and retain the last valid styles. */
         finalizeUpdate: (artifacts, writeStylesheet) => service.finalizeUpdate(artifacts, writeStylesheet)
     }

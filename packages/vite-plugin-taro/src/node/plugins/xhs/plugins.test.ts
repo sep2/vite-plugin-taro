@@ -32,7 +32,7 @@ test('binds XHS native APIs, template rendering, CSS, and both HMR transports', 
     assert.equal(contract.output.generateProjectSkeleton, createXhsSkeleton)
 })
 
-test('initializes XHS Pages with native data objects while preserving input options', () => {
+test('initializes XHS Pages with native data objects while preserving input options', async () => {
     const input: VptOptions = {
         ...options,
         pages: [undefined, false, true].map((prerender, index) => ({
@@ -46,6 +46,8 @@ test('initializes XHS Pages with native data objects while preserving input opti
         (value) => value && typeof value === 'object' && 'name' in value && value.name === 'vpt:mini'
     )
     assert.ok(plugin && typeof plugin === 'object' && 'transform' in plugin)
+    assert.ok('options' in plugin && typeof plugin.options === 'function')
+    await Reflect.apply(plugin.options, {}, [{}])
     const transform = plugin.transform
     assert.ok(transform && typeof transform === 'object' && 'handler' in transform)
     for (const page of input.pages) {

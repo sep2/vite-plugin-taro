@@ -10,7 +10,6 @@ for (const cssCodeSplit of [true, false]) {
         const originalEntries = structuredClone(entries)
         const service = createMiniStyleService(
             { styles: { appFileName: 'app.wxss', globalFileName: 'assets/global.wxss' } },
-            entries,
             { root: '/fixture', cssCodeSplit, cssMinify: false, logger: createLogger('silent') }
         )
         // This test-owned graph models changing import edges independently of the retained successful CSS captures.
@@ -27,7 +26,7 @@ for (const cssCodeSplit of [true, false]) {
                 return modules.get(id) ?? null
             }
         }
-        await service.startBuild(graph)
+        await service.startBuild(graph, entries)
         assert.deepEqual(entries, originalEntries)
 
         const appCss = '.app-style { color: red; }'

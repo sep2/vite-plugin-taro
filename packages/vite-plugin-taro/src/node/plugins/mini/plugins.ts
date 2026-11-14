@@ -16,23 +16,21 @@ import { createMiniPolyfillPlugin } from './polyfill/create-mini-polyfill-plugin
 import { renderCapsule } from './render/capsule.ts'
 import { renderNative } from './render/native.ts'
 import { createResolver } from './resolve/resolver.ts'
-import { createMiniStylePlugin } from './styles/plugins.ts'
+import { createMiniStylePlugin, type MiniStylePlugin } from './styles/plugins.ts'
 import { createMiniWatchPlugin } from './watch/create-mini-watch-plugin.ts'
 
 type MiniResolver = ReturnType<typeof createResolver>
 
 /** Creates the complete Mini Program plugin set. */
 export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] {
-    const resolver = createResolver(contract)
-
     const placement = createMiniPlacementPlugin(contract.automaticSubpackages)
 
-    const styles = createMiniStylePlugin(contract, resolver.entries)
+    const styles = createMiniStylePlugin(contract)
 
     return [
         placement,
         styles,
-        createMiniPlugin(contract, resolver, placement),
+        createMiniPlugin(contract, placement, styles),
         createMiniNativeComponentPlugin(),
         createMiniPolyfillPlugin(contract),
         createMiniGlobalPlugin(placement),
@@ -43,7 +41,14 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
 }
 
 /** Configures the complete Mini Program target build pipeline. */
-function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placement: MiniPlacementPlugin): Plugin {
+function createMiniPlugin(
+    contract: MiniContract,
+    placement: MiniPlacementPlugin,
+    styles: Pick<MiniStylePlugin, 'startBuild'>
+): Plugin {
+    // Each compiler initialization installs its resolver in options, before buildStart and module hooks consume its graph.
+    let resolver: MiniResolver
+
     return {
         name: 'vpt:mini',
 
@@ -88,15 +93,21 @@ function createMiniPlugin(contract: MiniContract, resolver: MiniResolver, placem
                     // images bloat the JS bundle toward the mini program package limit.
                     assetsInlineLimit: 0,
 
-                    target: esTarget,
-
-                    rolldownOptions: {
-                        // The dedicated Mini placement plugin owns output naming and entry-signature semantics. This plugin owns
-                        // only the closed named input set of native shells, lifecycle capsules, and bootstrap entries.
-                        input: resolver.input
-                    }
+                    target: esTarget
                 }
             }
+        },
+
+        async options(options) {
+            resolver = createResolver(contract)
+            // The dedicated Mini placement plugin owns output naming and entry-signature semantics. This plugin owns
+            // only the closed named input set of native shells, lifecycle capsules, and bootstrap entries.
+            return { ...options, input: resolver.input }
+        },
+
+        /** Supplies the completed entry graph to styles after every asynchronous options hook has finished. */
+        buildStart() {
+            return styles.startBuild(this, resolver.entries)
         },
 
         resolveId(id, importer) {

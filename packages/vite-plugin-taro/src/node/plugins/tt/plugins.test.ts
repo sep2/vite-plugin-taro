@@ -38,7 +38,7 @@ test('binds TT runtime and style paths without translating native configuration'
     )
 })
 
-test('uses ordinary Page initialization for every TT route while preserving caller options', () => {
+test('uses ordinary Page initialization for every TT route while preserving caller options', async () => {
     const input: VptOptions = {
         ...options,
         pages: [undefined, false, true].map((prerender, index) => ({
@@ -52,6 +52,8 @@ test('uses ordinary Page initialization for every TT route while preserving call
         (plugin) => plugin && typeof plugin === 'object' && 'name' in plugin && plugin.name === 'vpt:mini'
     )
     assert.ok(plugin && typeof plugin === 'object' && 'transform' in plugin)
+    assert.ok('options' in plugin && typeof plugin.options === 'function')
+    await Reflect.apply(plugin.options, {}, [{}])
     const transform = plugin.transform
     assert.ok(transform && typeof transform === 'object' && 'handler' in transform)
     assert.equal(typeof transform.handler, 'function')

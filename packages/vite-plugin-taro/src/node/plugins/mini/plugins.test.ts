@@ -18,6 +18,71 @@ import {
 } from './module/module.ts'
 import { createMiniTargetPlugins } from './plugins.ts'
 
+test('creates native entries after asynchronous options and supplies them to buildStart', async () => {
+    // This test-owned gate models page configuration becoming available in an earlier asynchronous options hook.
+    let pagesReady = false
+    const pages = [{ path: 'pages/home/index' }, { path: 'pages/detail/index' }]
+    const contract = createWxMiniContract({
+        target: 'wx',
+        app: 'src/app.tsx',
+        get pages() {
+            assert.equal(pagesReady, true, 'Page metadata is consumed at the options boundary')
+            return pages
+        },
+        appJson: {},
+        projectConfigJson: {}
+    })
+    const config = await resolveConfig({ configFile: false, plugins: createMiniTargetPlugins(contract) }, 'build')
+    const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
+    assert.ok(typeof compiler?.options === 'function' && typeof compiler.buildStart === 'function')
+    assert.equal(config.build.rolldownOptions.input, undefined)
+    // Capture the actual options seen by the following plugin, rather than inspecting an eagerly prepared config value.
+    const inputs: Record<string, string>[] = []
+    const bundle = await rolldown({
+        input: '/unused-entry.js',
+        treeshake: false,
+        plugins: [
+            {
+                name: 'test:async-page-options',
+                async options(options) {
+                    await Promise.resolve()
+                    pagesReady = true
+                    return options
+                }
+            },
+            { name: compiler.name, options: compiler.options, buildStart: compiler.buildStart },
+            {
+                name: 'test:resolved-entry-sources',
+                options(options) {
+                    const input = options.input
+                    assert.ok(input && typeof input === 'object' && !Array.isArray(input))
+                    assert.equal(options.treeshake, false)
+                    inputs.push({ ...input })
+                    return null
+                },
+                resolveId: normalizePath,
+                load: (id) => `export const source = ${JSON.stringify(id)}`
+            }
+        ]
+    })
+    try {
+        const output = await bundle.generate({ format: 'es' })
+        assert.equal(inputs.length, 1)
+        assert.deepEqual(
+            Object.keys(inputs[0]!).filter((name) => name.startsWith('pages/')),
+            pages.flatMap((page) => [`${page.path}.js`, `${page.path}-capsule`])
+        )
+        assert.deepEqual(
+            output.output
+                .flatMap((chunk) => (chunk.type === 'chunk' && chunk.isEntry ? [chunk.facadeModuleId] : []))
+                .sort(),
+            Object.values(inputs[0]!).map(normalizePath).sort()
+        )
+    } finally {
+        await bundle.close()
+    }
+})
+
 test('native rendering resolves loader from each output generation rather than an ambient global', async () => {
     const contract = createWxMiniContract({
         target: 'wx',
@@ -172,12 +237,13 @@ for (const [target, createContract] of [
                 'build'
             )
             assert.equal(config.build.cssCodeSplit, false)
-            const styles = config.plugins.find((plugin) => plugin.name === 'vpt:mini-styles')
-            assert.ok(typeof styles?.buildStart === 'function')
+            const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
+            assert.ok(typeof compiler?.options === 'function' && typeof compiler.buildStart === 'function')
+            await Reflect.apply(compiler.options, {}, [{}])
             // Record resolution requests to verify the global cascade keeps App-first route order without native shells.
             const entryIds: string[] = []
             await Reflect.apply(
-                styles.buildStart,
+                compiler.buildStart,
                 {
                     async resolve(id: string) {
                         entryIds.push(id)
@@ -212,6 +278,8 @@ for (const [target, createContract] of [
         const plugin = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
         assert.ok(plugin?.transform && typeof plugin.transform === 'object')
         assert.equal(plugin.transform.order, 'pre')
+        assert.ok(typeof plugin.options === 'function')
+        await Reflect.apply(plugin.options, {}, [{}])
         const appId = normalizePath(miniAppCapsuleId)
         const pageId = normalizePath(miniPageCapsuleId)
         const appSource = 'export const config = __VPT_APP_CONFIG__'

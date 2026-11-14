@@ -12,7 +12,6 @@ import {
     type InterpreterServerMessage,
     interpreterServerEvent
 } from '../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
-import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import { createNativeDevRuntime } from '../../../tests/create-native-dev-runtime.ts'
 import { createTestProject } from '../../../tests/create-test-project.ts'
 import { publishSourceGeneration } from '../../../tests/publish-source-generation.ts'
@@ -462,7 +461,7 @@ test('rejects a server without Vite bundled development ownership', async (conte
             createMiniDevHost({
                 server: server,
                 contract: contract,
-                styles: createMiniStylePlugin(contract, createMiniStyleEntries(import.meta.filename, [])),
+                styles: createMiniStylePlugin(contract),
                 hmrMode: createDevtoolsHmrMode(runtimeFile)
             }),
         /Vite did not create the Mini Program bundled-development environment/

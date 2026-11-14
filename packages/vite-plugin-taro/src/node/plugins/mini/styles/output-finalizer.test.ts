@@ -14,7 +14,7 @@ const { createMiniStylePlugin, transformers, projections } = await importObserve
 
 /** Observe real projections and transformers at their module boundaries, without a production injection API. */
 async function importObservedPlugin() {
-    const pluginUrl = new URL('./plugins.ts', import.meta.url).href
+    const pluginUrl = new URL('./test/create-mini-style-fixture-plugin.ts', import.meta.url).href
     const serviceUrl = new URL('./create-mini-style-service.ts', import.meta.url).href
     const transformerUrl = new URL('./create-mini-transformer.ts', import.meta.url).href
     const projectorUrl = new URL('./project-mini-styles.ts', import.meta.url).href
@@ -47,7 +47,7 @@ async function importObservedPlugin() {
         }
     })
     try {
-        const plugin: typeof import('./plugins.ts') = await import(pluginUrl)
+        const plugin: typeof import('./test/create-mini-style-fixture-plugin.ts') = await import(pluginUrl)
         const observer: {
             transformers: ReturnType<typeof createMiniTransformer>[]
             projections: {
@@ -56,7 +56,7 @@ async function importObservedPlugin() {
             }[]
         } = await import(observerUrl)
         return {
-            createMiniStylePlugin: plugin.createMiniStylePlugin,
+            createMiniStylePlugin: plugin.createMiniStyleFixturePlugin,
             transformers: observer.transformers,
             projections: observer.projections
         }

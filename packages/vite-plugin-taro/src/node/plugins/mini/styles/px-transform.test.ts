@@ -8,7 +8,7 @@ import { createMemoryBuildProject } from '../../../tests/create-memory-build-pro
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { minifyMiniStylesheet } from './minify-mini-stylesheet.ts'
-import { createMiniStylePlugin } from './plugins.ts'
+import { createMiniStyleFixturePlugin as createMiniStylePlugin } from './test/create-mini-style-fixture-plugin.ts'
 
 test('converts Mini CSS units with the fixed 750 design width', async () => {
     const source = '.sizes { width: 100px; padding: 1rem; border-bottom-width: 1px; }'

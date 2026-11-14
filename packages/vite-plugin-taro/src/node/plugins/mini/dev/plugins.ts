@@ -36,16 +36,6 @@ export function createMiniDevelopmentPlugin(
     // Resolve once so plugins, journal effects, entry banners, and runtime bundling cannot disagree about the active mechanism.
     const hmrMode = createMiniHmrMode(contract.options.hmr, contract.runtime)
     const reset = hmrMode.reset?.()
-    // These files are owned by DevTools or the host, not necessarily emitted in Rolldown's bundle.
-    const hostFiles = [
-        contract.output.projectConfigFilename,
-        contract.output.projectPrivateConfigFilename,
-        contract.styles.appFileName,
-        contract.styles.globalFileName,
-        ...contract.options.pages.map((page) => `${page.path}${path.extname(contract.styles.appFileName)}`),
-        ...(hmrMode.rebuildStrategy === 'on-failure' ? [hmrInfoFileName] : []),
-        ...(reset?.kind === 'write' ? [reset.fileName] : [])
-    ]
 
     /*
      * Vite creates this plugin descriptor before a server or DevEngine exists, then invokes configureServer and closeBundle on
@@ -123,6 +113,19 @@ export function createMiniDevelopmentPlugin(
                     if (!initialOutputPending) {
                         return
                     }
+                    // These files are owned by DevTools or the host, not necessarily emitted in Rolldown's bundle.
+                    const hostFiles = [
+                        contract.output.projectConfigFilename,
+                        contract.output.projectPrivateConfigFilename,
+                        contract.styles.appFileName,
+                        contract.styles.globalFileName,
+                        ...contract.options.pages.map(
+                            (page) => `${page.path}${path.extname(contract.styles.appFileName)}`
+                        ),
+                        ...(hmrMode.rebuildStrategy === 'on-failure' ? [hmrInfoFileName] : []),
+                        ...(reset?.kind === 'write' ? [reset.fileName] : [])
+                    ]
+
                     // Remove obsolete files only after the new output has been written, retaining project settings and
                     // host-published files. Until then (or if startup fails), the previous output remains available.
                     const { root, build } = this.environment.config

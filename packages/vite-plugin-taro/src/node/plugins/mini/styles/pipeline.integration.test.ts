@@ -11,7 +11,7 @@ import { createMiniViteClientPlugin } from '../dev/create-mini-vite-client-plugi
 import { writeDevelopmentFile } from '../dev/hmr-files.ts'
 import type { BundledDev } from '../dev/mini-dev-options.ts'
 import type { MiniContract } from '../mini-contract.ts'
-import { createMiniStylePlugin } from './plugins.ts'
+import { createMiniStyleFixturePlugin as createMiniStylePlugin } from './test/create-mini-style-fixture-plugin.ts'
 
 const contract = {
     styles: {

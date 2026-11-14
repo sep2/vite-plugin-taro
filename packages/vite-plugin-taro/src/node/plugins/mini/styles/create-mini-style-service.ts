@@ -47,6 +47,8 @@ type StylesheetInput = Readonly<{ fileName: string; css: string; app: boolean }>
 /** A successful native conversion keyed by its exact projected source. */
 type ConvertedStylesheet = Readonly<{ css: string; source: string }>
 
+type MiniEntries = ReturnType<typeof createResolver>['entries']
+
 type ModuleGraph = Parameters<typeof projectMiniStyles>[2]
 
 type BuildContext = ModuleGraph & {
@@ -68,8 +70,9 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
 /**
  * Creates the service that owns App/Page native-style compilation, graph projection, class rewriting, and publication.
  *
- * The Vite adapter constructs this service with complete entry metadata and output policy during `configResolved`.
- * It supplies successful CSS captures, watch notifications, and graph contexts, then commits complete-build results.
+ * The Vite adapter constructs this service with its output policy during `configResolved`. The Mini compiler creates entry
+ * metadata in its async options hook and supplies it with the graph context at buildStart. The style adapter supplies successful
+ * CSS captures and watch notifications, then commits complete-build results.
  *
  * ## Architectural invariant
  *
@@ -163,7 +166,7 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * ### 5b. Development commit
  *
  * The development host calls `finalizeUpdate()` after Rolldown produces patch factories or a complete-output notification.
- * Finalization uses the graph reader passed to `startBuild()` by the adapter's `buildStart` hook, observing the compiler's
+ * Finalization uses the graph reader passed to `startBuild()` by the Mini compiler's `buildStart` hook, observing the compiler's
  * current graph. The host's atomic writer publishes valid native CSS before `finalizeUpdate()` returns converted patch factories.
  * CSS conversion errors retain only the affected file's last valid styles; they do not block valid patches or healthy stylesheets.
  * Captured Vite CSS literals are emptied first; factories, exports, changed IDs, and sequences remain intact.
@@ -200,15 +203,11 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * compiler initialization. Successful native CSS conversions are reused while projected CSS is unchanged; failures retry;
  * no extra source reads or graph traversals are needed.
  */
-export function createMiniStyleService(
-    contract: Pick<MiniContract, 'styles'>,
-    entries: ReturnType<typeof createResolver>['entries'],
-    policy: StylePolicy
-) {
+export function createMiniStyleService(contract: Pick<MiniContract, 'styles'>, policy: StylePolicy) {
     // Construction fixes the output policy and transformer; all builds and HMR reuse this bounded conversion cache.
     const finalizeOutput = createFinalizeOutput(contract.styles, policy.cssMinify, policy.logger)
     // startBuild atomically replaces these entry records with resolved capsules while preserving native output metadata.
-    let resolvedEntries: typeof entries
+    let resolvedEntries: MiniEntries
     // startBuild installs this mutable context because the development host finalizes output outside a Rolldown plugin hook.
     let graphContext: ModuleGraph
     // This mutable map is the only retained style store: Vite and Tailwind update separate fields at one module identity.
@@ -218,7 +217,7 @@ export function createMiniStyleService(
 
     return {
         /** Resolves exact graph roots and captures the graph reader used by host calls outside plugin hooks. */
-        async startBuild(context: BuildContext): Promise<void> {
+        async startBuild(context: BuildContext, entries: MiniEntries): Promise<void> {
             // Resolve through Rolldown rather than reconstructing real paths, whose drive casing and separators vary on Windows.
             const resolveEntry = async (entry: typeof entries.appEntries) => ({
                 ...entry,

@@ -39,10 +39,14 @@ for (const polyfills of [
 ]) {
     test(`loads polyfills ${JSON.stringify(polyfills)} without changing renderer bindings`, async () => {
         const config = await resolvePolyfillConfig('wx', polyfills, 'build')
-        const input = config.build.rolldownOptions.input
+        const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
+        assert.ok(typeof compiler?.options === 'function')
+        const resolved: unknown = await Reflect.apply(compiler.options, {}, [config.build.rolldownOptions])
+        assert.ok(resolved && typeof resolved === 'object' && 'input' in resolved)
+        const input = resolved.input
         assert.ok(input && typeof input === 'object' && !Array.isArray(input))
-        assert.equal(input.polyfills, undefined)
-        assert.equal(input['vpt-global'], undefined)
+        assert.equal(Object.hasOwn(input, 'polyfills'), false)
+        assert.equal(Object.hasOwn(input, 'vpt-global'), false)
         const inject = config.build.rolldownOptions.transform?.inject
         assert.deepEqual(inject, { ...miniBrowserBindings, globalThis: [vptGlobalBindingId, 'vptGlobal'] })
         assert.equal(config.build.rolldownOptions.transform?.define?.__VPT_GLOBAL__, undefined)

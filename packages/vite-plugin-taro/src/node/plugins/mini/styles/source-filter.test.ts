@@ -5,7 +5,7 @@ import { build } from 'rolldown'
 import { createLogger, isCSSRequest, normalizePath, type Plugin, resolveConfig } from 'vite'
 import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries.ts'
 import { wrapPluginTransform } from '../../../utils/vite.ts'
-import { createMiniStylePlugin } from './plugins.ts'
+import { createMiniStyleFixturePlugin as createMiniStylePlugin } from './test/create-mini-style-fixture-plugin.ts'
 
 const contract = { styles: { appFileName: 'app.wxss', globalFileName: 'assets/global.wxss' } }
 

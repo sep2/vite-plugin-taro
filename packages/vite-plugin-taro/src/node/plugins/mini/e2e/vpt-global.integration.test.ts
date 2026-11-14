@@ -17,9 +17,13 @@ const config = await resolveConfig(
     'build'
 )
 const options = config.build.rolldownOptions
-const configuredInput = options.input
+const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
+assert.ok(typeof compiler?.options === 'function')
+const resolved: unknown = await Reflect.apply(compiler.options, {}, [options])
+assert.ok(resolved && typeof resolved === 'object' && 'input' in resolved)
+const configuredInput = resolved.input
 assert.ok(configuredInput && typeof configuredInput === 'object' && !Array.isArray(configuredInput))
-assert.equal(configuredInput['vpt-global'], undefined)
+assert.equal(Object.hasOwn(configuredInput, 'vpt-global'), false)
 const outputOptions = options.output
 assert.ok(outputOptions && !Array.isArray(outputOptions))
 const splitting = outputOptions.codeSplitting
