@@ -2,7 +2,19 @@
 
 import test from 'node:test'
 import type { defineVptPage } from 'virtual:vpt'
-import type { VptPageDeclaration, VptPageOptionNoPath, VptTarget } from '../../../index.ts'
+import type { VptOptions, VptPageDeclaration, VptPageOptionNoPath, VptTarget } from '../../../index.ts'
+
+test('typechecks optional and explicit page lists', () => {
+    const configure = (_options: VptOptions): void => {}
+    const options = { target: 'wx', app: 'src/app.tsx', appJson: {}, projectConfigJson: {} } satisfies VptOptions
+    configure(options)
+    configure({ ...options, pages: [] })
+    configure({ ...options, pages: [{ path: 'pages/home', entry: true }] })
+    // @ts-expect-error Explicit pages require source routes.
+    configure({ ...options, pages: [{}] })
+    // @ts-expect-error A page list is an array.
+    configure({ ...options, pages: 'pages/home' })
+})
 
 test('typechecks the virtual page module declaration contract', () => {
     // A local stub lets tsc check the factory signature while Node runs the test.

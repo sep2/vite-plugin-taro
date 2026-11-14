@@ -98,13 +98,13 @@ export interface VptOptions {
     app: string
 
     /**
-     * Complete ordered list of application pages.
+     * Optional complete ordered list of application pages. Omission produces an empty list.
      *
      * The page marked `entry: true` is placed first, preserving the declared order of all other pages.
      * This resolved order becomes the `pages` order in the generated `app.json`, the H5 route order, and the Page order
      * in the application style cascade. Each Page source is resolved according to its `path`.
      */
-    pages: VptPageOption[]
+    pages?: VptPageOption[]
 
     /**
      * Native application configuration for the selected target.

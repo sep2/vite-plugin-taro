@@ -316,7 +316,7 @@ for (const [target, createContract] of [
         const eligibleSources = [
             { id: appId, code: appSource, marker: 'app-config' },
             { id: `${appId}?v=1`, code: appSource, marker: 'app-config' },
-            ...contract.options.pages.map((page) => ({
+            ...contract.options.pages!.map((page) => ({
                 id: `${pageId}?route=${encodeURIComponent(page.path)}&v=1`,
                 code: pageSource,
                 marker: page.path

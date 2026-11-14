@@ -57,7 +57,7 @@ test('uses ordinary Page initialization for every TT route while preserving call
     const transform = plugin.transform
     assert.ok(transform && typeof transform === 'object' && 'handler' in transform)
     assert.equal(typeof transform.handler, 'function')
-    for (const page of input.pages) {
+    for (const page of input.pages!) {
         const result: unknown = Reflect.apply(
             transform.handler,
             { environment: { config: { build: { sourcemap: false } } } },
@@ -77,7 +77,7 @@ for (const isProduction of [false, true]) {
         const output = contract.output.generateProjectSkeleton(
             {
                 bundle: {},
-                pages: contract.options.pages,
+                pages: contract.options.pages!,
                 subpackages: [{ root: 'sub/p_example' }],
                 nativeComponents: [
                     { name: 'native-card', componentPath: '/sub/p_example/card/index', fields: ['@select'] }
@@ -132,7 +132,7 @@ for (const isProduction of [false, true]) {
         assert.match(asset('comp.ttml'), /<sjs module="xs" src=".\/utils.sjs" \/>/)
         assert.match(asset('comp.ttml'), /data="{{i:i,p:p}}"/)
         assert.match(asset('custom-wrapper.ttml'), /data="{{i:item,p:p}}"/)
-        for (const page of options.pages) {
+        for (const page of options.pages!) {
             assert.match(asset(`${page.path}.ttml`), /<comp i="{{app}}" p="{{page}}" \/>/)
             assert.match(asset(`${page.path}.ttml`), /\.\.\/\.\.\/base.ttml/)
             assert.ok(!assets.has(`${page.path}.ttss`), 'Page styles belong to the style pipeline')
@@ -155,7 +155,7 @@ for (const [description, projectPrivateConfigJson, expected] of [
         const output = contract.output.generateProjectSkeleton(
             {
                 bundle: {},
-                pages: contract.options.pages,
+                pages: contract.options.pages!,
                 subpackages: [],
                 nativeComponents: [],
                 isProduction: true

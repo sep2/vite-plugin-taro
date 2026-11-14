@@ -262,7 +262,7 @@ async function startDevFixture(
                     const allowedFiles = new Set([
                         'app.wxss',
                         'assets/global.wxss',
-                        ...options.pages.map((page) => `${page.path}.wxss`),
+                        ...options.pages!.map((page) => `${page.path}.wxss`),
                         'project.config.json',
                         'project.private.config.json',
                         hmrInfoFileName,

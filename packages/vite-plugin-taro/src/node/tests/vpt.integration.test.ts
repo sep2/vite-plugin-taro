@@ -273,7 +273,7 @@ for (const target of ['wx', 'zfb', 'tb', 'tt', 'xhs', 'h5'] as const) {
                     'index.html': '<main id="app"></main>',
                     'src/app.tsx': appSource,
                     ...Object.fromEntries(
-                        options.pages.map((page) => [
+                        options.pages!.map((page) => [
                             `src/${page.path}.tsx`,
                             'export default function Page() { return null }'
                         ])
@@ -296,7 +296,7 @@ for (const target of ['wx', 'zfb', 'tb', 'tt', 'xhs', 'h5'] as const) {
                     )
                 } else {
                     assert.deepEqual(parseJsonAsset(output, 'app.json').pages, expected)
-                    for (const page of options.pages) {
+                    for (const page of options.pages!) {
                         assert.equal(Object.hasOwn(parseJsonAsset(output, `${page.path}.json`), 'entry'), false)
                     }
                 }

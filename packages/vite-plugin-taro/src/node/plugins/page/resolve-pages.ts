@@ -7,8 +7,8 @@ export async function resolvePages({
     pages
 }: PageBuildConfig &
     Readonly<{
-        pages: readonly VptPageOption[]
+        pages: readonly VptPageOption[] | undefined
         target: VptTarget
     }>): Promise<readonly VptPageOption[]> {
-    return orderPages(pages)
+    return orderPages(pages ?? [])
 }

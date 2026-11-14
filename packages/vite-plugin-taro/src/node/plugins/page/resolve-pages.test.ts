@@ -15,6 +15,10 @@ test('resolves configured pages asynchronously with their order and metadata int
     assert.equal(resolved[1], pages[1])
 })
 
+test('resolves omitted pages to an empty list', async () => {
+    assert.deepEqual(await resolvePages({ pages: undefined, target: 'h5', root: '/project' }), [])
+})
+
 test('resolves an explicit empty page list', async () => {
     const pages = Object.freeze([])
     assert.deepEqual(await resolvePages({ pages, target: 'h5', root: '/project' }), [])
