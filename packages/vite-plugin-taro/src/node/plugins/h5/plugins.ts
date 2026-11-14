@@ -27,7 +27,7 @@ function createH5Plugin(options: Readonly<VptOptions>): Plugin {
     return {
         name: 'vpt:h5',
         async configResolved(config) {
-            moduleResolver = await createModuleResolver(options, config.root)
+            moduleResolver = await createModuleResolver(options, config)
         },
 
         config() {

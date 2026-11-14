@@ -17,7 +17,7 @@ const options: VptOptions = {
 }
 
 test('resolves the configured App component', async () => {
-    const resolver = await createModuleResolver(options, path.resolve('/project'))
+    const resolver = await createModuleResolver(options, { root: path.resolve('/project') })
     const projectRoot = path.resolve('/project')
 
     assert.equal(
@@ -28,7 +28,7 @@ test('resolves the configured App component', async () => {
 })
 
 test('specializes only the physical H5 App', async () => {
-    const resolver = await createModuleResolver(options, path.resolve('/project'))
+    const resolver = await createModuleResolver(options, { root: path.resolve('/project') })
     const source = `const config = __VPT_H5_APP_CONFIG__
 config.routes = __VPT_H5_ROUTES__
 `

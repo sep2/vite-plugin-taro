@@ -2,13 +2,20 @@ import { normalizePath } from 'vite'
 import type { VptOptions } from '../../../../options.ts'
 import { normalizeModuleId, resolveAppComponentPath } from '../../../utils/modules.ts'
 import { appComponentId } from '../../client/constant.ts'
+import type { PageBuildConfig } from '../../page/page-build-config.ts'
 import { resolvePages } from '../../page/resolve-pages.ts'
 import { h5AppPath } from '../constant.ts'
 import { transformH5App } from '../transform-app.ts'
 
 /** Resolves pages and creates H5 application module resolution and specialization. */
-export async function createModuleResolver(options: Readonly<VptOptions>, root: string) {
-    const pages = await resolvePages({ pages: options.pages, target: options.target, root })
+export async function createModuleResolver(options: Readonly<VptOptions>, config: PageBuildConfig) {
+    const pages = await resolvePages({
+        pages: options.pages,
+        target: options.target,
+        root: config.root,
+        define: config.define,
+        resolve: config.resolve
+    })
 
     return {
         resolveId({ id, projectRoot }: { id: string; projectRoot: string }): string | undefined {

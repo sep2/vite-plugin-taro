@@ -68,7 +68,7 @@ const contract = {
 } satisfies Pick<MiniContract, 'options' | 'taro' | 'supportsPagePrerender'>
 
 test('resolves fixed and route-specific private IDs', async () => {
-    const resolver = await createResolver(contract, path.resolve('/project'))
+    const resolver = await createResolver(contract, { root: path.resolve('/project') })
     const projectRoot = path.resolve('/project')
 
     assert.deepEqual(resolver.entries, {
@@ -125,7 +125,7 @@ for (const [target, createContract] of [
     test(`${target}: resolves the selected target host for every renderer configuration`, async () => {
         for (const selection of [{}, { renderer: 'template' }, { renderer: 'dom' }] as const) {
             const targetContract = createContract({ ...contract.options, target, ...selection })
-            const resolver = await createResolver(targetContract, path.resolve('/project'))
+            const resolver = await createResolver(targetContract, { root: path.resolve('/project') })
 
             assert.equal(
                 resolver.resolveId(rendererHostId, undefined, path.resolve('/project')),
@@ -141,11 +141,11 @@ for (const [target, createContract] of [
 
 test('resolves custom renderer hosts independently of App/Page entries', async () => {
     const targetContract = createTtMiniContract({ ...contract.options, target: 'tt', renderer: 'dom' })
-    const resolver = await createResolver(targetContract, path.resolve('/project'))
+    const resolver = await createResolver(targetContract, { root: path.resolve('/project') })
 
     const customHostResolver = await createResolver(
         { ...targetContract, taro: { ...targetContract.taro, hostPath: '/runtime/custom-host.ts' } },
-        path.resolve('/project')
+        { root: path.resolve('/project') }
     )
     assert.equal(
         customHostResolver.resolveId(rendererHostId, undefined, path.resolve('/project')),
@@ -162,7 +162,7 @@ test('preserves configured Page order and reuses App/Page entries in the native 
     ]
     Object.freeze(pages)
     const input = Object.freeze({ ...contract, options: Object.freeze({ ...contract.options, pages }) })
-    const resolver = await createResolver(input, path.resolve('/project'))
+    const resolver = await createResolver(input, { root: path.resolve('/project') })
 
     assert.deepEqual(resolver.pages, pages)
     assert.equal(resolver.pages[0], pages[0])
@@ -189,7 +189,7 @@ test('preserves configured Page order and reuses App/Page entries in the native 
 
 test('retains App entries with no Page entries when no routes are configured', async () => {
     const input = { ...contract, options: { ...contract.options, pages: [] } }
-    const resolver = await createResolver(input, path.resolve('/project'))
+    const resolver = await createResolver(input, { root: path.resolve('/project') })
 
     assert.deepEqual(resolver.entries, {
         appEntries: {
@@ -218,7 +218,7 @@ for (const supportsPagePrerender of [false, true]) {
             options: Object.freeze({ ...contract.options, pages: [page] }),
             supportsPagePrerender
         })
-        const resolver = await createResolver(fixedContract, path.resolve('/project'))
+        const resolver = await createResolver(fixedContract, { root: path.resolve('/project') })
         const result = resolver.specialize(
             'const options = __VPT_PAGE_OPTIONS__',
             `${modules.pageCapsule}?route=${encodeURIComponent(page.path)}`,
@@ -232,7 +232,7 @@ for (const supportsPagePrerender of [false, true]) {
 }
 
 test('rejects Page-private imports without one configured route origin', async () => {
-    const resolver = await createResolver(contract, path.resolve('/project'))
+    const resolver = await createResolver(contract, { root: path.resolve('/project') })
     const projectRoot = path.resolve('/project')
 
     assert.throws(
@@ -250,7 +250,7 @@ test('rejects Page-private imports without one configured route origin', async (
 })
 
 test('specializes the App capsule with the configured App JSON', async () => {
-    const resolver = await createResolver(contract, path.resolve('/project'))
+    const resolver = await createResolver(contract, { root: path.resolve('/project') })
     const result = await resolver.specialize('export default __VPT_APP_CONFIG__', modules.appCapsule)
 
     assert.ok(result && 'meta' in result)

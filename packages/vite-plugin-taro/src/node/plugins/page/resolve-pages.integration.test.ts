@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { registerHooks } from 'node:module'
 import test from 'node:test'
-import { build, normalizePath } from 'vite'
+import { build, normalizePath, type ResolvedConfig } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { createMemoryBuildProject } from '../../tests/create-memory-build-project.ts'
 import type { resolvePages } from './resolve-pages.ts'
@@ -98,21 +98,39 @@ for (const [target, styleExtension] of [
         const original = structuredClone(input)
         const previousCalls = calls.length
         const plugins = vpt(input)
+        // Capture the resolved configuration to verify compiler inputs preserve Vite's original configuration references.
+        const configured = Promise.withResolvers<ResolvedConfig>()
         assert.equal(calls.length, previousCalls, 'Page resolution belongs to compiler initialization')
         const result = await build({
             root: project.root,
             configFile: false,
             logLevel: 'silent',
-            plugins: [project.plugin, plugins],
+            define: { __PROJECT_CONFIG__: JSON.stringify('resolver-config') },
+            resolve: { alias: { '@configured': `${project.root}/src` } },
+            plugins: [
+                project.plugin,
+                plugins,
+                {
+                    name: 'test:resolver-project-config',
+                    configResolved(config) {
+                        configured.resolve(config)
+                    }
+                }
+            ],
             build: { write: false, minify: false, cssMinify: false, cssCodeSplit: true }
         })
         assert.ok(!Array.isArray(result) && 'output' in result)
         assert.equal(calls.length, previousCalls + 1)
+        const config = await configured.promise
         assert.deepEqual(calls.at(-1), {
             target,
             root: normalizePath(project.root),
-            pages: original.pages
+            pages: original.pages,
+            define: config.define,
+            resolve: config.resolve
         })
+        assert.equal(calls.at(-1)?.define, config.define)
+        assert.equal(calls.at(-1)?.resolve, config.resolve)
         assert.deepEqual(input, original)
         const chunks = result.output.filter((file) => file.type === 'chunk')
         assert.ok(chunks.some((chunk) => chunk.code.includes('Resolved page')))

@@ -53,7 +53,7 @@ function createMiniPlugin(
     return {
         name: 'vpt:mini',
         async configResolved(config) {
-            resolver = await createResolver(contract, config.root)
+            resolver = await createResolver(contract, config)
         },
 
         config() {
