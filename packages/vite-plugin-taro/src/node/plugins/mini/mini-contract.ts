@@ -1,6 +1,6 @@
 /* c8 ignore start -- Type-only module; validated by tsc. */
 import type { ResolvedConfig, Rolldown } from 'vite'
-import type { VptJsonObject, VptOptions } from '../../../options.ts'
+import type { VptJsonObject, VptOptions, VptPageOption } from '../../../options.ts'
 
 /** Taro compiler bindings selected by one Mini Program target. */
 export type TaroContract = {
@@ -37,7 +37,7 @@ export type MiniGeneratedSubpackage = Readonly<{
 
 /** Complete final-graph input supplied to one target's project-skeleton generator. */
 export type MiniProjectSkeletonInput = Readonly<{
-    pages: readonly MiniPage[]
+    pages: readonly VptPageOption[]
     bundle: Rolldown.OutputBundle
     subpackages: readonly MiniGeneratedSubpackage[]
     nativeComponents: readonly MiniNativeComponentRegistration[]
@@ -78,9 +78,6 @@ export type MiniContract = Readonly<{
 
 /** Application JSON represented by the current Mini Program contract. */
 export type MiniJsonObject = VptJsonObject
-
-/** One Page represented by the current Mini Program contract. */
-export type MiniPage = MiniContract['options']['pages'][number]
 
 /** HMR configuration represented by the current Mini Program contract. */
 export type MiniHmrOptions = MiniContract['options']['hmr']

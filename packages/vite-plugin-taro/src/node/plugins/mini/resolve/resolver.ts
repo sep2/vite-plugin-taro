@@ -1,11 +1,12 @@
 import path from 'node:path'
 import { normalizePath, type Rolldown } from 'vite'
+import type { VptPageOption } from '../../../../options.ts'
 import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } from '../../../utils/modules.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
 import { appComponentId } from '../../client/constant.ts'
 import { pageMetadataKey } from '../../page/page-metadata-key.ts'
 import { resolvePages } from '../../page/resolve-pages.ts'
-import type { MiniContract, MiniPage } from '../mini-contract.ts'
+import type { MiniContract } from '../mini-contract.ts'
 import {
     appShellFileName,
     componentShellFileName,
@@ -127,7 +128,7 @@ export async function createResolver(
 }
 
 /** Declares native output inputs and exposes their App and ordered Page entries. */
-function createEntryGraph(pages: readonly MiniPage[]) {
+function createEntryGraph(pages: readonly VptPageOption[]) {
     const appEntries = {
         capsuleId: miniAppCapsuleId,
         capsuleName: 'app-capsule',
@@ -178,8 +179,8 @@ function requireConfiguredPage({
     pageByPath
 }: {
     moduleId: string | undefined
-    pageByPath: ReadonlyMap<string, MiniPage>
-}): MiniPage {
+    pageByPath: ReadonlyMap<string, VptPageOption>
+}): VptPageOption {
     const queryIndex = moduleId?.indexOf('?') ?? -1
     const pagePath = queryIndex === -1 ? undefined : new URLSearchParams(moduleId?.slice(queryIndex + 1)).get('route')
     const page = pagePath ? pageByPath.get(pagePath) : undefined

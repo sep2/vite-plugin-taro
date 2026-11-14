@@ -62,10 +62,8 @@ export type VptPageOption = {
 
 export type VptPageOptionNoPath = Omit<VptPageOption, 'path'>
 
-/** Page metadata or a target-specific factory accepted by defineVptPage. */
-export type VptPageDeclaration =
-    | VptPageOptionNoPath
-    | ((context: { target: VptTarget }) => VptPageOptionNoPath | Promise<VptPageOptionNoPath>)
+/** Target-specific configuration factory accepted by defineVptPage. */
+export type VptPageDeclaration = (context: { target: VptTarget }) => VptPageOptionNoPath | Promise<VptPageOptionNoPath>
 
 /** Configures vpt for one build target. */
 export interface VptOptions {

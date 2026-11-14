@@ -1,9 +1,9 @@
 import path from 'node:path'
 import type { Rolldown } from 'vite'
-import type { VptOptions } from '../../../../options.ts'
+import type { VptOptions, VptPageOption } from '../../../../options.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { createAppConfig, getPageConfig } from '../../../utils/project-config.ts'
-import type { MiniJsonObject, MiniNativeComponentRegistration, MiniPage } from '../mini-contract.ts'
+import type { MiniJsonObject, MiniNativeComponentRegistration } from '../mini-contract.ts'
 import { isGeneratedSubpackageFile } from '../placer/placement.ts'
 
 /*
@@ -47,7 +47,7 @@ export type SkeletonNativeComponentConfig = {
 /** Creates application configuration with generated package declarations appended by the target skeleton. */
 export function createSkeletonAppJson(
     options: Readonly<VptOptions>,
-    pages: readonly MiniPage[],
+    pages: readonly VptPageOption[],
     subpackages: readonly MiniJsonObject[]
 ): MiniJsonObject {
     return {
@@ -58,7 +58,7 @@ export function createSkeletonAppJson(
 
 /** Creates a Page config while preserving caller fields and registering every generated rendering boundary. */
 export function createSkeletonPageJson(
-    page: MiniPage,
+    page: VptPageOption,
     nativeComponents: SkeletonNativeComponentConfig
 ): MiniJsonObject {
     const config = getPageConfig(page)

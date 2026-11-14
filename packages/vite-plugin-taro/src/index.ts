@@ -8,5 +8,6 @@ export type {
     VptPageConfig,
     VptPageDeclaration,
     VptPageOption,
+    VptPageOptionNoPath,
     VptTarget
 } from './options.ts'

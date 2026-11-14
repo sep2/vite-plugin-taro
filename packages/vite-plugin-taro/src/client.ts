@@ -1,6 +1,8 @@
 /* c8 ignore start -- Ambient declarations; validated by tsc and consumer type tests. */
-/** Declares page metadata through the compile-time macro. */
-declare function defineVptPage(options: import('./options.js').VptPageDeclaration): void
+declare module 'virtual:vpt' {
+    /** Declares a page configuration factory evaluated for the build target. */
+    export function defineVptPage(factory: import('./options.js').VptPageDeclaration): void
+}
 
 declare module 'virtual:taro/api' {
     import Taro = require('vite-plugin-taro-runtime/taro')

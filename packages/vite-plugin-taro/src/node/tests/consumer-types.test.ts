@@ -94,10 +94,17 @@ async function createConsumerFiles(
             import Taro, { showToast } from 'virtual:taro/api'
             import type { MapProps } from 'virtual:taro/components'
             import { defineNativeComponent, type NativeComponentEvent } from 'virtual:taro/native'
+            import { defineVptPage } from 'virtual:vpt'
             import { box, toCamelCase, type Box } from 'virtual:taro/shared'
             import type { SpaRouterConfig } from 'vite-plugin-taro-runtime/router/types/router'
 
-            defineVptPage({ entry: true, config: { title: 'Home' } })
+            // @ts-expect-error Page factories use explicit virtual-module imports.
+            globalThis.defineVptPage(() => ({}))
+            defineVptPage(() => ({ entry: true, config: { title: 'Home' } }))
+            // @ts-expect-error Page declarations require configuration factories.
+            defineVptPage({ entry: true })
+            // @ts-expect-error Empty objects are not configuration factories.
+            defineVptPage({})
             defineVptPage(({ target }) => {
                 const platform: 'wx' | 'zfb' | 'tb' | 'tt' | 'xhs' | 'h5' = target
                 // @ts-expect-error The inferred target is a string union.
@@ -106,11 +113,11 @@ async function createConsumerFiles(
             })
             defineVptPage(async ({ target }) => ({ config: { title: target } }))
             // @ts-expect-error Routes are derived from source filenames.
-            defineVptPage({ path: 'custom/path' })
+            defineVptPage(() => ({ path: 'custom/path' }))
             // @ts-expect-error Entry selection is boolean.
-            defineVptPage({ entry: 'yes' })
+            defineVptPage(() => ({ entry: 'yes' }))
             // @ts-expect-error Native configuration contains JSON values.
-            defineVptPage({ config: { title: () => 'Home' } })
+            defineVptPage(() => ({ config: { title: () => 'Home' } }))
             // @ts-expect-error Async factories must return page options.
             defineVptPage(async () => 42)
 

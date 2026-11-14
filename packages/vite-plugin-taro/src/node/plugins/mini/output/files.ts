@@ -1,5 +1,6 @@
 import type { Rolldown } from 'vite'
-import type { MiniContract, MiniPage } from '../mini-contract.ts'
+import type { VptPageOption } from '../../../../options.ts'
+import type { MiniContract } from '../mini-contract.ts'
 import { createNativeComponentOutput } from '../native/create-native-component-output.ts'
 import type { GeneratedSubpackage, PackageLocation } from '../placer/placement.ts'
 
@@ -15,7 +16,7 @@ export async function createOutputFiles({
 }: {
     bundle: Rolldown.OutputBundle
     contract: MiniContract
-    pages: readonly MiniPage[]
+    pages: readonly VptPageOption[]
     subpackages: readonly GeneratedSubpackage[]
     isProduction: boolean
     getModuleInfo: (moduleId: string) => { meta: Rolldown.CustomPluginOptions } | null

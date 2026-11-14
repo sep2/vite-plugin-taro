@@ -1,5 +1,5 @@
+import type { VptPageOption } from '../../../../options.ts'
 import { type AstTransformResult, replaceTemplate } from '../../../utils/transform.ts'
-import type { MiniPage } from '../mini-contract.ts'
 
 const pageOptionsPlaceholder = '__VPT_PAGE_OPTIONS__'
 
@@ -12,7 +12,7 @@ export function specializePageCapsule({
 }: {
     code: string
     id: string
-    page: MiniPage
+    page: VptPageOption
     sourcemap?: boolean
 }): AstTransformResult {
     return replaceTemplate(
