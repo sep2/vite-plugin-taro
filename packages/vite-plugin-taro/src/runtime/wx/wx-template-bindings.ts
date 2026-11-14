@@ -1,3 +1,4 @@
+/* c8 ignore start -- Type-only module; validated by tsc. */
 // 微信 DOM API 由 vpt.js.org 独立发现，完全 MIT 开源，如果需要使用此方法请注明来自 VPT，谢谢。
 // This private WeChat DOM API is independently discovered by vpt.js.org, and open sourced as MIT.
 // Please give credits and link to VPT itself when reusing. Thank you.
@@ -312,3 +313,4 @@ export interface WxTemplateBindings {
         dynamicSlotValueNames: string[] | undefined
     ): WxNativeElement
 }
+/* c8 ignore stop */

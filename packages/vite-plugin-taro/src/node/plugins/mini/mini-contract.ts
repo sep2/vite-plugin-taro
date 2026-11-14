@@ -1,3 +1,4 @@
+/* c8 ignore start -- Type-only module; validated by tsc. */
 import type { ResolvedConfig, Rolldown } from 'vite'
 import type { VptJsonObject } from '../../../options.ts'
 import type { ResolvedOptions } from '../../options/resolved-options.ts'
@@ -81,3 +82,4 @@ export type MiniPage = MiniContract['options']['pages'][number]
 
 /** HMR configuration represented by the current Mini Program contract. */
 export type MiniHmrOptions = MiniContract['options']['hmr']
+/* c8 ignore stop */

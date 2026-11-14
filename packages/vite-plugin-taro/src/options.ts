@@ -1,3 +1,4 @@
+/* c8 ignore start -- Type-only module; validated by tsc. */
 import type { Options as ReactOptions } from '@vitejs/plugin-react'
 
 /** One immutable JSON value accepted by generated target configuration files. */
@@ -171,3 +172,4 @@ export interface VptOptions {
      */
     hmr?: VptHmrOptions
 }
+/* c8 ignore stop */

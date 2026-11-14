@@ -1,3 +1,4 @@
+/* c8 ignore start -- Test harness for bundling and executing runtime fixtures. */
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { registerHooks } from 'node:module'
@@ -202,3 +203,4 @@ export function createExecutionContext(harness: unknown): ExecutionContext {
         wx: { onBeforePageLoad() {} }
     }
 }
+/* c8 ignore stop */
