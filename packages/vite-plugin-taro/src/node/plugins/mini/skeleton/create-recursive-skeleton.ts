@@ -21,7 +21,7 @@ import {
 
 /** Emits recursive named templates with independent App and Page roots and target-owned package declarations. */
 export function createRecursiveSkeleton(
-    { bundle, nativeComponents, isProduction }: MiniProjectSkeletonInput,
+    { bundle, pages, nativeComponents, isProduction }: MiniProjectSkeletonInput,
     contract: MiniContract,
     platform: Readonly<{
         template: RecursiveTemplate
@@ -38,7 +38,7 @@ export function createRecursiveSkeleton(
     const jsonAsset = (fileName: string, value: MiniJsonObject) => createJsonAsset(fileName, value, isProduction)
 
     return [
-        jsonAsset('app.json', createSkeletonAppJson(options, subpackages)),
+        jsonAsset('app.json', createSkeletonAppJson(options, pages, subpackages)),
         createTextAsset(
             baseFileName,
             buildRecursiveBaseTemplate(
@@ -59,7 +59,7 @@ export function createRecursiveSkeleton(
             buildRecursiveCustomWrapperTemplate(template.buildCustomComponentTemplate(extension))
         ),
         jsonAsset('custom-wrapper.json', recursiveComponentJson),
-        ...options.pages.flatMap((page) => [
+        ...pages.flatMap((page) => [
             jsonAsset(`${page.path}.json`, createSkeletonPageJson(page, nativeComponentConfig)),
             createTextAsset(
                 `${page.path}${extension}`,

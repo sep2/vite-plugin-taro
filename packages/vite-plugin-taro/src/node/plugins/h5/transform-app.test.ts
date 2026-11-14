@@ -39,6 +39,7 @@ test('specializes the physical H5 App configuration and routes', () => {
         code: source,
         id,
         options,
+        pages: options.pages,
         projectRoot
     })
 
@@ -63,12 +64,12 @@ test('preserves H5 configuration, route overrides, and escaped paths without sou
         id,
         options: {
             ...options,
-            appJson: { router: { mode: 'browser' }, note: '__VPT_H5_ROUTES__' },
-            pages: [
-                { path: pagePath, config },
-                { path: 'pages/overrides/index', config: { path: 'override', load: 'configured-load' } }
-            ]
+            appJson: { router: { mode: 'browser' }, note: '__VPT_H5_ROUTES__' }
         },
+        pages: [
+            { path: pagePath, config },
+            { path: 'pages/overrides/index', config: { path: 'override', load: 'configured-load' } }
+        ],
         projectRoot,
         sourcemap: false
     })
@@ -105,6 +106,7 @@ test('preserves tabbar configuration for the H5 router mount', () => {
         code: source,
         id,
         options: { ...options, appJson: { ...options.appJson, tabBar } },
+        pages: options.pages,
         projectRoot
     })
     const observed: unknown = Function(`${result.code}\nreturn config.tabBar`)()
@@ -118,6 +120,7 @@ test('rejects an H5 App missing its specialization placeholders', () => {
                 code: 'export default {}',
                 id,
                 options,
+                pages: options.pages,
                 projectRoot
             }),
         /Expected one placeholder __VPT_H5_APP_CONFIG__, found 0/

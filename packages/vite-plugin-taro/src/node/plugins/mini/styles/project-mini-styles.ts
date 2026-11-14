@@ -1,7 +1,7 @@
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import type { createResolver } from '../resolve/resolver.ts'
 
-type MiniEntries = ReturnType<typeof createResolver>['entries']
+type MiniEntries = Awaited<ReturnType<typeof createResolver>>['entries']
 
 /** Projection needs captured CSS and candidates, not the retained compiler or its invalidation state. */
 type StyleSource = Readonly<{

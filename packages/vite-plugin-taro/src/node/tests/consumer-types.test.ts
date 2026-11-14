@@ -8,6 +8,7 @@ import test from 'node:test'
 import { createVirtualFileSystem } from 'typescript/unstable/fs'
 import { API } from 'typescript/unstable/sync'
 import { normalizePath } from 'vite'
+import pluginPackage from '../../../package.json' with { type: 'json' }
 import { packageRequire, resolveTaroRuntime } from '../utils/packages.ts'
 import { projectTempDir } from './project-temp-dir.ts'
 
@@ -31,11 +32,28 @@ async function readDeclarations(sourceRoot: string, destinationRoot: string): Pr
     )
 }
 
-async function createConsumerFiles(root: string): Promise<Record<string, string>> {
+async function createConsumerFiles(
+    root: string,
+    distribution: 'workspace' | 'published'
+): Promise<Record<string, string>> {
     const modules = `${root}/node_modules`
     const reactManifest = packageRequire.resolve('@types/react/package.json')
     const reactRequire = createRequire(reactManifest)
+    const workspaceFiles =
+        distribution === 'workspace'
+            ? {
+                  [`${modules}/vite-plugin-taro/src/runtime/client/taro/native.ts`]: await readFile(
+                      path.join(pluginRoot, 'src/runtime/client/taro/native.ts'),
+                      'utf8'
+                  )
+              }
+            : {}
     const declarations = await Promise.all([
+        readDeclarations(path.join(pluginRoot, 'dist'), `${modules}/vite-plugin-taro/dist`),
+        readDeclarations(
+            path.resolve(path.dirname(packageRequire.resolve('@vitejs/plugin-react')), '..'),
+            `${modules}/@vitejs/plugin-react`
+        ),
         readDeclarations(path.join(runtimeRoot, 'dist'), `${modules}/vite-plugin-taro-runtime/dist`),
         readDeclarations(
             path.dirname(packageRequire.resolve('@tarojs/shared/package.json')),
@@ -45,14 +63,16 @@ async function createConsumerFiles(root: string): Promise<Record<string, string>
         readDeclarations(path.dirname(reactRequire.resolve('csstype/package.json')), `${modules}/csstype`)
     ])
     return {
+        ...workspaceFiles,
         ...Object.fromEntries(declarations.flatMap(Object.entries)),
         [`${modules}/vite-plugin-taro-runtime/package.json`]: await readFile(
             path.join(runtimeRoot, 'package.json'),
             'utf8'
         ),
-        [`${modules}/vite-plugin-taro/client.d.ts`]: await readFile(path.join(pluginRoot, 'client.d.ts'), 'utf8'),
         [`${modules}/vite-plugin-taro/package.json`]: JSON.stringify({
-            exports: { './client': { types: './client.d.ts' } }
+            name: pluginPackage.name,
+            type: pluginPackage.type,
+            exports: distribution === 'workspace' ? pluginPackage.exports : pluginPackage.publishConfig.exports
         }),
         [`${root}/tsconfig.json`]: JSON.stringify({
             compilerOptions: {
@@ -60,22 +80,56 @@ async function createConsumerFiles(root: string): Promise<Record<string, string>
                 noEmit: true,
                 // Matches generated applications; negative assertions catch declarations silently degrading to any.
                 skipLibCheck: true,
+                target: 'ES2023',
+                lib: ['ES2023', 'DOM'],
                 module: 'ESNext',
                 moduleResolution: 'Bundler',
+                moduleDetection: 'force',
                 types: ['vite-plugin-taro/client']
             },
             files: ['consumer.ts']
         }),
         [`${root}/consumer.ts`]: `
-            import Taro from 'virtual:taro/api'
+            import type { ComponentProps } from 'react'
+            import Taro, { showToast } from 'virtual:taro/api'
             import type { MapProps } from 'virtual:taro/components'
+            import { defineNativeComponent, type NativeComponentEvent } from 'virtual:taro/native'
             import { box, toCamelCase, type Box } from 'virtual:taro/shared'
             import type { SpaRouterConfig } from 'vite-plugin-taro-runtime/router/types/router'
+
+            defineVptPage({ entry: true, config: { title: 'Home' } })
+            defineVptPage(({ target }) => {
+                const platform: 'wx' | 'zfb' | 'tb' | 'tt' | 'xhs' | 'h5' = target
+                // @ts-expect-error The inferred target is a string union.
+                target.toFixed()
+                return { entry: platform === 'wx' }
+            })
+            defineVptPage(async ({ target }) => ({ config: { title: target } }))
+            // @ts-expect-error Routes are derived from source filenames.
+            defineVptPage({ path: 'custom/path' })
+            // @ts-expect-error Entry selection is boolean.
+            defineVptPage({ entry: 'yes' })
+            // @ts-expect-error Native configuration contains JSON values.
+            defineVptPage({ config: { title: () => 'Home' } })
+            // @ts-expect-error Async factories must return page options.
+            defineVptPage(async () => 42)
 
             // @ts-expect-error Upstream build dependencies must not leak into this consumer.
             import type {} from '@tarojs/taro'
             // @ts-expect-error Runtime types must resolve through the published package, not its build dependencies.
             import type {} from '@tarojs/runtime'
+
+            showToast({ title: 'Hello' })
+            // @ts-expect-error Named API exports retain their parameter types.
+            showToast({ title: 42 })
+
+            const Counter = defineNativeComponent<{ count: number }>(async () => ({}))
+            const counterProps: ComponentProps<typeof Counter> = { count: 1 }
+            // @ts-expect-error Native JSX interfaces retain their prop types.
+            const invalidCounterProps: ComponentProps<typeof Counter> = { count: 'invalid' }
+            const event: NativeComponentEvent<{ count: number }> = { detail: counterProps }
+            // @ts-expect-error Native event details retain their declared shape.
+            const invalidEvent: NativeComponentEvent<{ count: number }> = { detail: { count: 'invalid' } }
 
             const marker: MapProps.marker = { id: 1, latitude: 1, longitude: 2, iconPath: '/marker.png' }
             Taro.createMapContext('map').addMarkers({ markers: [marker] })
@@ -105,47 +159,56 @@ async function createConsumerFiles(root: string): Promise<Record<string, string>
     }
 }
 
-test('preserves API, shared, and router types through published declarations', async () => {
-    const root = normalizePath(path.join(projectTempDir, `vpt-consumer-types-${randomUUID()}`))
-    const files = await createConsumerFiles(root)
-    const virtualFs = createVirtualFileSystem(files)
-    // TypeScript 7's API runs the bundled tsc binary with virtual FS callbacks, retaining the real checker without disk fixtures.
-    const api = new API({
-        cwd: root,
-        fs: {
-            ...virtualFs,
-            readFile(file) {
-                // Missing consumer files must not fall back to the workspace; only tsc's own standard libraries live outside it.
-                return files[file] ?? (file.startsWith(`${root}/`) ? null : undefined)
-            },
-            getAccessibleEntries(directory) {
-                return virtualFs.getAccessibleEntries?.(directory) ?? { files: [], directories: [] }
+for (const distribution of ['workspace', 'published'] as const) {
+    test(`${distribution}: preserves client types in an ES2023 application`, async () => {
+        const root = normalizePath(path.join(projectTempDir, `vpt-consumer-types-${randomUUID()}`))
+        const files = await createConsumerFiles(root, distribution)
+        const virtualFs = createVirtualFileSystem(files)
+        // TypeScript 7's API runs the bundled tsc binary with virtual FS callbacks, retaining the real checker without disk fixtures.
+        const api = new API({
+            cwd: root,
+            fs: {
+                ...virtualFs,
+                readFile(file) {
+                    // Missing consumer files must not fall back to the workspace; only tsc's own standard libraries live outside it.
+                    return files[file] ?? (file.startsWith(`${root}/`) ? null : undefined)
+                },
+                getAccessibleEntries(directory) {
+                    return virtualFs.getAccessibleEntries?.(directory) ?? { files: [], directories: [] }
+                }
             }
+        })
+        try {
+            using snapshot = api.updateSnapshot({ openProjects: [`${root}/tsconfig.json`] })
+            const project = snapshot.getProject(`${root}/tsconfig.json`)
+            assert.ok(project)
+            const program = project.program
+            assert.deepEqual(
+                [
+                    ...program.getConfigFileParsingDiagnostics(),
+                    ...program.getProgramDiagnostics(),
+                    ...program.getSyntacticDiagnostics(),
+                    ...program.getGlobalDiagnostics(),
+                    ...program.getSemanticDiagnostics()
+                ],
+                []
+            )
+            const sourceFiles = program.getSourceFileNames()
+            assert.ok(sourceFiles.includes(`${root}/consumer.ts`))
+            assert.ok(sourceFiles.includes(`${root}/node_modules/vite-plugin-taro/dist/client.d.ts`))
+            assert.ok(sourceFiles.includes(`${root}/node_modules/vite-plugin-taro/dist/options.d.ts`))
+            assert.equal(
+                sourceFiles.some((file) => /\/vite-plugin-taro\/(?:src|dist)\/node\//.test(file)),
+                false,
+                'Client types must remain independent of the Node build implementation'
+            )
+            assert.ok(sourceFiles.some((file) => file.startsWith(`${root}/node_modules/vite-plugin-taro-runtime/`)))
+            for (const file of sourceFiles) {
+                assert.ok(file.startsWith(`${root}/`) || program.getSourceFileMetadata(file)?.isDefaultLibrary, file)
+            }
+            assert.equal(existsSync(root), false, 'The consumer project must remain entirely virtual')
+        } finally {
+            api.close()
         }
     })
-    try {
-        using snapshot = api.updateSnapshot({ openProjects: [`${root}/tsconfig.json`] })
-        const project = snapshot.getProject(`${root}/tsconfig.json`)
-        assert.ok(project)
-        const program = project.program
-        assert.deepEqual(
-            [
-                ...program.getConfigFileParsingDiagnostics(),
-                ...program.getProgramDiagnostics(),
-                ...program.getSyntacticDiagnostics(),
-                ...program.getGlobalDiagnostics(),
-                ...program.getSemanticDiagnostics()
-            ],
-            []
-        )
-        const sourceFiles = program.getSourceFileNames()
-        assert.ok(sourceFiles.includes(`${root}/consumer.ts`))
-        assert.ok(sourceFiles.some((file) => file.startsWith(`${root}/node_modules/vite-plugin-taro-runtime/`)))
-        for (const file of sourceFiles) {
-            assert.ok(file.startsWith(`${root}/`) || program.getSourceFileMetadata(file)?.isDefaultLibrary, file)
-        }
-        assert.equal(existsSync(root), false, 'The consumer project must remain entirely virtual')
-    } finally {
-        api.close()
-    }
-})
+}

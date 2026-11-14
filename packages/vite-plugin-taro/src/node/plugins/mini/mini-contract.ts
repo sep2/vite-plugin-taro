@@ -1,7 +1,6 @@
 /* c8 ignore start -- Type-only module; validated by tsc. */
 import type { ResolvedConfig, Rolldown } from 'vite'
-import type { VptJsonObject } from '../../../options.ts'
-import type { ResolvedOptions } from '../../options/resolved-options.ts'
+import type { VptJsonObject, VptOptions } from '../../../options.ts'
 
 /** Taro compiler bindings selected by one Mini Program target. */
 export type TaroContract = {
@@ -38,6 +37,7 @@ export type MiniGeneratedSubpackage = Readonly<{
 
 /** Complete final-graph input supplied to one target's project-skeleton generator. */
 export type MiniProjectSkeletonInput = Readonly<{
+    pages: readonly MiniPage[]
     bundle: Rolldown.OutputBundle
     subpackages: readonly MiniGeneratedSubpackage[]
     nativeComponents: readonly MiniNativeComponentRegistration[]
@@ -59,9 +59,11 @@ export type OverrideContract = Readonly<{
     content: VptJsonObject
 }>
 
-/** Complete input consumed by the shared Mini Program pipeline. */
-export type MiniContract = {
-    options: ResolvedOptions
+/** Fixed platform contract constructed before the shared Mini Program plugins. */
+export type MiniContract = Readonly<{
+    options: Readonly<VptOptions>
+    /** Whether native Page initialization supports the caller's prerender request. */
+    supportsPagePrerender: boolean
     /** Places lazy chunks in native subpackages; false keeps code in main with deferred SystemJS execution. */
     automaticSubpackages: boolean
     /** Build-time expressions supplied by the target, overriding shared defaults. */
@@ -72,7 +74,7 @@ export type MiniContract = {
     output: OutputContract
     /** Applied in declaration order after project-skeleton emission. */
     override: readonly OverrideContract[]
-}
+}>
 
 /** Application JSON represented by the current Mini Program contract. */
 export type MiniJsonObject = VptJsonObject

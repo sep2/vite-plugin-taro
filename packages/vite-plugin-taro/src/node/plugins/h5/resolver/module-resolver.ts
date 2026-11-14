@@ -1,12 +1,15 @@
 import { normalizePath } from 'vite'
-import type { ResolvedOptions } from '../../../options/resolved-options.ts'
+import type { VptOptions } from '../../../../options.ts'
 import { normalizeModuleId, resolveAppComponentPath } from '../../../utils/modules.ts'
 import { appComponentId } from '../../client/constant.ts'
+import { resolvePages } from '../../page/resolve-pages.ts'
 import { h5AppPath } from '../constant.ts'
 import { transformH5App } from '../transform-app.ts'
 
-/** Creates H5 application module resolution and specialization. */
-export function createModuleResolver(options: ResolvedOptions) {
+/** Resolves pages and creates H5 application module resolution and specialization. */
+export async function createModuleResolver(options: Readonly<VptOptions>, root: string) {
+    const pages = await resolvePages({ pages: options.pages, target: options.target, root })
+
     return {
         resolveId({ id, projectRoot }: { id: string; projectRoot: string }): string | undefined {
             if (id === appComponentId) {
@@ -18,7 +21,7 @@ export function createModuleResolver(options: ResolvedOptions) {
             code,
             id,
             projectRoot,
-            sourcemap = true
+            sourcemap
         }: {
             code: string
             id: string
@@ -26,7 +29,7 @@ export function createModuleResolver(options: ResolvedOptions) {
             sourcemap?: boolean
         }) {
             if (normalizeModuleId(id) === normalizePath(h5AppPath)) {
-                return transformH5App({ code, id, options, projectRoot, sourcemap })
+                return transformH5App({ code, id, options, pages, projectRoot, sourcemap })
             }
         }
     }

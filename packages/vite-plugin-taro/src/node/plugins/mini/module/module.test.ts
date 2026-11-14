@@ -8,6 +8,7 @@ import { createMemoryTestProject } from '../../../tests/create-memory-test-proje
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import {
     classifyMiniModule,
+    isMiniPageShell,
     isMiniPolyfillModule,
     miniAppCapsuleId,
     miniAppShellId,
@@ -43,6 +44,14 @@ test('classifies native lifecycle shells and entry capsules by module identity',
     for (const moduleId of [miniAppCapsuleId, miniPageCapsuleId, miniComponentCapsuleId]) {
         assert.equal(classifyModule(chunk('/dependency', moduleId)), 'entry-capsule')
     }
+})
+
+test('identifies native Page input IDs and emitted facades independently of their route', () => {
+    assert.equal(isMiniPageShell(miniPageShellId), true)
+    assert.equal(isMiniPageShell(`${miniPageShellId}?route=pages%2Fhome`), true)
+    assert.equal(isMiniPageShell(`${miniPageShellId}.backup`), false)
+    assert.equal(isMiniPageShell(miniPageCapsuleId), false)
+    assert.equal(isMiniPageShell(null), false)
 })
 
 test('recognizes route-qualified lifecycle entries', () => {

@@ -16,8 +16,8 @@ const options: VptOptions = {
     sitemapJson: {}
 }
 
-test('resolves the configured App component', () => {
-    const resolver = createModuleResolver(options)
+test('resolves the configured App component', async () => {
+    const resolver = await createModuleResolver(options, path.resolve('/project'))
     const projectRoot = path.resolve('/project')
 
     assert.equal(
@@ -28,7 +28,7 @@ test('resolves the configured App component', () => {
 })
 
 test('specializes only the physical H5 App', async () => {
-    const resolver = createModuleResolver(options)
+    const resolver = await createModuleResolver(options, path.resolve('/project'))
     const source = `const config = __VPT_H5_APP_CONFIG__
 config.routes = __VPT_H5_ROUTES__
 `

@@ -19,7 +19,7 @@ const config = await resolveConfig(
 const options = config.build.rolldownOptions
 const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
 assert.ok(typeof compiler?.options === 'function')
-const resolved: unknown = await Reflect.apply(compiler.options, {}, [options])
+const resolved: unknown = await Reflect.apply(compiler.options, { environment: { config } }, [options])
 assert.ok(resolved && typeof resolved === 'object' && 'input' in resolved)
 const configuredInput = resolved.input
 assert.ok(configuredInput && typeof configuredInput === 'object' && !Array.isArray(configuredInput))

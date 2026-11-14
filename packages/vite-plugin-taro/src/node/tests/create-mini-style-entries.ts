@@ -4,7 +4,7 @@ import type { createResolver } from '../plugins/mini/resolve/resolver.ts'
 export function createMiniStyleEntries(
     appId: string,
     pageIds: readonly string[]
-): ReturnType<typeof createResolver>['entries'] {
+): Awaited<ReturnType<typeof createResolver>>['entries'] {
     return {
         appEntries: {
             capsuleId: appId,

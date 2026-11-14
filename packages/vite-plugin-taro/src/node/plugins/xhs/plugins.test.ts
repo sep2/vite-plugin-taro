@@ -47,7 +47,7 @@ test('initializes XHS Pages with native data objects while preserving input opti
     )
     assert.ok(plugin && typeof plugin === 'object' && 'transform' in plugin)
     assert.ok('options' in plugin && typeof plugin.options === 'function')
-    await Reflect.apply(plugin.options, {}, [{}])
+    await Reflect.apply(plugin.options, { environment: { config: { root: process.cwd() } } }, [{}])
     const transform = plugin.transform
     assert.ok(transform && typeof transform === 'object' && 'handler' in transform)
     for (const page of input.pages) {
@@ -71,6 +71,7 @@ for (const isProduction of [false, true]) {
         const output = createXhsSkeleton(
             {
                 bundle: {},
+                pages: contract.options.pages,
                 subpackages: [{ root: 'sub/p_example' }],
                 nativeComponents: [
                     { name: 'native-card', componentPath: '/sub/p_example/card/index', fields: ['@select'] }
@@ -143,7 +144,7 @@ for (const [description, projectPrivateConfigJson, expected] of [
     test(`preserves ${description} XHS private configuration`, () => {
         const contract = createXhsMiniContract({ ...options, projectPrivateConfigJson })
         const output = createXhsSkeleton(
-            { bundle: {}, subpackages: [], nativeComponents: [], isProduction: true },
+            { bundle: {}, pages: contract.options.pages, subpackages: [], nativeComponents: [], isProduction: true },
             contract
         )
         assert.deepEqual(

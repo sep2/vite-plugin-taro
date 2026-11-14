@@ -118,6 +118,10 @@ test('public packages preserve their published entrypoints and scaffold dependen
         assert.equal(manifest.dependencies['vite-plugin-taro-runtime'], runtimePackage.version)
         assert.ok(readPackedFile(root, pluginPackage, 'dist/index.js').length > 0)
         assert.match(readPackedFile(root, pluginPackage, 'dist/options.d.ts'), /'tb'/)
+        assert.equal(
+            readPackedFile(root, pluginPackage, 'dist/client.d.ts'),
+            readFileSync(path.join(repoRoot, 'packages/vite-plugin-taro/dist/client.d.ts'), 'utf8')
+        )
         for (const mode of ['devtools', 'interpreter']) {
             assert.match(
                 readPackedFile(root, pluginPackage, `dist/runtime/tb/dev/${mode}-runtime.js`),

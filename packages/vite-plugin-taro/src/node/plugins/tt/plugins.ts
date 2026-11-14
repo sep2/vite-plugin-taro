@@ -1,5 +1,5 @@
 import type { PluginOption } from 'vite'
-import type { ResolvedOptions } from '../../options/resolved-options.ts'
+import type { VptOptions } from '../../../options.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
@@ -7,23 +7,19 @@ import { isMiniWatchBuild } from '../mini/watch/is-mini-watch-build.ts'
 import { createTtSkeleton } from './create-tt-skeleton.ts'
 
 /** Adapts the shared Mini Program pipeline to TikTok. */
-export function createTtMiniPlugins(options: ResolvedOptions): PluginOption[] {
-    return createMiniTargetPlugins(
-        createTtMiniContract({
-            ...options,
-            // TT requires object-form initial Page data.
-            pages: options.pages.map((page) => ({ ...page, prerender: false }))
-        })
-    )
+export function createTtMiniPlugins(options: Readonly<VptOptions>): PluginOption[] {
+    return createMiniTargetPlugins(createTtMiniContract(options))
 }
 
 /** Binds TT's runtime, native templates, styles, and socket transport to the shared compiler. */
-export function createTtMiniContract(options: ResolvedOptions): MiniContract {
+export function createTtMiniContract(options: Readonly<VptOptions>): MiniContract {
     const projectConfigFilename = 'project.config.json'
     const projectPrivateConfigFilename = 'project.private.config.json'
 
     return {
         options,
+        // TT requires object-form initial Page data.
+        supportsPagePrerender: false,
         automaticSubpackages: true,
         define: {
             // We don't use taro's tt dom impl, vpt has it own dom host.

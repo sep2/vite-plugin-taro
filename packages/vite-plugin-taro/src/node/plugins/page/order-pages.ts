@@ -1,4 +1,4 @@
-import type { VptPageOption } from '../../options.ts'
+import type { VptPageOption } from '../../../options.ts'
 
 /** Places the unique application entry first while preserving all other pages' declared order. */
 export function orderPages(pages: readonly VptPageOption[]): VptPageOption[] {

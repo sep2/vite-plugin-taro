@@ -19,7 +19,7 @@ import { createResolver } from './resolve/resolver.ts'
 import { createMiniStylePlugin, type MiniStylePlugin } from './styles/plugins.ts'
 import { createMiniWatchPlugin } from './watch/create-mini-watch-plugin.ts'
 
-type MiniResolver = ReturnType<typeof createResolver>
+type MiniResolver = Awaited<ReturnType<typeof createResolver>>
 
 /** Creates the complete Mini Program plugin set. */
 export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] {
@@ -46,7 +46,8 @@ function createMiniPlugin(
     placement: MiniPlacementPlugin,
     styles: Pick<MiniStylePlugin, 'startBuild'>
 ): Plugin {
-    // Each compiler initialization installs its resolver in options, before buildStart and module hooks consume its graph.
+    // Each options invocation installs the resolver after page resolution. Later hooks consume its page snapshot,
+    // native inputs and stylesheet traversal roots from the same compiler generation.
     let resolver: MiniResolver
 
     return {
@@ -99,7 +100,7 @@ function createMiniPlugin(
         },
 
         async options(options) {
-            resolver = createResolver(contract)
+            resolver = await createResolver(contract, this.environment.config.root)
             // The dedicated Mini placement plugin owns output naming and entry-signature semantics. This plugin owns
             // only the closed named input set of native shells, lifecycle capsules, and bootstrap entries.
             return { ...options, input: resolver.input }
@@ -171,6 +172,7 @@ function createMiniPlugin(
                 const outputFiles = await createOutputFiles({
                     bundle,
                     contract,
+                    pages: resolver.pages,
                     subpackages,
                     isProduction: this.environment.config.isProduction,
                     getModuleInfo: (moduleId) => this.getModuleInfo(moduleId),

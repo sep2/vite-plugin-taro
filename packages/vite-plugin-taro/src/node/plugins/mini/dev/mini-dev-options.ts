@@ -5,7 +5,7 @@ import type { ViteDevServer } from 'vite'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { build, rolldownRuntimePath, viteReporterPlugin } from '../../../utils/vite-rolldown.ts'
-import type { MiniContract } from '../mini-contract.ts'
+import { isMiniPageShell } from '../module/module.ts'
 import type { MiniHmrMode } from './hmr-mode.ts'
 import { replaceViteTransformPlugin } from './replace-vite-transform-plugin.ts'
 
@@ -20,15 +20,7 @@ export type BundledDev = {
  * Applies physical Mini Program output and runtime conventions through Rolldown's public options hook.
  * Build completion deliberately remains outside this options adapter: DevEngine onOutput is the single lifecycle authority.
  */
-export function createMiniDevOptionsPlugin({
-    server,
-    contract,
-    hmrMode
-}: {
-    server: ViteDevServer
-    contract: Pick<MiniContract, 'options'>
-    hmrMode: MiniHmrMode
-}) {
+export function createMiniDevOptionsPlugin({ server, hmrMode }: { server: ViteDevServer; hmrMode: MiniHmrMode }) {
     return {
         name: 'vpt:mini-dev-options',
         /*
@@ -44,10 +36,15 @@ export function createMiniDevOptionsPlugin({
             }
             const configured = configuredOutput ?? {}
 
-            // Entry banners run after Rolldown has assigned chunk names, so the mode receives route membership rather than source
-            // IDs. DevTools uses O(1) membership to add Page patch dependencies, interpreter initializes only App, and rebuild emits
-            // no host-only edge. ReadonlySet prevents the entry set from changing while Rolldown invokes later banners.
-            const pageFiles: ReadonlySet<string> = new Set(contract.options.pages.map((page) => `${page.path}.js`))
+            // This adapter follows the Mini options hook, so its named inputs contain the resolved pages. Entry banners run
+            // after Rolldown assigns chunk names: the mode receives native filenames rather than source IDs. DevTools uses O(1)
+            // membership to add Page patch dependencies, interpreter initializes only App, and rebuild emits no host-only edge.
+            // ReadonlySet prevents the entry set from changing while Rolldown invokes later banners.
+            const pageFiles: ReadonlySet<string> = new Set(
+                Object.entries(rolldownOptions.input ?? {}).flatMap(([fileName, id]) =>
+                    isMiniPageShell(id) ? [fileName] : []
+                )
+            )
 
             /*
              * DevEngine receives this mutable output object separately before options hooks run, and nested Vite plugins may retain it.

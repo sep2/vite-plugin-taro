@@ -41,7 +41,9 @@ for (const polyfills of [
         const config = await resolvePolyfillConfig('wx', polyfills, 'build')
         const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
         assert.ok(typeof compiler?.options === 'function')
-        const resolved: unknown = await Reflect.apply(compiler.options, {}, [config.build.rolldownOptions])
+        const resolved: unknown = await Reflect.apply(compiler.options, { environment: { config } }, [
+            config.build.rolldownOptions
+        ])
         assert.ok(resolved && typeof resolved === 'object' && 'input' in resolved)
         const input = resolved.input
         assert.ok(input && typeof input === 'object' && !Array.isArray(input))

@@ -1,5 +1,4 @@
-import type { VptPageOption } from '../../../options.ts'
-import type { ResolvedOptions } from '../../options/resolved-options.ts'
+import type { VptOptions, VptPageOption } from '../../../options.ts'
 import { createPageComponentImportPath } from '../../utils/modules.ts'
 import { createAppConfig, getPageConfig } from '../../utils/project-config.ts'
 import { type AstTransformResult, replaceTemplate } from '../../utils/transform.ts'
@@ -9,12 +8,14 @@ export function transformH5App({
     code,
     id,
     options,
+    pages,
     projectRoot,
     sourcemap
 }: {
     code: string
     id: string
-    options: ResolvedOptions
+    options: Readonly<VptOptions>
+    pages: readonly VptPageOption[]
     projectRoot: string
     sourcemap?: boolean
 }): AstTransformResult {
@@ -22,8 +23,8 @@ export function transformH5App({
         code,
         id,
         {
-            __VPT_H5_APP_CONFIG__: JSON.stringify({ router: {}, ...createAppConfig(options) }),
-            __VPT_H5_ROUTES__: `[${options.pages.map((page) => createRoute(page, projectRoot)).join(',')}]`
+            __VPT_H5_APP_CONFIG__: JSON.stringify({ router: {}, ...createAppConfig(options, pages) }),
+            __VPT_H5_ROUTES__: `[${pages.map((page) => createRoute(page, projectRoot)).join(',')}]`
         },
         sourcemap ?? true
     )

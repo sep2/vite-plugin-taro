@@ -53,7 +53,7 @@ test('uses ordinary Page initialization for every TT route while preserving call
     )
     assert.ok(plugin && typeof plugin === 'object' && 'transform' in plugin)
     assert.ok('options' in plugin && typeof plugin.options === 'function')
-    await Reflect.apply(plugin.options, {}, [{}])
+    await Reflect.apply(plugin.options, { environment: { config: { root: process.cwd() } } }, [{}])
     const transform = plugin.transform
     assert.ok(transform && typeof transform === 'object' && 'handler' in transform)
     assert.equal(typeof transform.handler, 'function')
@@ -77,6 +77,7 @@ for (const isProduction of [false, true]) {
         const output = contract.output.generateProjectSkeleton(
             {
                 bundle: {},
+                pages: contract.options.pages,
                 subpackages: [{ root: 'sub/p_example' }],
                 nativeComponents: [
                     { name: 'native-card', componentPath: '/sub/p_example/card/index', fields: ['@select'] }
@@ -154,6 +155,7 @@ for (const [description, projectPrivateConfigJson, expected] of [
         const output = contract.output.generateProjectSkeleton(
             {
                 bundle: {},
+                pages: contract.options.pages,
                 subpackages: [],
                 nativeComponents: [],
                 isProduction: true

@@ -1,7 +1,7 @@
-/// <reference path="../../../client.d.ts" />
+/// <reference path="../../../client.ts" />
 
 import test from 'node:test'
-import type { VptPageDeclaration, VptTarget } from '../../index.ts'
+import type { VptPageDeclaration, VptTarget } from '../../../index.ts'
 
 test('typechecks the global page declaration contract', () => {
     // A local stub lets tsc check the macro signature while Node runs the test.

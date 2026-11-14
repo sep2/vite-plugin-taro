@@ -5,7 +5,7 @@ import { createMiniStylePlugin, type MiniStylePlugin } from '../plugins.ts'
 /** Supplies test-owned graph entries to the production style adapter at the compiler's buildStart boundary. */
 export function createMiniStyleFixturePlugin(
     contract: Pick<MiniContract, 'styles'>,
-    entries: ReturnType<typeof createResolver>['entries']
+    entries: Awaited<ReturnType<typeof createResolver>>['entries']
 ): MiniStylePlugin {
     const styles = createMiniStylePlugin(contract)
     return {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { VptPageOption } from '../../options.ts'
+import type { VptPageOption } from '../../../options.ts'
 import { orderPages } from './order-pages.ts'
 
 test('preserves empty pages and declared order when no entry is selected', () => {

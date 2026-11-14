@@ -23,7 +23,7 @@
             "default": "./src/index.ts"
         },
         "./client": {
-            "types": "./client.d.ts"
+            "types": "./dist/client.d.ts"
         },
         "./types/native": {
             "types": "./src/runtime/client/taro/native.ts"
@@ -32,7 +32,6 @@
     },
     "files": [
         "dist",
-        "client.d.ts",
         "LICENSE",
         "README.md",
         "README.en.md"
@@ -69,7 +68,7 @@
                 "default": "./dist/index.js"
             },
             "./client": {
-                "types": "./client.d.ts"
+                "types": "./dist/client.d.ts"
             },
             "./types/native": {
                 "types": "./dist/runtime/client/taro/native.d.ts"

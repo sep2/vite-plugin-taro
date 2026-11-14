@@ -63,7 +63,7 @@ import { createWxTemplate } from './create-wx-template.ts'
  * current complete App snapshot with its initial Page batch; retained and hidden Pages need no navigation synchronization.
  */
 export function createWxSkeleton(
-    { bundle, subpackages, nativeComponents, isProduction }: MiniProjectSkeletonInput,
+    { bundle, pages, subpackages, nativeComponents, isProduction }: MiniProjectSkeletonInput,
     contract: MiniContract
 ): Rolldown.EmittedAsset[] {
     const { options, output, taro } = contract
@@ -79,6 +79,7 @@ export function createWxSkeleton(
             'app.json',
             createSkeletonAppJson(
                 options,
+                pages,
                 subpackages.map((subpackage) => createWxSubpackageJson(subpackage.root))
             )
         ),
@@ -98,7 +99,7 @@ export function createWxSkeleton(
         createTextAsset('custom-wrapper.wxml', template.buildCustomComponentTemplate('.wxml')),
         jsonAsset('custom-wrapper.json', recursiveComponentJson),
 
-        ...options.pages.flatMap((page) => [
+        ...pages.flatMap((page) => [
             jsonAsset(`${page.path}.json`, createSkeletonPageJson(page, nativeComponentConfig)),
             createTextAsset(
                 `${page.path}.wxml`,

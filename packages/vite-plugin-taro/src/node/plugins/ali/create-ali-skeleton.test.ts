@@ -42,6 +42,7 @@ test('assembles shared AXML templates from the target contract', () => {
     const output = contract.output.generateProjectSkeleton(
         {
             bundle: {},
+            pages: contract.options.pages,
             subpackages: [{ root: 'sub/p_example' }],
             nativeComponents: [
                 {

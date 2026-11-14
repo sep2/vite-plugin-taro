@@ -1,5 +1,5 @@
 import type { PluginOption } from 'vite'
-import type { ResolvedOptions } from '../../options/resolved-options.ts'
+import type { VptOptions } from '../../../options.ts'
 import { resolveTaroRuntime, resolveVptRuntime } from '../../utils/packages.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 import { createMiniTargetPlugins } from '../mini/plugins.ts'
@@ -7,23 +7,19 @@ import { isMiniWatchBuild } from '../mini/watch/is-mini-watch-build.ts'
 import { createXhsSkeleton } from './create-xhs-skeleton.ts'
 
 /** Creates Xiaohongshu's template compiler with object-form native Page initialization. */
-export function createXhsMiniPlugins(options: ResolvedOptions): PluginOption[] {
-    return createMiniTargetPlugins(
-        createXhsMiniContract({
-            ...options,
-            // XHS Page data is a native JSON object; React mounts through the shared onLoad barrier.
-            pages: options.pages.map((page) => ({ ...page, prerender: false }))
-        })
-    )
+export function createXhsMiniPlugins(options: Readonly<VptOptions>): PluginOption[] {
+    return createMiniTargetPlugins(createXhsMiniContract(options))
 }
 
 /** Binds XHS templates, CSS, native APIs, and development transports to the shared compiler. */
-export function createXhsMiniContract(options: ResolvedOptions): MiniContract {
+export function createXhsMiniContract(options: Readonly<VptOptions>): MiniContract {
     const projectConfigFilename = 'project.config.json'
     const projectPrivateConfigFilename = 'project.private.config.json'
 
     return {
         options,
+        // XHS Page data is a native JSON object; React mounts through the shared onLoad barrier.
+        supportsPagePrerender: false,
         automaticSubpackages: false,
         define: {},
         taro: {

@@ -68,7 +68,7 @@ import { createAliTemplate } from './create-ali-template.ts'
  * model: no synthetic Page, native lifecycle, route, or template exists merely to make code eligible for asynchronous loading.
  */
 export function createAliSkeleton(
-    { bundle, subpackages, nativeComponents, isProduction }: MiniProjectSkeletonInput,
+    { bundle, pages, subpackages, nativeComponents, isProduction }: MiniProjectSkeletonInput,
     contract: MiniContract
 ): Rolldown.EmittedAsset[] {
     const { options, output, taro } = contract
@@ -87,14 +87,14 @@ export function createAliSkeleton(
     const jsonAsset = (fileName: string, value: MiniJsonObject) => createJsonAsset(fileName, value, isProduction)
 
     return [
-        jsonAsset('app.json', createSkeletonAppJson(options, generatedSubpackages)),
+        jsonAsset('app.json', createSkeletonAppJson(options, pages, generatedSubpackages)),
         createTextAsset('base.axml', baseTemplateSource),
         createTextAsset('utils.sjs', template.buildXScript()),
         createTextAsset('comp.axml', recursiveComponentTemplateSource),
         jsonAsset('comp.json', recursiveComponentJson),
         createTextAsset('custom-wrapper.axml', customWrapperTemplateSource),
         jsonAsset('custom-wrapper.json', recursiveComponentJson),
-        ...options.pages.flatMap((page) => {
+        ...pages.flatMap((page) => {
             const baseTemplatePath = toRootRelativePath(page.path, 'base.axml')
             const pageTemplateSource = template.buildPageTemplate(baseTemplatePath, {
                 content: getPageConfig(page),

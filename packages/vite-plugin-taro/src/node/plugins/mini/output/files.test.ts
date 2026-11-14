@@ -15,6 +15,7 @@ test('creates the stable app stylesheet wrapper', async () => {
     const outputFiles = await createOutputFiles({
         bundle: {},
         contract: contract,
+        pages: contract.options.pages,
         subpackages: [],
         isProduction: false,
         getModuleInfo: () => null,

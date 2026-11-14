@@ -53,7 +53,7 @@ test('preserves top-level application glass-easel settings without injecting Pag
         }
     })
     const output = configured.output.generateProjectSkeleton(
-        { bundle: {}, subpackages: [], nativeComponents: [], isProduction: true },
+        { bundle: {}, pages: configured.options.pages, subpackages: [], nativeComponents: [], isProduction: true },
         configured
     )
     const assets = new Map(output.map((asset) => [asset.fileName, String(asset.source)]))
@@ -70,6 +70,7 @@ test('creates native rendering and configuration assets', () => {
     const output = contract.output.generateProjectSkeleton(
         {
             bundle: {} as Rolldown.OutputBundle,
+            pages: contract.options.pages,
             subpackages: [{ root: 'sub/p_example' }],
             isProduction: false,
             nativeComponents: [

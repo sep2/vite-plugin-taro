@@ -47,7 +47,7 @@ type StylesheetInput = Readonly<{ fileName: string; css: string; app: boolean }>
 /** A successful native conversion keyed by its exact projected source. */
 type ConvertedStylesheet = Readonly<{ css: string; source: string }>
 
-type MiniEntries = ReturnType<typeof createResolver>['entries']
+type MiniEntries = Awaited<ReturnType<typeof createResolver>>['entries']
 
 type ModuleGraph = Parameters<typeof projectMiniStyles>[2]
 

@@ -35,6 +35,7 @@ test('creates native entries after asynchronous options and supplies them to bui
     const config = await resolveConfig({ configFile: false, plugins: createMiniTargetPlugins(contract) }, 'build')
     const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
     assert.ok(typeof compiler?.options === 'function' && typeof compiler.buildStart === 'function')
+    const optionsHook = compiler.options
     assert.equal(config.build.rolldownOptions.input, undefined)
     // Capture the actual options seen by the following plugin, rather than inspecting an eagerly prepared config value.
     const inputs: Record<string, string>[] = []
@@ -50,7 +51,13 @@ test('creates native entries after asynchronous options and supplies them to bui
                     return options
                 }
             },
-            { name: compiler.name, options: compiler.options, buildStart: compiler.buildStart },
+            {
+                name: compiler.name,
+                options(options) {
+                    return Reflect.apply(optionsHook, { environment: { config } }, [options])
+                },
+                buildStart: compiler.buildStart
+            },
             {
                 name: 'test:resolved-entry-sources',
                 options(options) {
@@ -239,7 +246,7 @@ for (const [target, createContract] of [
             assert.equal(config.build.cssCodeSplit, false)
             const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
             assert.ok(typeof compiler?.options === 'function' && typeof compiler.buildStart === 'function')
-            await Reflect.apply(compiler.options, {}, [{}])
+            await Reflect.apply(compiler.options, { environment: { config } }, [{}])
             // Record resolution requests to verify the global cascade keeps App-first route order without native shells.
             const entryIds: string[] = []
             await Reflect.apply(
@@ -279,7 +286,7 @@ for (const [target, createContract] of [
         assert.ok(plugin?.transform && typeof plugin.transform === 'object')
         assert.equal(plugin.transform.order, 'pre')
         assert.ok(typeof plugin.options === 'function')
-        await Reflect.apply(plugin.options, {}, [{}])
+        await Reflect.apply(plugin.options, { environment: { config } }, [{}])
         const appId = normalizePath(miniAppCapsuleId)
         const pageId = normalizePath(miniPageCapsuleId)
         const appSource = 'export const config = __VPT_APP_CONFIG__'

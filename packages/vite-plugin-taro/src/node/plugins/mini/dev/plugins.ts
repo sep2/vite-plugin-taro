@@ -6,8 +6,9 @@ import { cleanOutputFiles } from '../../../utils/clean-output-files.ts'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { createExactModuleIdFilter } from '../../../utils/modules.ts'
+import { pageMetadataKey } from '../../page/page-metadata-key.ts'
 import type { MiniContract } from '../mini-contract.ts'
-import { miniPageCapsuleId, pageComponentId, rolldownRuntimeId } from '../module/module.ts'
+import { miniAppCapsuleId, miniPageCapsuleId, pageComponentId, rolldownRuntimeId } from '../module/module.ts'
 import type { MiniStyleService } from '../styles/create-mini-style-service.ts'
 import { createMiniViteClientPlugin } from './create-mini-vite-client-plugin.ts'
 import { createMiniDevHost, type MiniDevHost } from './dev-host.ts'
@@ -109,19 +110,23 @@ export function createMiniDevelopmentPlugin(
 
             writeBundle: {
                 order: 'post',
-                handler(_, bundle) {
+                async handler(_, bundle) {
                     if (!initialOutputPending) {
                         return
                     }
+                    // App is a required entry whose transform publishes page metadata before successful output. Resolve its
+                    // exact graph identity through the compiler so filesystem casing and separators agree on every platform.
+                    const app = await this.resolve(miniAppCapsuleId)
+                    const pages = this.getModuleInfo(app!.id)!.meta[pageMetadataKey]!
+                    const styleExtension = path.extname(contract.styles.appFileName)
+
                     // These files are owned by DevTools or the host, not necessarily emitted in Rolldown's bundle.
                     const hostFiles = [
                         contract.output.projectConfigFilename,
                         contract.output.projectPrivateConfigFilename,
                         contract.styles.appFileName,
                         contract.styles.globalFileName,
-                        ...contract.options.pages.map(
-                            (page) => `${page.path}${path.extname(contract.styles.appFileName)}`
-                        ),
+                        ...pages.map((page) => `${page.path}${styleExtension}`),
                         ...(hmrMode.rebuildStrategy === 'on-failure' ? [hmrInfoFileName] : []),
                         ...(reset?.kind === 'write' ? [reset.fileName] : [])
                     ]

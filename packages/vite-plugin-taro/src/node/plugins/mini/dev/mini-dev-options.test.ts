@@ -18,7 +18,7 @@ import { type BuildOptions, createServer } from 'vite'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import { createAliMiniContract } from '../../ali/plugins.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
-import type { MiniContract } from '../mini-contract.ts'
+import { miniAppShellId, miniPageCapsuleId, miniPageShellId } from '../module/module.ts'
 import { renderNative } from '../render/native.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
 import { createMiniDevOptionsPlugin, requireSingleOutput } from './mini-dev-options.ts'
@@ -28,20 +28,6 @@ const packageRoot = path.dirname(packageRequire.resolve('vite-plugin-taro/packag
 
 const runtimeFile = resolveVptRuntime('wx/dev/devtools-runtime')
 
-const options = {
-    options: {
-        target: 'wx',
-        app: 'src/app.tsx',
-        pages: [
-            {
-                path: 'pages/home/index',
-                config: {}
-            }
-        ],
-        appJson: {},
-        projectConfigJson: {}
-    }
-} satisfies Pick<MiniContract, 'options'>
 const hmrMode = createDevtoolsHmrMode(runtimeFile)
 
 /** Names survive the minifier's existing compression and mangling passes within the Mini syntax target. */
@@ -95,7 +81,6 @@ for (const logLevel of [undefined, 'info', 'warn', 'error', 'silent'] as const) 
                     try {
                         const plugin = createMiniDevOptionsPlugin({
                             server,
-                            contract: ${JSON.stringify(options)},
                             hmrMode: createDevtoolsHmrMode(${JSON.stringify(runtimeFile)})
                         })
                         const adapted = await plugin.options({
@@ -230,8 +215,13 @@ test('adapts physical wx development output without changing configured filename
         name: 'builtin:vite-transform',
         _options: { transformOptions: viteTransformOptions }
     }
-    const plugin = createMiniDevOptionsPlugin({ server, contract: options, hmrMode })
+    const plugin = createMiniDevOptionsPlugin({ server, hmrMode })
     const adaptedOptions = await plugin.options({
+        input: {
+            'app.js': miniAppShellId,
+            'pages/home/index.js': `${miniPageShellId}?route=pages%2Fhome%2Findex`,
+            'pages/home/index-capsule': `${miniPageCapsuleId}?route=pages%2Fhome%2Findex`
+        },
         output: generatedOutput,
         plugins: [[{ name: 'fixture:existing-plugin' }], viteTransformPlugin],
         experimental: {
@@ -321,7 +311,7 @@ test('executes generated development code with a bundled runtime and no ambient 
         output,
         plugins: [
             sourcePlugin,
-            createMiniDevOptionsPlugin({ server, contract: options, hmrMode }),
+            createMiniDevOptionsPlugin({ server, hmrMode }),
             {
                 name: 'test:runtime-output',
                 options() {
@@ -378,7 +368,7 @@ test('executes generated development code with a bundled runtime and no ambient 
 
 test('minified development emits ES2018 syntax for colliding class names', async (context) => {
     const server = await createOptionsServer(context, {})
-    const plugin = createMiniDevOptionsPlugin({ server, contract: options, hmrMode })
+    const plugin = createMiniDevOptionsPlugin({ server, hmrMode })
     const output = requireSingleOutput(await plugin.options({ output: {} }))
     const entry = '\0test:class-names'
     const dependency = '\0test:other-class'
@@ -433,7 +423,7 @@ export const classNames = [new ReadableStream().constructor.name, new Other().co
 
 test('minified development keeps HOC component names compatible with React Refresh', async (context) => {
     const server = await createOptionsServer(context, {})
-    const plugin = createMiniDevOptionsPlugin({ server, contract: options, hmrMode })
+    const plugin = createMiniDevOptionsPlugin({ server, hmrMode })
     const output = requireSingleOutput(await plugin.options({ output: {} }))
     assertDevelopmentMinification(output)
     const refreshRuntimePath = path.join(
@@ -515,7 +505,6 @@ for (const [target, createContract] of [
             const server = await createOptionsServer(context, {})
             const plugin = createMiniDevOptionsPlugin({
                 server,
-                contract,
                 hmrMode: createMiniHmrMode({ mode }, contract.runtime)
             })
             const adapted = await plugin.options({})
@@ -548,7 +537,7 @@ test('leaves naming unspecified when Vite has no configured output', async (cont
         }
     })
     const server = await createOptionsServer(context, {})
-    const plugin = createMiniDevOptionsPlugin({ server, contract: options, hmrMode })
+    const plugin = createMiniDevOptionsPlugin({ server, hmrMode })
     const adapted = await plugin.options({
         plugins: [false],
         experimental: { devMode: true }
@@ -574,7 +563,7 @@ test('rejects missing and multiple generated outputs before creating a developme
 test('rejects output arrays from both Vite configuration and generated Rolldown options', async (context) => {
     const server = await createOptionsServer(context, { rolldownOptions: { output: [{}, {}] } })
 
-    const plugin = createMiniDevOptionsPlugin({ server, contract: options, hmrMode })
+    const plugin = createMiniDevOptionsPlugin({ server, hmrMode })
     await assert.rejects(
         () => plugin.options({ output: {} }),
         /Mini Program development supports one configured Rolldown output/

@@ -3,6 +3,8 @@ import { normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } from '../../../utils/modules.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
 import { appComponentId } from '../../client/constant.ts'
+import { pageMetadataKey } from '../../page/page-metadata-key.ts'
+import { resolvePages } from '../../page/resolve-pages.ts'
 import type { MiniContract, MiniPage } from '../mini-contract.ts'
 import {
     appShellFileName,
@@ -30,16 +32,20 @@ import { specializePageCapsule } from './specialize-page-capsule.ts'
 /** Resolves one exact plugin-private ID using its importer and configured project root. */
 type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => string
 
-/** Creates the resolver and source specializer for one Mini Program module graph. */
-export function createResolver(contract: Pick<MiniContract, 'options' | 'taro'>) {
+/** Resolves pages and creates the source specializer and entries for one Mini Program module graph. */
+export async function createResolver(
+    contract: Pick<MiniContract, 'options' | 'taro' | 'supportsPagePrerender'>,
+    root: string
+) {
+    const pages = await resolvePages({ pages: contract.options.pages, target: contract.options.target, root })
     const normalizedAppCapsulePath = normalizePath(miniAppCapsuleId)
     const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
 
     // Construct App/Page metadata and output inputs together so traversal roots and native paths share one definition.
-    const entryGraph = createEntryGraph(contract.options.pages)
+    const entryGraph = createEntryGraph(pages)
 
     // Provide constant-time route validation and access to each configured Page JSON object.
-    const pageByPath = new Map(contract.options.pages.map((page) => [page.path, page]))
+    const pageByPath = new Map(pages.map((page) => [page.path, page]))
 
     const privateIdResolvers = new Map<string, PrivateIdResolver>([
         // Preload needs only the initialized loader.
@@ -73,6 +79,9 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'taro'>)
     return {
         ...entryGraph,
 
+        // Native configuration uses the same ordered page metadata as module resolution and entry construction.
+        pages,
+
         resolveId(
             id: string,
             importer: string | undefined,
@@ -91,14 +100,25 @@ export function createResolver(contract: Pick<MiniContract, 'options' | 'taro'>)
             const normalizedId = normalizeModuleId(id)
 
             if (normalizedId === normalizedAppCapsulePath) {
-                return specializeAppCapsule({ code, id, appConfig: createAppConfig(contract.options), sourcemap })
+                return {
+                    ...specializeAppCapsule({
+                        code,
+                        id,
+                        appConfig: createAppConfig(contract.options, pages),
+                        sourcemap
+                    }),
+                    // The application module publishes the ordered pages for consumers of the current compiler graph.
+                    meta: { [pageMetadataKey]: pages }
+                }
             }
 
             if (normalizedId === normalizedPageCapsulePath) {
+                const page = requireConfiguredPage({ moduleId: id, pageByPath })
+
                 return specializePageCapsule({
                     code,
                     id,
-                    page: requireConfiguredPage({ moduleId: id, pageByPath }),
+                    page: { ...page, prerender: contract.supportsPagePrerender && page.prerender === true },
                     sourcemap
                 })
             }

@@ -1,6 +1,6 @@
 import path from 'node:path'
 import type { Rolldown } from 'vite'
-import type { ResolvedOptions } from '../../../options/resolved-options.ts'
+import type { VptOptions } from '../../../../options.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { createAppConfig, getPageConfig } from '../../../utils/project-config.ts'
 import type { MiniJsonObject, MiniNativeComponentRegistration, MiniPage } from '../mini-contract.ts'
@@ -46,11 +46,12 @@ export type SkeletonNativeComponentConfig = {
 
 /** Creates application configuration with generated package declarations appended by the target skeleton. */
 export function createSkeletonAppJson(
-    options: ResolvedOptions,
+    options: Readonly<VptOptions>,
+    pages: readonly MiniPage[],
     subpackages: readonly MiniJsonObject[]
 ): MiniJsonObject {
     return {
-        ...createAppConfig(options),
+        ...createAppConfig(options, pages),
         ...(subpackages.length > 0 ? { subPackages: subpackages } : {})
     }
 }

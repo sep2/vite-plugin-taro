@@ -101,6 +101,11 @@ export function isMiniFrameworkVendorModule(moduleId: string): boolean {
     return frameworkPackageRoots.some((root) => normalizedId.startsWith(root))
 }
 
+/** Identifies route-qualified native Page entries in compiler inputs and emitted chunk facades. */
+export function isMiniPageShell(moduleId: string | null): boolean {
+    return moduleId !== null && normalizeModuleId(moduleId) === miniPageShellId
+}
+
 /** Fixed Mini graph identities are indexed once; classification scans module IDs until the first match. */
 const moduleKindById: ReadonlyMap<string, MiniChunkKind> = new Map([
     [miniAppShellId, 'native'],

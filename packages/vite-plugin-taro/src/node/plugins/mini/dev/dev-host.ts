@@ -289,7 +289,7 @@ export async function createMiniDevHost({
         return dev(
             {
                 ...rolldownOptions,
-                plugins: [rolldownOptions.plugins, createMiniDevOptionsPlugin({ server, contract, hmrMode })]
+                plugins: [rolldownOptions.plugins, createMiniDevOptionsPlugin({ server, hmrMode })]
             },
             output,
             {

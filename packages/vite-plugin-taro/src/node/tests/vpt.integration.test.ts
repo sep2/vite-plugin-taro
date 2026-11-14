@@ -233,19 +233,26 @@ function collectModuleIds(output: BuildOutput): string[] {
         .map(normalizePath)
 }
 
-test('rejects multiple entry pages through the public plugin entry', () => {
-    assert.throws(
-        () =>
-            vpt({
-                ...createOptions('wx'),
-                pages: [
-                    { path: 'pages/home/index', entry: true },
-                    { path: 'pages/profile/index', entry: true }
-                ]
-            }),
-        /Only one page may set entry: true.*pages\/home\/index, pages\/profile\/index/
-    )
-})
+for (const target of ['wx', 'h5'] as const) {
+    test(`rejects multiple entry pages during ${target} resolver initialization`, async () => {
+        await assert.rejects(
+            inspectFixtureBuild(
+                {
+                    files: {},
+                    options: {
+                        ...createOptions(target),
+                        pages: [
+                            { path: 'pages/home/index', entry: true },
+                            { path: 'pages/profile/index', entry: true }
+                        ]
+                    }
+                },
+                () => assert.fail('Invalid page configuration must reject before output generation')
+            ),
+            /Only one page may set entry: true.*pages\/home\/index, pages\/profile\/index/
+        )
+    })
+}
 
 for (const target of ['wx', 'zfb', 'tb', 'tt', 'xhs', 'h5'] as const) {
     test(`places the explicit entry first through the public ${target} pipeline`, async () => {
