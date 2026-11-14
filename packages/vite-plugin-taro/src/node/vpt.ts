@@ -2,6 +2,7 @@ import react from '@vitejs/plugin-react'
 import type { PluginOption } from 'vite'
 import type { VptOptions } from '../options.ts'
 import { createAliMiniPlugins } from './plugins/ali/plugins.ts'
+import { createApiModulePlugin } from './plugins/api/create-api-module-plugin.ts'
 import { createClientTaroPlugin } from './plugins/client/client-taro.ts'
 import { createConditionalDirectivePlugin } from './plugins/conditional/conditional-directives.ts'
 import { createDepsPlugin } from './plugins/deps/create-deps-plugin.ts'
@@ -15,6 +16,7 @@ export default function vpt(options: Readonly<VptOptions>): PluginOption[] {
     return [
         createDepsPlugin(),
         createConditionalDirectivePlugin(options.target),
+        createApiModulePlugin(),
         createClientTaroPlugin(options.target),
         ...react(options.react),
         ...(options.target === 'wx' ? createWxMiniPlugins(options) : []),
