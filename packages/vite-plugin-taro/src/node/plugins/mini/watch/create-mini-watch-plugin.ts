@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Plugin } from 'vite'
 import { cleanOutputFiles } from '../../../utils/clean-output-files.ts'
-import { isMiniClientEnvironment } from '../dev/plugins.ts'
+import { isClientEnvironment } from '../../../utils/is-client-environment.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { isMiniWatchBuild } from './is-mini-watch-build.ts'
 
@@ -22,7 +22,7 @@ export function createMiniWatchPlugin(contract: {
         apply({ build }, { command }) {
             return isMiniWatchBuild({ build, command })
         },
-        applyToEnvironment: isMiniClientEnvironment,
+        applyToEnvironment: isClientEnvironment,
         config() {
             // Vite already keeps the output root, but recursively removes its children. WeChat DevTools can keep stale
             // child buffers after unlinkDir/addDir: unlike individual unlink/change events, those events do not clear

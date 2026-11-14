@@ -4,6 +4,7 @@ import path from 'node:path'
 import { normalizePath, type PluginOption, transformWithOxc } from 'vite'
 import { cleanOutputFiles } from '../../../utils/clean-output-files.ts'
 import { esTarget } from '../../../utils/constant.ts'
+import { isClientEnvironment } from '../../../utils/is-client-environment.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { createExactModuleIdFilter } from '../../../utils/modules.ts'
 import { pageMetadataKey } from '../../page/page-metadata-key.ts'
@@ -17,11 +18,6 @@ import { createMiniHmrMode } from './hmr-mode.ts'
 import { hmrEndpointPath } from './hmr-protocol.ts'
 import { injectDevPageComponent } from './inject-dev-page-component.ts'
 import { createMiniReactRefreshTransforms } from './react-refresh.ts'
-
-/** Selects the sole Vite environment that owns the physical Mini Program development project. */
-export function isMiniClientEnvironment(environment: Readonly<{ name: string }>): boolean {
-    return environment.name === 'client'
-}
 
 /**
  * Adds the serve-only bundled-development plugin set for a Mini Program target: the shared dev adapter, selected HMR mode, and React
@@ -54,7 +50,7 @@ export function createMiniDevelopmentPlugin(
             apply: 'serve',
             // The physical Mini Program DevEngine is a client build. Environment scoping gives its host exactly one
             // generate/close lifecycle instead of admitting hooks from Vite's unrelated SSR environment.
-            applyToEnvironment: isMiniClientEnvironment,
+            applyToEnvironment: isClientEnvironment,
 
             config() {
                 return {

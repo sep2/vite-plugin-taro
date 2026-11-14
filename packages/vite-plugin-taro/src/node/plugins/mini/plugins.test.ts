@@ -18,36 +18,57 @@ import {
 } from './module/module.ts'
 import { createMiniTargetPlugins } from './plugins.ts'
 
-test('creates native entries after asynchronous options and supplies them to buildStart', async () => {
-    // This test-owned gate models page configuration becoming available in an earlier asynchronous options hook.
+test('initializes native entries from resolved project configuration for options and buildStart', async () => {
+    // These test-owned counters track asynchronous configuration readiness and the single page snapshot read.
     let pagesReady = false
+    let pageReads = 0
     const pages = [{ path: 'pages/home/index' }, { path: 'pages/detail/index' }]
     const contract = createWxMiniContract({
         target: 'wx',
         app: 'src/app.tsx',
         get pages() {
-            assert.equal(pagesReady, true, 'Page metadata is consumed at the options boundary')
+            assert.equal(pagesReady, true, 'Page metadata is consumed after project configuration is resolved')
+            pageReads += 1
             return pages
         },
         appJson: {},
         projectConfigJson: {}
     })
-    const config = await resolveConfig({ configFile: false, plugins: createMiniTargetPlugins(contract) }, 'build')
+    const config = await resolveConfig(
+        {
+            configFile: false,
+            plugins: [
+                {
+                    name: 'test:async-page-configuration',
+                    async config() {
+                        await Promise.resolve()
+                        pagesReady = true
+                    }
+                },
+                createMiniTargetPlugins(contract)
+            ]
+        },
+        'build'
+    )
     const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
     assert.ok(typeof compiler?.options === 'function' && typeof compiler.buildStart === 'function')
     const optionsHook = compiler.options
+    assert.ok(compiler.configResolved)
+    const clientOptions = Reflect.apply(optionsHook, { environment: { name: 'client', config } }, [{}])
+    const ssrOptions = Reflect.apply(optionsHook, { environment: { name: 'ssr', config } }, [{}])
+    assert.equal(clientOptions.input, ssrOptions.input)
+    assert.equal(pageReads, 1)
     assert.equal(config.build.rolldownOptions.input, undefined)
-    // Capture the actual options seen by the following plugin, rather than inspecting an eagerly prepared config value.
+    // Capture the concrete inputs supplied at the native options boundary.
     const inputs: Record<string, string>[] = []
     const bundle = await rolldown({
         input: '/unused-entry.js',
         treeshake: false,
         plugins: [
             {
-                name: 'test:async-page-options',
+                name: 'test:async-options',
                 async options(options) {
                     await Promise.resolve()
-                    pagesReady = true
                     return options
                 }
             },
@@ -75,6 +96,7 @@ test('creates native entries after asynchronous options and supplies them to bui
     try {
         const output = await bundle.generate({ format: 'es' })
         assert.equal(inputs.length, 1)
+        assert.equal(pageReads, 1)
         assert.deepEqual(
             Object.keys(inputs[0]!).filter((name) => name.startsWith('pages/')),
             pages.flatMap((page) => [`${page.path}.js`, `${page.path}-capsule`])
@@ -246,7 +268,7 @@ for (const [target, createContract] of [
             assert.equal(config.build.cssCodeSplit, false)
             const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
             assert.ok(typeof compiler?.options === 'function' && typeof compiler.buildStart === 'function')
-            await Reflect.apply(compiler.options, { environment: { config } }, [{}])
+            assert.ok(compiler.configResolved)
             // Record resolution requests to verify the global cascade keeps App-first route order without native shells.
             const entryIds: string[] = []
             await Reflect.apply(
@@ -285,8 +307,7 @@ for (const [target, createContract] of [
         const plugin = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
         assert.ok(plugin?.transform && typeof plugin.transform === 'object')
         assert.equal(plugin.transform.order, 'pre')
-        assert.ok(typeof plugin.options === 'function')
-        await Reflect.apply(plugin.options, { environment: { config } }, [{}])
+        assert.ok(plugin.configResolved)
         const appId = normalizePath(miniAppCapsuleId)
         const pageId = normalizePath(miniPageCapsuleId)
         const appSource = 'export const config = __VPT_APP_CONFIG__'

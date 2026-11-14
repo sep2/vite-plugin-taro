@@ -90,6 +90,45 @@ test('configures H5 runtime resolution and optimization', async () => {
     assert.deepEqual(optimizerAdapter.transform, applicationAdapter.transform)
 })
 
+test('shares configured page metadata between client and SSR after project initialization', async () => {
+    // This fixture-owned counter verifies that both environments consume one initialized page graph.
+    let pageReads = 0
+    const pages = [{ path: 'pages/about' }, { path: 'pages/home', entry: true }]
+    Object.freeze(pages)
+    const config = await resolveConfig(
+        {
+            configFile: false,
+            plugins: createH5TargetPlugins({
+                ...options,
+                get pages() {
+                    pageReads += 1
+                    return pages
+                }
+            })
+        },
+        'serve'
+    )
+    const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:h5')
+    assert.ok(compiler?.configResolved)
+    assert.ok(compiler.transform && typeof compiler.transform === 'object')
+    const source = 'const config = __VPT_H5_APP_CONFIG__; config.routes = __VPT_H5_ROUTES__;'
+    for (const name of ['client', 'ssr']) {
+        const result: unknown = await Reflect.apply(compiler.transform.handler, { environment: { name, config } }, [
+            source,
+            normalizePath(h5AppPath)
+        ])
+        assert.ok(result && typeof result === 'object' && 'code' in result && typeof result.code === 'string')
+        assert.match(result.code, /pages\/home/)
+        assert.match(result.code, /pages\/about/)
+        assert.ok(result.code.indexOf('pages/home') < result.code.indexOf('pages/about'))
+    }
+    assert.equal(pageReads, 1)
+    assert.deepEqual(
+        pages.map((page) => page.path),
+        ['pages/about', 'pages/home']
+    )
+})
+
 test('native filtering specializes only exact and query-suffixed H5 App IDs', async () => {
     const appId = normalizePath(h5AppPath)
     const eligibleIds = new Set([appId, `${appId}?v=1`, `${appId}?import&v=2`])

@@ -1,5 +1,5 @@
 import type { Plugin } from 'vite'
-import { isMiniClientEnvironment } from '../dev/plugins.ts'
+import { isClientEnvironment } from '../../../utils/is-client-environment.ts'
 import type { MiniContract, MiniJsonObject } from '../mini-contract.ts'
 import { recursiveMerge } from '../skeleton/recursive-merge.ts'
 import { createJsonAsset } from '../skeleton/skeleton-utils.ts'
@@ -9,7 +9,7 @@ export function createMiniOverridePlugin(contract: Pick<MiniContract, 'override'
     return {
         name: 'vpt:mini-override',
         enforce: 'post',
-        applyToEnvironment: isMiniClientEnvironment,
+        applyToEnvironment: isClientEnvironment,
         generateBundle: {
             order: 'post',
             handler(_, bundle) {

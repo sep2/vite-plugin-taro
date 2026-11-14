@@ -21,11 +21,14 @@ export function createH5TargetPlugins(options: Readonly<VptOptions>): PluginOpti
 
 /** Configures H5 resolution and supplies the specialized physical application entry. */
 function createH5Plugin(options: Readonly<VptOptions>): Plugin {
-    // options installs the complete page snapshot before this environment resolves or transforms application modules.
+    // Resolved project configuration installs one page graph shared by application environments.
     let moduleResolver: Awaited<ReturnType<typeof createModuleResolver>>
 
     return {
         name: 'vpt:h5',
+        async configResolved(config) {
+            moduleResolver = await createModuleResolver(options, config.root)
+        },
 
         config() {
             return {
@@ -112,10 +115,6 @@ function createH5Plugin(options: Readonly<VptOptions>): Plugin {
                     target: esTarget
                 }
             }
-        },
-
-        async options() {
-            moduleResolver = await createModuleResolver(options, this.environment.config.root)
         },
 
         resolveId: {

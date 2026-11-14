@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import type { Plugin } from 'vite'
-import { isMiniClientEnvironment } from '../mini/dev/plugins.ts'
+import { isClientEnvironment } from '../../utils/is-client-environment.ts'
 import type { MiniContract } from '../mini/mini-contract.ts'
 
 const placeholderFiles = {
@@ -16,7 +16,7 @@ export function createAliCustomTabBarPlugin(contract: MiniContract): Plugin {
     return {
         name: 'vpt:ali-custom-tab-bar',
         enforce: 'post',
-        applyToEnvironment: isMiniClientEnvironment,
+        applyToEnvironment: isClientEnvironment,
         generateBundle: {
             order: 'post',
             handler(_, bundle) {

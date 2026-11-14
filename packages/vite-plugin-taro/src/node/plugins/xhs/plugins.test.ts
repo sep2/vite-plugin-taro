@@ -46,8 +46,8 @@ test('initializes XHS Pages with native data objects while preserving input opti
         (value) => value && typeof value === 'object' && 'name' in value && value.name === 'vpt:mini'
     )
     assert.ok(plugin && typeof plugin === 'object' && 'transform' in plugin)
-    assert.ok('options' in plugin && typeof plugin.options === 'function')
-    await Reflect.apply(plugin.options, { environment: { config: { root: process.cwd() } } }, [{}])
+    assert.ok('configResolved' in plugin && typeof plugin.configResolved === 'function')
+    await Reflect.apply(plugin.configResolved, undefined, [{ root: process.cwd() }])
     const transform = plugin.transform
     assert.ok(transform && typeof transform === 'object' && 'handler' in transform)
     for (const page of input.pages) {

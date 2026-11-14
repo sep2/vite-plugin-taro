@@ -46,12 +46,15 @@ function createMiniPlugin(
     placement: MiniPlacementPlugin,
     styles: Pick<MiniStylePlugin, 'startBuild'>
 ): Plugin {
-    // Each options invocation installs the resolver after page resolution. Later hooks consume its page snapshot,
-    // native inputs and stylesheet traversal roots from the same compiler generation.
+    // Resolved project configuration installs one resolver before plugin containers or native engines invoke options.
+    // Compilation and recovery hooks share its page metadata, native inputs and stylesheet traversal roots.
     let resolver: MiniResolver
 
     return {
         name: 'vpt:mini',
+        async configResolved(config) {
+            resolver = await createResolver(contract, config.root)
+        },
 
         config() {
             return {
@@ -99,14 +102,13 @@ function createMiniPlugin(
             }
         },
 
-        async options(options) {
-            resolver = await createResolver(contract, this.environment.config.root)
+        options(options) {
             // The dedicated Mini placement plugin owns output naming and entry-signature semantics. This plugin owns
             // only the closed named input set of native shells, lifecycle capsules, and bootstrap entries.
             return { ...options, input: resolver.input }
         },
 
-        /** Supplies the completed entry graph to styles after every asynchronous options hook has finished. */
+        /** Supplies the project's completed entry graph to styles at each compilation boundary. */
         buildStart() {
             return styles.startBuild(this, resolver.entries)
         },

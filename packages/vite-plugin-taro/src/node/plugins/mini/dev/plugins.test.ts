@@ -8,7 +8,7 @@ import { pageMetadataKey } from '../../page/page-metadata-key.ts'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
 import { miniAppCapsuleId, pageComponentId } from '../module/module.ts'
 import { createMiniStylePlugin } from '../styles/plugins.ts'
-import { createMiniDevelopmentPlugin, isMiniClientEnvironment, removeDevelopmentAppStyle } from './plugins.ts'
+import { createMiniDevelopmentPlugin, removeDevelopmentAppStyle } from './plugins.ts'
 
 const runtimeModules = {
     devtoolsHmrRuntime: '/runtime/devtools-hmr.ts',
@@ -46,11 +46,6 @@ const contract = {
     },
     override: []
 } satisfies MiniContract
-
-test('assigns physical Mini Program host ownership only to the client environment', () => {
-    assert.equal(isMiniClientEnvironment({ name: 'client' }), true)
-    assert.equal(isMiniClientEnvironment({ name: 'ssr' }), false)
-})
 
 test('preserves physical outputs and composes the selected mode across development restarts', async () => {
     const config = await resolveConfig(
