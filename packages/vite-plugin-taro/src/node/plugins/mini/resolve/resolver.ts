@@ -4,9 +4,7 @@ import type { VptPageOption } from '../../../../options.ts'
 import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } from '../../../utils/modules.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
 import { appComponentId } from '../../client/constant.ts'
-import type { PageBuildConfig } from '../../page/page-build-config.ts'
 import { pageMetadataKey } from '../../page/page-metadata-key.ts'
-import { resolvePages } from '../../page/resolve-pages.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import {
     appShellFileName,
@@ -34,19 +32,11 @@ import { specializePageCapsule } from './specialize-page-capsule.ts'
 /** Resolves one exact plugin-private ID using its importer and configured project root. */
 type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => string
 
-/** Resolves pages and creates the source specializer and entries for one Mini Program module graph. */
-export async function createResolver(
+/** Creates the source specializer and entries from resolved Mini Program pages. */
+export function createResolver(
     contract: Pick<MiniContract, 'options' | 'taro' | 'supportsPagePrerender'>,
-    config: PageBuildConfig
+    pages: readonly VptPageOption[]
 ) {
-    const pages = await resolvePages({
-        pages: contract.options.pages,
-        target: contract.options.target,
-        root: config.root,
-        define: config.define,
-        resolve: config.resolve
-    })
-
     const normalizedAppCapsulePath = normalizePath(miniAppCapsuleId)
     const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
 

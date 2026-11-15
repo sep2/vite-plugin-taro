@@ -67,8 +67,8 @@ const contract = {
     }
 } satisfies Pick<MiniContract, 'options' | 'taro' | 'supportsPagePrerender'>
 
-test('resolves fixed and route-specific private IDs', async () => {
-    const resolver = await createResolver(contract, { root: path.resolve('/project') })
+test('resolves fixed and route-specific private IDs', () => {
+    const resolver = createResolver(contract, contract.options.pages)
     const projectRoot = path.resolve('/project')
 
     assert.deepEqual(resolver.entries, {
@@ -122,10 +122,10 @@ for (const [target, createContract] of [
     ['zfb', createAliMiniContract],
     ['tt', createTtMiniContract]
 ] as const) {
-    test(`${target}: resolves the selected target host for every renderer configuration`, async () => {
+    test(`${target}: resolves the selected target host for every renderer configuration`, () => {
         for (const selection of [{}, { renderer: 'template' }, { renderer: 'dom' }] as const) {
             const targetContract = createContract({ ...contract.options, target, ...selection })
-            const resolver = await createResolver(targetContract, { root: path.resolve('/project') })
+            const resolver = createResolver(targetContract, contract.options.pages)
 
             assert.equal(
                 resolver.resolveId(rendererHostId, undefined, path.resolve('/project')),
@@ -139,13 +139,13 @@ for (const [target, createContract] of [
     })
 }
 
-test('resolves custom renderer hosts independently of App/Page entries', async () => {
+test('resolves custom renderer hosts independently of App/Page entries', () => {
     const targetContract = createTtMiniContract({ ...contract.options, target: 'tt', renderer: 'dom' })
-    const resolver = await createResolver(targetContract, { root: path.resolve('/project') })
+    const resolver = createResolver(targetContract, contract.options.pages)
 
-    const customHostResolver = await createResolver(
+    const customHostResolver = createResolver(
         { ...targetContract, taro: { ...targetContract.taro, hostPath: '/runtime/custom-host.ts' } },
-        { root: path.resolve('/project') }
+        contract.options.pages
     )
     assert.equal(
         customHostResolver.resolveId(rendererHostId, undefined, path.resolve('/project')),
@@ -155,16 +155,16 @@ test('resolves custom renderer hosts independently of App/Page entries', async (
     assert.deepEqual(resolver.input, customHostResolver.input)
 })
 
-test('preserves configured Page order and reuses App/Page entries in the native input map', async () => {
+test('preserves resolved Page order and reuses App/Page entries in the native input map', () => {
     const pages = [
         Object.freeze({ path: 'pages/z-last/index', config: { title: 'First' } }),
         Object.freeze({ path: 'features/account/pages/a-first/index' })
     ]
     Object.freeze(pages)
-    const input = Object.freeze({ ...contract, options: Object.freeze({ ...contract.options, pages }) })
-    const resolver = await createResolver(input, { root: path.resolve('/project') })
+    const input = Object.freeze({ ...contract, options: Object.freeze({ ...contract.options }) })
+    const resolver = createResolver(input, pages)
 
-    assert.deepEqual(resolver.pages, pages)
+    assert.equal(resolver.pages, pages)
     assert.equal(resolver.pages[0], pages[0])
     const { appEntries, pageEntries } = resolver.entries
     assert.deepEqual(pageEntries, [
@@ -187,9 +187,8 @@ test('preserves configured Page order and reuses App/Page entries in the native 
     }
 })
 
-test('retains App entries with no Page entries when no routes are configured', async () => {
-    const input = { ...contract, options: { ...contract.options, pages: [] } }
-    const resolver = await createResolver(input, { root: path.resolve('/project') })
+test('retains App entries with an empty resolved Page list', () => {
+    const resolver = createResolver(contract, [])
 
     assert.deepEqual(resolver.entries, {
         appEntries: {
@@ -211,14 +210,14 @@ test('retains App entries with no Page entries when no routes are configured', a
 })
 
 for (const supportsPagePrerender of [false, true]) {
-    test(`applies the fixed contract's prerender capability (${supportsPagePrerender}) to resolved pages`, async () => {
+    test(`applies the fixed contract's prerender capability (${supportsPagePrerender}) to resolved pages`, () => {
         const page = Object.freeze({ path: 'pages/compiled/index', prerender: true })
         const fixedContract = Object.freeze({
             ...contract,
             options: Object.freeze({ ...contract.options, pages: [page] }),
             supportsPagePrerender
         })
-        const resolver = await createResolver(fixedContract, { root: path.resolve('/project') })
+        const resolver = createResolver(fixedContract, [page])
         const result = resolver.specialize(
             'const options = __VPT_PAGE_OPTIONS__',
             `${modules.pageCapsule}?route=${encodeURIComponent(page.path)}`,
@@ -231,8 +230,8 @@ for (const supportsPagePrerender of [false, true]) {
     })
 }
 
-test('rejects Page-private imports without one configured route origin', async () => {
-    const resolver = await createResolver(contract, { root: path.resolve('/project') })
+test('rejects Page-private imports without one configured route origin', () => {
+    const resolver = createResolver(contract, contract.options.pages)
     const projectRoot = path.resolve('/project')
 
     assert.throws(
@@ -249,9 +248,9 @@ test('rejects Page-private imports without one configured route origin', async (
     )
 })
 
-test('specializes the App capsule with the configured App JSON', async () => {
-    const resolver = await createResolver(contract, { root: path.resolve('/project') })
-    const result = await resolver.specialize('export default __VPT_APP_CONFIG__', modules.appCapsule)
+test('specializes the App capsule with the configured App JSON', () => {
+    const resolver = createResolver(contract, contract.options.pages)
+    const result = resolver.specialize('export default __VPT_APP_CONFIG__', modules.appCapsule)
 
     assert.ok(result && 'meta' in result)
     assert.equal(result.meta[pageMetadataKey], resolver.pages)

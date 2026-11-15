@@ -234,7 +234,7 @@ function collectModuleIds(output: BuildOutput): string[] {
 }
 
 for (const target of ['wx', 'h5'] as const) {
-    test(`rejects multiple entry pages during ${target} resolver initialization`, async () => {
+    test(`rejects multiple entry pages during ${target} configuration resolution`, async () => {
         await assert.rejects(
             inspectFixtureBuild(
                 {

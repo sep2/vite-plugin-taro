@@ -3,6 +3,7 @@ import { esTarget } from '../../utils/constant.ts'
 import { createExactModuleIdFilter } from '../../utils/modules.ts'
 import { packageRequire, resolveTaroRuntime } from '../../utils/packages.ts'
 import type { AstTransformResult } from '../../utils/transform.ts'
+import { resolvePages } from '../page/resolve-pages.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
 import { createMiniGlobalPlugin } from './global/create-mini-global-plugin.ts'
 import type { MiniContract } from './mini-contract.ts'
@@ -19,7 +20,7 @@ import { createResolver } from './resolve/resolver.ts'
 import { createMiniStylePlugin, type MiniStylePlugin } from './styles/plugins.ts'
 import { createMiniWatchPlugin } from './watch/create-mini-watch-plugin.ts'
 
-type MiniResolver = Awaited<ReturnType<typeof createResolver>>
+type MiniResolver = ReturnType<typeof createResolver>
 
 /** Creates the complete Mini Program plugin set. */
 export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] {
@@ -53,7 +54,14 @@ function createMiniPlugin(
     return {
         name: 'vpt:mini',
         async configResolved(config) {
-            resolver = await createResolver(contract, config)
+            const pages = await resolvePages({
+                pages: contract.options.pages,
+                target: contract.options.target,
+                root: config.root,
+                define: config.define,
+                resolve: config.resolve
+            })
+            resolver = createResolver(contract, pages)
         },
 
         config() {

@@ -12,8 +12,8 @@ const { vpt, calls } = await importObservedPlugin()
 async function importObservedPlugin() {
     const resolverUrl = new URL('./resolve-pages.ts', import.meta.url).href
     const consumerUrls = new Set([
-        new URL('../mini/resolve/resolver.ts', import.meta.url).href,
-        new URL('../h5/resolver/module-resolver.ts', import.meta.url).href
+        new URL('../mini/plugins.ts', import.meta.url).href,
+        new URL('../h5/plugins.ts', import.meta.url).href
     ])
     const observerUrl = `data:text/javascript,${encodeURIComponent(`
         import { resolvePages as resolve } from ${JSON.stringify(resolverUrl)}
@@ -48,11 +48,7 @@ async function importObservedPlugin() {
             if (specifier === '../mini/plugins.ts') {
                 return { url: contractObserverUrl, shortCircuit: true }
             }
-            if (
-                context.parentURL &&
-                consumerUrls.has(context.parentURL) &&
-                specifier === '../../page/resolve-pages.ts'
-            ) {
+            if (context.parentURL && consumerUrls.has(context.parentURL) && specifier === '../page/resolve-pages.ts') {
                 return { url: observerUrl, shortCircuit: true }
             }
             return nextResolve(specifier, context)

@@ -4,6 +4,7 @@ import type { VptOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { createExactModuleIdFilter, toViteFileImportPath } from '../../utils/modules.ts'
 import { resolveTaroRuntime } from '../../utils/packages.ts'
+import { resolvePages } from '../page/resolve-pages.ts'
 import { tailwindcssBasedir } from '../tailwind/tailwind-css.ts'
 import { h5AppPath } from './constant.ts'
 import { createStencilClientAdapter } from './create-stencil-client-adapter.ts'
@@ -22,12 +23,19 @@ export function createH5TargetPlugins(options: Readonly<VptOptions>): PluginOpti
 /** Configures H5 resolution and supplies the specialized physical application entry. */
 function createH5Plugin(options: Readonly<VptOptions>): Plugin {
     // Resolved project configuration installs one page graph shared by application environments.
-    let moduleResolver: Awaited<ReturnType<typeof createModuleResolver>>
+    let moduleResolver: ReturnType<typeof createModuleResolver>
 
     return {
         name: 'vpt:h5',
         async configResolved(config) {
-            moduleResolver = await createModuleResolver(options, config)
+            const pages = await resolvePages({
+                pages: options.pages,
+                target: options.target,
+                root: config.root,
+                define: config.define,
+                resolve: config.resolve
+            })
+            moduleResolver = createModuleResolver(options, pages)
         },
 
         config() {

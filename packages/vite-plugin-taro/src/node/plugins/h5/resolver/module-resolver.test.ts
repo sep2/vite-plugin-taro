@@ -16,8 +16,8 @@ const options: VptOptions = {
     sitemapJson: {}
 }
 
-test('resolves the configured App component', async () => {
-    const resolver = await createModuleResolver(options, { root: path.resolve('/project') })
+test('resolves the configured App component', () => {
+    const resolver = createModuleResolver(options, [])
     const projectRoot = path.resolve('/project')
 
     assert.equal(
@@ -27,19 +27,24 @@ test('resolves the configured App component', async () => {
     assert.equal(resolver.resolveId({ id: 'react', projectRoot }), undefined)
 })
 
-test('specializes only the physical H5 App', async () => {
-    const resolver = await createModuleResolver(options, { root: path.resolve('/project') })
+test('specializes only the physical H5 App using resolved pages', () => {
+    const pages = Object.freeze([
+        Object.freeze({ path: 'pages/resolved/index', config: { navigationBarTitleText: 'Resolved page' } })
+    ])
+    const resolver = createModuleResolver(Object.freeze(options), pages)
     const source = `const config = __VPT_H5_APP_CONFIG__
 config.routes = __VPT_H5_ROUTES__
 `
 
-    assert.ok(
-        await resolver.transform({
-            code: source,
-            id: h5AppPath,
-            projectRoot: '/project'
-        })
-    )
+    const result = resolver.transform({
+        code: source,
+        id: h5AppPath,
+        projectRoot: path.resolve('/project')
+    })
+    assert.ok(result)
+    assert.match(result.code, /"pages":\s*\[\s*"pages\/resolved\/index"/)
+    assert.match(result.code, /import\([^)]*\/src\/pages\/resolved\/index\.tsx/)
+    assert.match(result.code, /"navigationBarTitleText":\s*"Resolved page"/)
     assert.equal(
         resolver.transform({
             code: source,
