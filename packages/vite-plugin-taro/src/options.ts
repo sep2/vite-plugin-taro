@@ -98,7 +98,8 @@ export interface VptOptions {
     app: string
 
     /**
-     * Optional complete ordered list of application pages. Omission produces an empty list.
+     * Optional ordered page list. Omission discovers page declarations in TSX modules under src.
+     * An explicit array, including an empty array, is authoritative.
      *
      * The page marked `entry: true` is placed first, preserving the declared order of all other pages.
      * This resolved order becomes the `pages` order in the generated `app.json`, the H5 route order, and the Page order

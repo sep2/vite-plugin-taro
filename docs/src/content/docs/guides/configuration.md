@@ -87,7 +87,7 @@ App 生命周期、React Provider 和应用级初始化都可以放在这里。
 
 ## `pages`
 
-声明应用的全部页面：
+可选。声明完整页面清单：
 
 ```ts
 pages: [
@@ -107,7 +107,22 @@ pages: [
 ]
 ```
 
-vpt 不扫描目录。新增页面时，必须创建页面文件并把它加入 `pages`。
+省略 `pages` 时，VPT 扫描 `src/**/*.tsx`。 直接导入 `virtual:vpt` 且执行 `defineVptPage()` 的文件会成为页面。例如 `src/pages/home/index.tsx`：
+
+```tsx
+import { defineVptPage } from 'virtual:vpt'
+
+defineVptPage(async ({ target }) => ({
+    entry: true,
+    config: { navigationBarTitleText: target === 'wx' ? '微信首页': '小程序首页' }
+}))
+
+export default function Home() {
+    return <div>...</div>
+}
+```
+
+此页面的路由自动配置为 `pages/home/index`。
 
 ### `pages[].path`
 

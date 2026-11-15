@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createTestProject } from '../../tests/create-test-project.ts'
 import { resolvePages } from './resolve-pages.ts'
 
 test('resolves configured pages asynchronously with their order and metadata intact', async () => {
@@ -15,8 +16,9 @@ test('resolves configured pages asynchronously with their order and metadata int
     assert.equal(resolved[1], pages[1])
 })
 
-test('resolves omitted pages to an empty list', async () => {
-    assert.deepEqual(await resolvePages({ pages: undefined, target: 'h5', root: '/project' }), [])
+test('resolves omitted pages to an empty list when src is absent', async () => {
+    const root = await createTestProject('empty-pages-')
+    assert.deepEqual(await resolvePages({ pages: undefined, target: 'h5', root }), [])
 })
 
 test('resolves an explicit empty page list', async () => {
