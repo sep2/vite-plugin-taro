@@ -98,6 +98,53 @@ test('builds an entry, a shared registry and a path-bound API for each candidate
     )
 })
 
+test('configuration hooks preserve module ownership and defer unrelated modules', async () => {
+    const root = await createProject({
+        'src/home.tsx': `import { defineVptPage } from 'virtual:vpt'; defineVptPage(() => ({}));`
+    })
+    await evaluatePageModules(['home'], { root }, 'wx')
+    const configuration = await builds.at(-1)?.plugins?.[2]
+    assert.ok(configuration && !Array.isArray(configuration))
+    assert.equal(configuration.name, 'vpt:page-configuration')
+    assert.ok('resolveId' in configuration && typeof configuration.resolveId === 'function')
+    assert.ok('load' in configuration && typeof configuration.load === 'function')
+
+    const entryId = '\0vpt:page-entry'
+    const pageApiId = `\0${apiModuleId}:home`
+    for (const id of [entryId, pageApiId]) {
+        assert.equal(Reflect.apply(configuration.resolveId, {}, [id, undefined]), id)
+    }
+    for (const importer of [entryId, pageApiId]) {
+        assert.equal(Reflect.apply(configuration.resolveId, {}, [apiModuleId, importer]), apiModuleId)
+    }
+    assert.equal(Reflect.apply(configuration.resolveId, {}, [apiModuleId, path.join(root, 'src/home.tsx')]), pageApiId)
+    assert.equal(Reflect.apply(configuration.resolveId, {}, ['./helper', entryId]), undefined)
+    assert.equal(Reflect.apply(configuration.load, {}, ['./helper']), undefined)
+    const resolveId = configuration.resolveId
+    assert.throws(
+        () => Reflect.apply(resolveId, {}, [apiModuleId, undefined]),
+        /Page declarations must be imported by a candidate page module: undefined/
+    )
+})
+
+test('evaluation hooks serve only the compiled entry', async () => {
+    const root = await createProject({
+        'src/home.tsx': `import { defineVptPage } from 'virtual:vpt'; defineVptPage(() => ({}));`
+    })
+    await evaluatePageModules(['home'], { root }, 'wx')
+    const evaluation = evaluations.at(-1)
+    assert.ok(evaluation)
+    const plugin = await evaluation.config.plugins?.[0]
+    assert.ok(plugin && !Array.isArray(plugin))
+    assert.equal(plugin.name, 'vpt:evaluate-page')
+    assert.ok('resolveId' in plugin && typeof plugin.resolveId === 'function')
+    assert.ok('load' in plugin && typeof plugin.load === 'function')
+    assert.equal(Reflect.apply(plugin.resolveId, {}, [evaluation.id]), evaluation.id)
+    assert.match(Reflect.apply(plugin.load, {}, [evaluation.id]), /export/)
+    assert.equal(Reflect.apply(plugin.resolveId, {}, ['node:fs']), undefined)
+    assert.equal(Reflect.apply(plugin.load, {}, ['node:fs']), undefined)
+})
+
 test('uses one shared graph, preserves closures and executes async factories in candidate order', async () => {
     const root = await createProject({
         'vite.config.ts': 'throw new Error("Configuration loaded")',
