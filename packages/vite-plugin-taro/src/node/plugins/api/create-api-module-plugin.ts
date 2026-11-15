@@ -1,14 +1,14 @@
 import type { Plugin } from 'vite'
+import { apiModuleId } from './api-module-id.ts'
 
-const moduleId = 'virtual:vpt'
-const resolvedModuleId = `\0${moduleId}`
+const resolvedModuleId = `\0${apiModuleId}`
 
 /** Supplies application declarations whose configuration factories remain unevaluated. */
 export function createApiModulePlugin(): Plugin {
     return {
         name: 'vpt:api-module',
         resolveId(id) {
-            if (id === moduleId) {
+            if (id === apiModuleId) {
                 return resolvedModuleId
             }
         },
