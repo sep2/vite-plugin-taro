@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
-import { miniPageShellId } from '../../../module/module.ts'
+import { miniAppShellId, miniPageShellId } from '../../../module/module.ts'
 import type { PatchUpdate } from '../../hmr-protocol.ts'
 import {
     createDevtoolsHmrMode,
@@ -21,19 +21,24 @@ const patch: PatchUpdate = {
     seq: 1
 }
 
-test('creates exact App and Page entry banners', () => {
+test('creates App and Page banners from chunk facades and output paths', () => {
     const mode = createDevtoolsHmrMode(runtimeFile)
-    const banner = mode.createEntryBanner(new Set(['pages/home/index.js']))
+    const banner = mode.entryBanner
 
     assert.equal(
-        banner({ name: 'app.js', fileName: 'app.js' }),
+        banner({ facadeModuleId: miniAppShellId, fileName: 'app.js' }),
         "__rolldown_runtime__.initialize(require('./hmr/info.js'));\n"
     )
     assert.equal(
-        banner({ name: 'pages/home/index.js', fileName: 'pages/home/index.js' }),
+        banner({ facadeModuleId: `${miniPageShellId}?route=pages%2Fhome%2Findex`, fileName: 'pages/home/index.js' }),
         "__rolldown_runtime__.applyPatches(require('../../hmr/patches.js'));\n"
     )
-    assert.equal(banner({ name: 'assets/vendor.js', fileName: 'assets/vendor.js' }), '')
+    assert.equal(
+        banner({ facadeModuleId: `${miniPageShellId}?route=pages%2Fdetail`, fileName: 'package/pages/detail.js' }),
+        "__rolldown_runtime__.applyPatches(require('../../hmr/patches.js'));\n"
+    )
+    assert.equal(banner({ facadeModuleId: null, fileName: 'app.js' }), '')
+    assert.equal(banner({ facadeModuleId: '/application/feature.ts', fileName: 'pages/home/index.js' }), '')
     assert.equal(mode.runtimeFile, runtimeFile)
 })
 

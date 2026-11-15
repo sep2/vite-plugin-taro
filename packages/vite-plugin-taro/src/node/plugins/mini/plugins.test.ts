@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { rolldown } from 'rolldown'
-import { build, normalizePath, resolveConfig } from 'vite'
+import { build, normalizePath, type Rolldown, resolveConfig } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { resolveVptRuntime } from '../../utils/packages.ts'
 import { wrapPluginTransform } from '../../utils/vite.ts'
@@ -16,9 +16,10 @@ import {
     miniPageCapsuleId,
     miniPageShellId
 } from './module/module.ts'
+import { createPlacementRolldownOptions } from './placer/placer.ts'
 import { createMiniTargetPlugins } from './plugins.ts'
 
-test('initializes native entries from resolved project configuration for options and buildStart', async () => {
+test('expands Page entries from the App shell alongside fixed compiler inputs', async () => {
     // These test-owned counters track asynchronous configuration readiness and the single page snapshot read.
     let pagesReady = false
     let pageReads = 0
@@ -62,6 +63,7 @@ test('initializes native entries from resolved project configuration for options
     // Capture the concrete inputs supplied at the native options boundary.
     const inputs: Record<string, string>[] = []
     const bundle = await rolldown({
+        ...createPlacementRolldownOptions(),
         input: '/unused-entry.js',
         treeshake: false,
         plugins: [
@@ -77,7 +79,8 @@ test('initializes native entries from resolved project configuration for options
                 options(options) {
                     return Reflect.apply(optionsHook, { environment: { config } }, [options])
                 },
-                buildStart: compiler.buildStart
+                buildStart: compiler.buildStart,
+                load: compiler.load
             },
             {
                 name: 'test:resolved-entry-sources',
@@ -99,13 +102,22 @@ test('initializes native entries from resolved project configuration for options
         assert.equal(pageReads, 1)
         assert.deepEqual(
             Object.keys(inputs[0]!).filter((name) => name.startsWith('pages/')),
-            pages.flatMap((page) => [`${page.path}.js`, `${page.path}-capsule`])
+            []
         )
+        const pageEntries = pages.flatMap((page) => [
+            { id: `${miniPageShellId}?route=${encodeURIComponent(page.path)}`, fileName: `${page.path}.js` },
+            { id: `${miniPageCapsuleId}?route=${encodeURIComponent(page.path)}`, fileName: `${page.path}-capsule.js` }
+        ])
+        for (const entry of pageEntries) {
+            const chunk = output.output.find((file) => file.fileName === entry.fileName)
+            assert.ok(chunk?.type === 'chunk' && chunk.isEntry, entry.fileName)
+            assert.equal(chunk.facadeModuleId, normalizePath(entry.id))
+        }
         assert.deepEqual(
             output.output
                 .flatMap((chunk) => (chunk.type === 'chunk' && chunk.isEntry ? [chunk.facadeModuleId] : []))
                 .sort(),
-            Object.values(inputs[0]!).map(normalizePath).sort()
+            [...Object.values(inputs[0]!), ...pageEntries.map((entry) => entry.id)].map(normalizePath).sort()
         )
     } finally {
         await bundle.close()
@@ -252,41 +264,70 @@ for (const [target, createContract] of [
         assert.deepEqual(contract.define, originalDefine)
     })
 
-    test(`${target}: styles traverse the App followed by configured Page capsules`, async () => {
-        for (const pages of [[], [{ path: 'pages/home/index' }, { path: 'pages/detail/index' }]]) {
-            const contract = createContract({
-                target,
-                app: 'src/app.tsx',
-                pages,
-                appJson: {},
-                projectConfigJson: {}
-            })
-            const config = await resolveConfig(
-                { configFile: false, plugins: createMiniTargetPlugins(contract) },
-                'build'
-            )
-            assert.equal(config.build.cssCodeSplit, false)
-            const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
-            assert.ok(typeof compiler?.options === 'function' && typeof compiler.buildStart === 'function')
-            assert.ok(compiler.configResolved)
-            // Record resolution requests to verify the global cascade keeps App-first route order without native shells.
-            const entryIds: string[] = []
-            await Reflect.apply(
-                compiler.buildStart,
-                {
-                    async resolve(id: string) {
-                        entryIds.push(id)
-                        return { id: normalizePath(id) }
-                    }
-                },
-                []
-            )
-            assert.deepEqual(entryIds, [
-                miniAppCapsuleId,
-                ...pages.map((page) => `${miniPageCapsuleId}?route=${encodeURIComponent(page.path)}`)
-            ])
-        }
-    })
+    for (const command of ['build', 'serve'] as const) {
+        test(`${target}: ${command} loads and styles share the same App/Page entries`, async () => {
+            for (const pages of [[], [{ path: 'pages/home/index' }, { path: 'pages/detail/index' }]]) {
+                const contract = createContract({
+                    target,
+                    app: 'src/app.tsx',
+                    pages,
+                    appJson: {},
+                    projectConfigJson: {}
+                })
+                const config = await resolveConfig(
+                    { configFile: false, plugins: createMiniTargetPlugins(contract) },
+                    command
+                )
+                assert.equal(config.build.cssCodeSplit, false)
+                const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
+                assert.ok(typeof compiler?.options === 'function' && typeof compiler.buildStart === 'function')
+                assert.ok(compiler.configResolved)
+                assert.ok(compiler.load && typeof compiler.load === 'object')
+                // Record emitted entries and style roots to verify both environments use the same page graph.
+                const emitted: Rolldown.EmittedFile[] = []
+                const entryIds: string[] = []
+                await Reflect.apply(
+                    compiler.buildStart,
+                    {
+                        async resolve(id: string) {
+                            entryIds.push(id)
+                            return { id: normalizePath(id) }
+                        }
+                    },
+                    []
+                )
+                Reflect.apply(
+                    compiler.load.handler,
+                    {
+                        emitFile(file: Rolldown.EmittedFile) {
+                            emitted.push(file)
+                            return ''
+                        }
+                    },
+                    [miniAppShellId]
+                )
+                assert.deepEqual(
+                    emitted,
+                    pages.flatMap((page) => [
+                        {
+                            type: 'chunk',
+                            id: `${miniPageShellId}?route=${encodeURIComponent(page.path)}`,
+                            fileName: `${page.path}.js`
+                        },
+                        {
+                            type: 'chunk',
+                            id: `${miniPageCapsuleId}?route=${encodeURIComponent(page.path)}`,
+                            fileName: `${page.path}-capsule.js`
+                        }
+                    ])
+                )
+                assert.deepEqual(entryIds, [
+                    miniAppCapsuleId,
+                    ...pages.map((page) => `${miniPageCapsuleId}?route=${encodeURIComponent(page.path)}`)
+                ])
+            }
+        })
+    }
 
     test(`${target}: native filters specialize only App and route-qualified Page capsules`, async () => {
         const contract = createContract({

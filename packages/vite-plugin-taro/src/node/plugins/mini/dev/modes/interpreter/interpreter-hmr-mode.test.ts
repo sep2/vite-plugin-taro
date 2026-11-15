@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { interpreterServerEvent } from '../../../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
+import { miniAppShellId, miniPageShellId } from '../../../module/module.ts'
 import type { PatchPublication, PatchUpdate } from '../../hmr-protocol.ts'
 import { createInterpreterHmrMode } from './interpreter-hmr-mode.ts'
 
@@ -16,13 +17,14 @@ const patch: PatchUpdate = {
 
 test('initializes only the App entry and installs no Page transform', () => {
     const mode = createInterpreterHmrMode(runtimeFile)
-    const banner = mode.createEntryBanner(new Set(['pages/home/index.js']))
+    const banner = mode.entryBanner
 
     assert.equal(
-        banner({ name: 'app.js', fileName: 'app.js' }),
+        banner({ facadeModuleId: miniAppShellId, fileName: 'app.js' }),
         "__rolldown_runtime__.initialize(require('./hmr/info.js'));\n"
     )
-    assert.equal(banner({ name: 'pages/home/index.js', fileName: 'pages/home/index.js' }), '')
+    assert.equal(banner({ facadeModuleId: miniPageShellId, fileName: 'pages/home/index.js' }), '')
+    assert.equal(banner({ facadeModuleId: null, fileName: 'app.js' }), '')
     assert.deepEqual(mode.plugins, [])
     assert.equal(mode.runtimeFile, runtimeFile)
 })

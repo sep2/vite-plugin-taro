@@ -5,7 +5,6 @@ import type { ViteDevServer } from 'vite'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { build, rolldownRuntimePath, viteReporterPlugin } from '../../../utils/vite-rolldown.ts'
-import { isMiniPageShell } from '../module/module.ts'
 import type { MiniHmrMode } from './hmr-mode.ts'
 import { replaceViteTransformPlugin } from './replace-vite-transform-plugin.ts'
 
@@ -36,16 +35,6 @@ export function createMiniDevOptionsPlugin({ server, hmrMode }: { server: ViteDe
             }
             const configured = configuredOutput ?? {}
 
-            // This adapter follows the Mini options hook, so its named inputs contain the resolved pages. Entry banners run
-            // after Rolldown assigns chunk names: the mode receives native filenames rather than source IDs. DevTools uses O(1)
-            // membership to add Page patch dependencies, interpreter initializes only App, and rebuild emits no host-only edge.
-            // ReadonlySet prevents the entry set from changing while Rolldown invokes later banners.
-            const pageFiles: ReadonlySet<string> = new Set(
-                Object.entries(rolldownOptions.input ?? {}).flatMap(([fileName, id]) =>
-                    isMiniPageShell(id) ? [fileName] : []
-                )
-            )
-
             /*
              * DevEngine receives this mutable output object separately before options hooks run, and nested Vite plugins may retain it.
              * Mutating that single object preserves their references while applying the shared output configuration and native runtime format.
@@ -55,7 +44,7 @@ export function createMiniDevOptionsPlugin({ server, hmrMode }: { server: ViteDe
                 // These banners create physical CommonJS edges only after graph analysis. Patch modes initialize their App runtime;
                 // DevTools additionally prepends Page delivery edges, while rebuild needs neither. Host-only metadata stays outside
                 // the application chunk graph and therefore cannot affect placement or generate transport chunks of its own.
-                banner: hmrMode.createEntryBanner(pageFiles),
+                banner: hmrMode.entryBanner,
                 // Keep ESM until the shared Mini renderChunk pipeline classifies each final chunk and converts capsules to
                 // System.register data or native/amphibious entries to CommonJS. Choosing CommonJS here would erase that boundary.
                 format: 'es',

@@ -1,7 +1,7 @@
 import path from 'node:path'
 import type { Plugin } from 'vite'
 import { createExactModuleIdFilter } from '../../../../../utils/modules.ts'
-import { appShellFileName, miniPageShellId } from '../../../module/module.ts'
+import { isMiniAppShell, isMiniPageShell, miniPageShellId } from '../../../module/module.ts'
 import { hmrInfoFileName } from '../../hmr-files.ts'
 import type { MiniHmrMode } from '../../hmr-mode.ts'
 import type { PatchUpdate } from '../../hmr-protocol.ts'
@@ -20,7 +20,17 @@ export function createDevtoolsHmrMode(runtimeFile: string): MiniHmrMode {
         rebuildStrategy: 'on-failure',
         runtimeFile,
         plugins: [createDevtoolsPagePlugin()],
-        createEntryBanner: createDevtoolsEntryBanner,
+        entryBanner(chunk) {
+            if (isMiniAppShell(chunk.facadeModuleId)) {
+                const infoPath = path.posix.relative(path.posix.dirname(chunk.fileName), hmrInfoFileName)
+                return `__rolldown_runtime__.initialize(require('./${infoPath}'));\n`
+            }
+            if (isMiniPageShell(chunk.facadeModuleId)) {
+                const patchesPath = path.posix.relative(path.posix.dirname(chunk.fileName), devtoolsPatchesFileName)
+                return `__rolldown_runtime__.applyPatches(require('${patchesPath}'));\n`
+            }
+            return ''
+        },
         // Every Page requires this path from its first complete build. Exporting undefined keeps that dependency valid while
         // making initial Page evaluation a no-op in the runtime adapter until a real cumulative patch suffix exists.
         reset: () => ({
@@ -62,26 +72,6 @@ export function renderDevtoolsPatches(buildId: string, patches: readonly PatchUp
     )
 
     return `module.exports = {buildId: ${JSON.stringify(buildId)}, patches: [${rendered.join(',')}]};\n`
-}
-
-/**
- * Prepends physical CommonJS edges after Rolldown graph analysis.
- *
- * App initialization reads the build identity once and retains it while the App keeps running. Every Page reads the stable patch path immediately
- * before its capsule, so DevTools classifies a replacement as Page JavaScript hot reload instead of an App restart. Injecting
- * these requires as source imports would incorrectly pull host-only files into Rolldown's application chunk graph.
- */
-function createDevtoolsEntryBanner(pageFiles: ReadonlySet<string>) {
-    return (chunk: Readonly<{ name: string; fileName: string }>): string => {
-        if (chunk.name === appShellFileName) {
-            return `__rolldown_runtime__.initialize(require('./${hmrInfoFileName}'));\n`
-        }
-        if (pageFiles.has(chunk.name)) {
-            const patchesPath = path.posix.relative(path.posix.dirname(chunk.fileName), devtoolsPatchesFileName)
-            return `__rolldown_runtime__.applyPatches(require('${patchesPath}'));\n`
-        }
-        return ''
-    }
 }
 
 /** Transforms the shared Page shell, including its route-qualified entries. */

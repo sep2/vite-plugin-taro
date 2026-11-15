@@ -1,4 +1,4 @@
-import type { Plugin } from 'vite'
+import type { Plugin, Rolldown } from 'vite'
 import type { MiniHmrOptions, RuntimeContract } from '../mini-contract.ts'
 import type { PatchPublication } from './hmr-protocol.ts'
 import { createDevtoolsHmrMode } from './modes/devtools/devtools-hmr-mode.ts'
@@ -30,9 +30,7 @@ export type MiniHmrMode = Readonly<{
     plugins: readonly Plugin[]
     reset?: () => MiniHmrAction
     publish?: (publication: PatchPublication) => MiniHmrAction
-    createEntryBanner: (
-        pageFiles: ReadonlySet<string>
-    ) => (chunk: Readonly<{ name: string; fileName: string }>) => string
+    entryBanner: (chunk: Readonly<Pick<Rolldown.RenderedChunk, 'facadeModuleId' | 'fileName'>>) => string
 }>
 
 /** Resolves exactly one implementation before the Mini Program development host is created. */

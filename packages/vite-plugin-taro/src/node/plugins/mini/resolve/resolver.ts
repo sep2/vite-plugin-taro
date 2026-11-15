@@ -40,7 +40,7 @@ export function createResolver(
     const normalizedAppCapsulePath = normalizePath(miniAppCapsuleId)
     const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
 
-    // Construct App/Page metadata and output inputs together so traversal roots and native paths share one definition.
+    // Construct fixed inputs and App/Page entries together so traversal roots and native paths share one definition.
     const entryGraph = createEntryGraph(pages)
 
     // Provide constant-time route validation and access to each configured Page JSON object.
@@ -125,7 +125,7 @@ export function createResolver(
     }
 }
 
-/** Declares native output inputs and exposes their App and ordered Page entries. */
+/** Declares fixed native inputs and ordered App/Page entries for each build. */
 function createEntryGraph(pages: readonly VptPageOption[]) {
     const appEntries = {
         capsuleId: miniAppCapsuleId,
@@ -155,13 +155,7 @@ function createEntryGraph(pages: readonly VptPageOption[]) {
             [appEntries.capsuleName, appEntries.capsuleId],
             [componentShellFileName, miniComponentShellId],
             ['component-capsule', miniComponentCapsuleId],
-            [customWrapperShellFileName, miniCustomWrapperShellId],
-            ...pageEntries.flatMap((entry) => {
-                return [
-                    [entry.shellName, entry.shellId],
-                    [entry.capsuleName, entry.capsuleId]
-                ]
-            })
+            [customWrapperShellFileName, miniCustomWrapperShellId]
         ])
     }
 }

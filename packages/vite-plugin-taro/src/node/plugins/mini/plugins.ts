@@ -7,7 +7,13 @@ import { resolvePages } from '../page/resolve-pages.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
 import { createMiniGlobalPlugin } from './global/create-mini-global-plugin.ts'
 import type { MiniContract } from './mini-contract.ts'
-import { classifyMiniModule, miniAppCapsuleId, miniPageCapsuleId, miniTaroRuntimeId } from './module/module.ts'
+import {
+    classifyMiniModule,
+    miniAppCapsuleId,
+    miniAppShellId,
+    miniPageCapsuleId,
+    miniTaroRuntimeId
+} from './module/module.ts'
 import { createMiniNativeComponentPlugin } from './native/create-mini-native-component-plugin.ts'
 import { createTransportOutput } from './output/create-transport-output.ts'
 import { createOutputFiles } from './output/files.ts'
@@ -111,14 +117,23 @@ function createMiniPlugin(
         },
 
         options(options) {
-            // The dedicated Mini placement plugin owns output naming and entry-signature semantics. This plugin owns
-            // only the closed named input set of native shells, lifecycle capsules, and bootstrap entries.
             return { ...options, input: resolver.input }
         },
 
-        /** Supplies the project's completed entry graph to styles at each compilation boundary. */
+        /** Supplies the complete App/Page entry graph to styles at each compilation boundary. */
         buildStart() {
             return styles.startBuild(this, resolver.entries)
+        },
+
+        /** The App shell owns Page entry emission, including replay from the bundler's module cache. */
+        load: {
+            filter: { id: createExactModuleIdFilter(miniAppShellId) },
+            handler() {
+                for (const entry of resolver.entries.pageEntries) {
+                    this.emitFile({ type: 'chunk', id: entry.shellId, fileName: entry.shellName })
+                    this.emitFile({ type: 'chunk', id: entry.capsuleId, fileName: `${entry.capsuleName}.js` })
+                }
+            }
         },
 
         resolveId(id, importer) {

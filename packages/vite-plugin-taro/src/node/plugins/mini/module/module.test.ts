@@ -8,6 +8,7 @@ import { createMemoryTestProject } from '../../../tests/create-memory-test-proje
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import {
     classifyMiniModule,
+    isMiniAppShell,
     isMiniPageShell,
     isMiniPolyfillModule,
     miniAppCapsuleId,
@@ -46,7 +47,16 @@ test('classifies native lifecycle shells and entry capsules by module identity',
     }
 })
 
-test('identifies native Page input IDs and emitted facades independently of their route', () => {
+test('identifies native App shells by their normalized module identity', () => {
+    assert.equal(isMiniAppShell(miniAppShellId), true)
+    assert.equal(isMiniAppShell(`${miniAppShellId}?v=1`), true)
+    assert.equal(isMiniAppShell(path.normalize(miniAppShellId)), true)
+    assert.equal(isMiniAppShell(`${miniAppShellId}.backup`), false)
+    assert.equal(isMiniAppShell(miniAppCapsuleId), false)
+    assert.equal(isMiniAppShell(null), false)
+})
+
+test('identifies native Page shells independently of their route', () => {
     assert.equal(isMiniPageShell(miniPageShellId), true)
     assert.equal(isMiniPageShell(`${miniPageShellId}?route=pages%2Fhome`), true)
     assert.equal(isMiniPageShell(`${miniPageShellId}.backup`), false)

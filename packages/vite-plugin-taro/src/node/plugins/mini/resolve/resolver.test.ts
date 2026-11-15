@@ -93,9 +93,7 @@ test('resolves fixed and route-specific private IDs', () => {
         bootstrap: modules.bootstrap,
         'app-capsule': modules.appCapsule,
         'component-capsule': modules.componentCapsule,
-        'custom-wrapper.js': modules.customWrapperShell,
-        'pages/home/index.js': `${modules.pageShell}?route=pages%2Fhome%2Findex`,
-        'pages/home/index-capsule': `${modules.pageCapsule}?route=pages%2Fhome%2Findex`
+        'custom-wrapper.js': modules.customWrapperShell
     })
     assert.deepEqual(resolver.resolveId(miniTransportId, modules.bootstrap, projectRoot), {
         id: './vpt-transport.js',
@@ -155,7 +153,7 @@ test('resolves custom renderer hosts independently of App/Page entries', () => {
     assert.deepEqual(resolver.input, customHostResolver.input)
 })
 
-test('preserves resolved Page order and reuses App/Page entries in the native input map', () => {
+test('preserves resolved Page order alongside fixed native inputs', () => {
     const pages = [
         Object.freeze({ path: 'pages/z-last/index', config: { title: 'First' } }),
         Object.freeze({ path: 'features/account/pages/a-first/index' })
@@ -181,10 +179,9 @@ test('preserves resolved Page order and reuses App/Page entries in the native in
             shellName: 'features/account/pages/a-first/index.js'
         }
     ])
-    for (const entry of [appEntries, ...pageEntries]) {
-        assert.equal(resolver.input[entry.capsuleName], entry.capsuleId)
-        assert.equal(resolver.input[entry.shellName], entry.shellId)
-    }
+    assert.equal(resolver.input[appEntries.capsuleName], appEntries.capsuleId)
+    assert.equal(resolver.input[appEntries.shellName], appEntries.shellId)
+    assert.deepEqual(resolver.input, createResolver(input, []).input)
 })
 
 test('retains App entries with an empty resolved Page list', () => {

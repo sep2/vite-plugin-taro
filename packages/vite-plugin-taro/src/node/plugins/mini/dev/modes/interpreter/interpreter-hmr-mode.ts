@@ -1,5 +1,6 @@
+import path from 'node:path'
 import { interpreterServerEvent } from '../../../../../../runtime/mini/dev/modes/interpreter/interpreter-protocol.ts'
-import { appShellFileName } from '../../../module/module.ts'
+import { isMiniAppShell } from '../../../module/module.ts'
 import { hmrInfoFileName } from '../../hmr-files.ts'
 import type { MiniHmrMode } from '../../hmr-mode.ts'
 import type { PatchPublication } from '../../hmr-protocol.ts'
@@ -10,7 +11,13 @@ export function createInterpreterHmrMode(runtimeFile: string): MiniHmrMode {
         rebuildStrategy: 'on-failure',
         runtimeFile,
         plugins: [],
-        createEntryBanner: createInterpreterEntryBanner,
+        entryBanner(chunk) {
+            if (isMiniAppShell(chunk.facadeModuleId)) {
+                const infoPath = path.posix.relative(path.posix.dirname(chunk.fileName), hmrInfoFileName)
+                return `__rolldown_runtime__.initialize(require('./${infoPath}'));\n`
+            }
+            return ''
+        },
         publish: (publication: PatchPublication) => ({
             kind: 'event',
             event: interpreterServerEvent,
@@ -21,14 +28,4 @@ export function createInterpreterHmrMode(runtimeFile: string): MiniHmrMode {
             }
         })
     } satisfies MiniHmrMode
-}
-
-/** Interpreter runtime starts from App only; Pages have no patch edge or lifecycle handoff. */
-function createInterpreterEntryBanner(_pageFiles: ReadonlySet<string>) {
-    return (chunk: Readonly<{ name: string; fileName: string }>): string => {
-        if (chunk.name === appShellFileName) {
-            return `__rolldown_runtime__.initialize(require('./${hmrInfoFileName}'));\n`
-        }
-        return ''
-    }
 }

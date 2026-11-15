@@ -18,7 +18,7 @@ import { type BuildOptions, createServer } from 'vite'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import { createAliMiniContract } from '../../ali/plugins.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
-import { miniAppShellId, miniPageCapsuleId, miniPageShellId } from '../module/module.ts'
+import { miniAppShellId, miniPageShellId } from '../module/module.ts'
 import { renderNative } from '../render/native.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
 import { createMiniDevOptionsPlugin, requireSingleOutput } from './mini-dev-options.ts'
@@ -152,14 +152,14 @@ function createPreRenderedChunk(name: string): PreRenderedChunk {
     }
 }
 
-function createRenderedChunk(name: string, fileName: string): RenderedChunk {
+function createRenderedChunk(name: string, fileName: string, facadeModuleId: string | null): RenderedChunk {
     return {
         type: 'chunk',
         name,
         fileName,
         isEntry: true,
         isDynamicEntry: false,
-        facadeModuleId: null,
+        facadeModuleId,
         moduleIds: [],
         exports: [],
         imports: [],
@@ -217,11 +217,7 @@ test('adapts physical wx development output without changing configured filename
     }
     const plugin = createMiniDevOptionsPlugin({ server, hmrMode })
     const adaptedOptions = await plugin.options({
-        input: {
-            'app.js': miniAppShellId,
-            'pages/home/index.js': `${miniPageShellId}?route=pages%2Fhome%2Findex`,
-            'pages/home/index-capsule': `${miniPageCapsuleId}?route=pages%2Fhome%2Findex`
-        },
+        input: { 'app.js': miniAppShellId },
         output: generatedOutput,
         plugins: [[{ name: 'fixture:existing-plugin' }], viteTransformPlugin],
         experimental: {
@@ -272,14 +268,16 @@ test('adapts physical wx development output without changing configured filename
         assert.fail('Expected a generated entry banner')
     }
     assert.equal(
-        await banner(createRenderedChunk('app.js', 'app.js')),
+        await banner(createRenderedChunk('app', 'app.js', miniAppShellId)),
         "__rolldown_runtime__.initialize(require('./hmr/info.js'));\n"
     )
     assert.equal(
-        await banner(createRenderedChunk('pages/home/index.js', 'pages/home/index.js')),
+        await banner(
+            createRenderedChunk('page', 'pages/home/index.js', `${miniPageShellId}?route=pages%2Fhome%2Findex`)
+        ),
         "__rolldown_runtime__.applyPatches(require('../../hmr/patches.js'));\n"
     )
-    assert.equal(await banner(createRenderedChunk('assets/vendor.js', 'assets/vendor.js')), '')
+    assert.equal(await banner(createRenderedChunk('app.js', 'app.js', null)), '')
 })
 
 test('executes generated development code with a bundled runtime and no ambient base class', async (context) => {
