@@ -6,6 +6,7 @@ import { build, type Rolldown } from 'vite'
 import { createTestProject } from '../../tests/create-test-project.ts'
 import { publishSourceGeneration } from '../../tests/publish-source-generation.ts'
 import vpt from '../../vpt.ts'
+import { miniAppShellId, miniBootstrapId } from './module/module.ts'
 
 for (const [target, styleExtension] of [
     ['wx', 'wxss'],
@@ -14,18 +15,22 @@ for (const [target, styleExtension] of [
     ['tt', 'ttss'],
     ['xhs', 'css']
 ] as const) {
-    test(`${target}: emits Page entries and styles on successive watch builds`, {
+    test(`${target}: retains App-owned entries and styles across watch builds and App reloads`, {
         timeout: 20_000
     }, async (context) => {
-        const root = await createTestProject('mini-page-entries-')
+        const root = await createTestProject('mini-app-entries-')
         const sources = {
+            'app-input.txt': 'initial',
             'src/app.tsx': 'export default function App({ children }) { return children }',
             'src/pages/home.tsx': `
                 import { View } from '@tarojs/components'
+                import { lazy } from 'react'
                 import './home.css'
-                export default function Home() { return <View className="home">first-home</View> }
+                const Feature = lazy(() => import('../feature'))
+                export default function Home() { return <View className="home">first-home<Feature /></View> }
             `,
             'src/pages/home.css': '.home { color: red; }',
+            'src/feature.tsx': 'export default function Feature() { return "lazy-feature" }',
             'src/pages/detail.tsx': `
                 import { View } from '@tarojs/components'
                 import './detail.css'
@@ -44,6 +49,8 @@ for (const [target, styleExtension] of [
         // Each completed build publishes its bundle; the next save gets a fresh completion promise.
         let output: Rolldown.OutputBundle = {}
         let completed = Promise.withResolvers<void>()
+        // The fixture-owned dependency forces an App shell reload after testing cached entry replay.
+        let appLoads = 0
         const watcher = await build({
             root,
             configFile: false,
@@ -57,7 +64,16 @@ for (const [target, styleExtension] of [
                     projectConfigJson: {}
                 }),
                 {
-                    name: 'test:page-entry-output',
+                    name: 'test:app-entry-output',
+                    options(options) {
+                        assert.deepEqual(options.input, { 'app.js': miniAppShellId })
+                    },
+                    load(id) {
+                        if (id === miniAppShellId) {
+                            appLoads += 1
+                            this.addWatchFile(path.join(root, 'app-input.txt'))
+                        }
+                    },
                     generateBundle: {
                         order: 'post',
                         handler(_options, bundle) {
@@ -78,17 +94,35 @@ for (const [target, styleExtension] of [
             }
         })
 
-        for (const marker of ['first-home', 'second-home']) {
-            if (marker === 'second-home') {
+        for (const change of [
+            undefined,
+            { file: 'src/pages/home.tsx', source: sources['src/pages/home.tsx'].replace('first-home', 'second-home') },
+            { file: 'app-input.txt', source: 'reload' }
+        ]) {
+            if (change) {
                 completed = Promise.withResolvers<void>()
-                await publishSourceGeneration(
-                    path.join(root, 'src/pages/home.tsx'),
-                    sources['src/pages/home.tsx'].replace('first-home', marker)
-                )
+                await publishSourceGeneration(path.join(root, change.file), change.source)
             }
+            const marker = change ? 'second-home' : 'first-home'
             await completed.promise
             const app = JSON.parse(await readFile(path.join(root, 'dist/app.json'), 'utf8'))
             assert.deepEqual(app.pages, ['pages/home', 'pages/detail'])
+            const bootstrap = Object.values(output).find(
+                (file) => file.type === 'chunk' && file.facadeModuleId === miniBootstrapId
+            )
+            assert.ok(bootstrap?.type === 'chunk' && bootstrap.exports.includes('System'))
+            for (const fileName of [
+                'app.js',
+                'app-capsule.js',
+                bootstrap.fileName,
+                'comp.js',
+                'component-capsule.js',
+                'custom-wrapper.js'
+            ]) {
+                const chunk = output[fileName]
+                assert.ok(chunk?.type === 'chunk' && chunk.isEntry, fileName)
+                assert.equal(await readFile(path.join(root, 'dist', fileName), 'utf8'), chunk.code)
+            }
             for (const page of ['home', 'detail']) {
                 for (const suffix of ['.js', '-capsule.js']) {
                     const fileName = `pages/${page}${suffix}`
@@ -104,6 +138,8 @@ for (const [target, styleExtension] of [
                 .join('\n')
             assert.ok(javascript.includes(marker))
             assert.ok(javascript.includes('detail-page'))
+            assert.ok(javascript.includes('lazy-feature'))
         }
+        assert.ok(appLoads >= 2, 'The App shell must register its entries again after its dependency changes')
     })
 }

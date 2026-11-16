@@ -52,24 +52,24 @@ test('keeps App styles global and Page-shared component styles in each consumer'
     fixture.module('/app.js', ['/global.css'], ['/chrome.js'])
     fixture.module('/page.js?route=first', ['/shared.js', '/first.css'], [])
     fixture.module('/page.js?route=second', ['/shared.js', '/second.css'], [])
-    fixture.module(entries.appEntries.shellId, ['/shell.css'], [])
+    fixture.module(entries.appEntry.shellId, ['/shell.css'], [])
     fixture.module(entries.pageEntries[0]!.shellId, ['/shell.css'], [])
     const originalStyles = structuredClone(fixture.styles)
 
     const projection = fixture.project(true)
     const [first, second] = projection.pageEntries
     assert.ok(first && second)
-    assert.equal(projection.appEntries.css, '.global {}\n._chrome_hash {}')
-    assert.deepEqual([...projection.appEntries.styles.keys()], ['/global.css', '/chrome.module.css'])
+    assert.equal(projection.appEntry.css, '.global {}\n._chrome_hash {}')
+    assert.deepEqual([...projection.appEntry.styles.keys()], ['/global.css', '/chrome.module.css'])
     assert.equal(first.css, '._shared_hash {}\n.first {}')
     assert.equal(second.css, '._shared_hash {}\n.second {}')
     assert.deepEqual(first.classSet, new Set(['shared', 'first']))
     assert.deepEqual(second.classSet, new Set(['shared', 'second']))
-    assert.deepEqual(projection.appEntries.classSet, new Set(['global']))
+    assert.deepEqual(projection.appEntry.classSet, new Set(['global']))
     assert.deepEqual(projection.classSet, new Set(['global', 'shared', 'first', 'second']))
-    for (const [index, projected] of [projection.appEntries, ...projection.pageEntries].entries()) {
+    for (const [index, projected] of [projection.appEntry, ...projection.pageEntries].entries()) {
         const { styles, css, classSet, ...entry } = projected
-        assert.deepEqual(entry, [entries.appEntries, ...entries.pageEntries][index])
+        assert.deepEqual(entry, [entries.appEntry, ...entries.pageEntries][index])
         assert.ok(styles.size > 0 && css.length > 0 && classSet.size > 0)
     }
     assert.deepEqual(entries, originalEntries)
@@ -120,7 +120,7 @@ test('deduplicates physical query variants without pruning dependencies of App-o
 
     const projection = fixture.project(true)
     const page = projection.pageEntries[0]!
-    assert.deepEqual([...projection.appEntries.styles.keys()], [normalizePath(appCss)])
+    assert.deepEqual([...projection.appEntry.styles.keys()], [normalizePath(appCss)])
     assert.deepEqual([...page.styles.keys()], [normalizePath(extraCss), normalizePath(pageCss)])
     assert.equal(page.css, '.extra {}\n.page {}')
     assert.deepEqual(page.classSet, new Set(['extra', 'page']))
@@ -135,7 +135,7 @@ test('recomputes ownership and prunes removed imports without retaining stale CS
     fixture.module('/first.js', ['/shared.css', '/first.css'], [])
     fixture.module('/second.js', ['/shared.css'], [])
     const initial = fixture.project(true)
-    assert.equal(initial.appEntries.css, '.shared {}')
+    assert.equal(initial.appEntry.css, '.shared {}')
     assert.deepEqual(
         initial.pageEntries.map((entry) => entry.css),
         ['.first {}', '']
@@ -143,8 +143,8 @@ test('recomputes ownership and prunes removed imports without retaining stale CS
 
     fixture.module('/app.js', [], [])
     const pageOwned = fixture.project(true)
-    assert.equal(pageOwned.appEntries.css, '')
-    assert.deepEqual(pageOwned.appEntries.classSet, new Set())
+    assert.equal(pageOwned.appEntry.css, '')
+    assert.deepEqual(pageOwned.appEntry.classSet, new Set())
     assert.deepEqual(
         pageOwned.pageEntries.map((entry) => entry.css),
         ['.shared {}\n.first {}', '.shared {}']
@@ -171,7 +171,7 @@ test('recomputes ownership and prunes removed imports without retaining stale CS
     fixture.graph.delete('/first.css')
     const missing = fixture.project(true)
     assert.deepEqual(missing.classSet, new Set())
-    assert.equal(initial.appEntries.css, '.shared {}', 'Later projections must not mutate earlier snapshots')
+    assert.equal(initial.appEntry.css, '.shared {}', 'Later projections must not mutate earlier snapshots')
 })
 
 test('ignores missing and uncaptured styles while retaining an empty captured stylesheet', () => {
@@ -184,7 +184,7 @@ test('ignores missing and uncaptured styles while retaining an empty captured st
     fixture.module('/app.js', ['/pending.css', '/empty.css', '/missing.css', '/uncaptured.css'], [])
 
     const projection = fixture.project(true)
-    assert.deepEqual([...projection.appEntries.styles.keys()], ['/empty.css'])
+    assert.deepEqual([...projection.appEntry.styles.keys()], ['/empty.css'])
     assert.equal(projection.pageEntries[0]!.css, '')
     assert.equal(projection.pageEntries[0]!.styles.size, 0)
     assert.deepEqual(projection.classSet, new Set())
@@ -207,7 +207,7 @@ test('combines App and ordered Page roots once, including cyclic lazy styles and
     fixture.module('/second.js', ['/second.css', '/shared.css?two', '/shared.js'], [])
 
     const initial = fixture.project(false)
-    assert.equal(initial.appEntries.css, '.app {}\n.shared {}\n.lazy {}\n.first {}\n.second {}')
+    assert.equal(initial.appEntry.css, '.app {}\n.shared {}\n.lazy {}\n.first {}\n.second {}')
     assert.deepEqual(initial.classSet, new Set(['app', 'shared', 'lazy', 'first', 'second']))
     assert.deepEqual(
         initial.pageEntries,
@@ -221,21 +221,21 @@ test('combines App and ordered Page roots once, including cyclic lazy styles and
 
     fixture.module('/first.js', [], [])
     const retainedShared = fixture.project(false)
-    assert.equal(retainedShared.appEntries.css, '.app {}\n.second {}\n.shared {}\n.lazy {}')
+    assert.equal(retainedShared.appEntry.css, '.app {}\n.second {}\n.shared {}\n.lazy {}')
     assert.deepEqual(retainedShared.classSet, new Set(['app', 'second', 'shared', 'lazy']))
 
     fixture.module('/second.js', [], [])
     const removed = fixture.project(false)
-    assert.equal(removed.appEntries.css, '.app {}')
+    assert.equal(removed.appEntry.css, '.app {}')
     assert.deepEqual(removed.classSet, new Set(['app']))
-    assert.equal(initial.appEntries.styles.size, 5, 'Later projections must not mutate the earlier snapshot')
+    assert.equal(initial.appEntry.styles.size, 5, 'Later projections must not mutate the earlier snapshot')
 })
 
 test('preserves an empty App projection with no configured Pages', () => {
     const entries = createMiniStyleEntries('/app.js', [])
     const projection = createFixture(entries).project(true)
 
-    assert.deepEqual(projection.appEntries, { ...entries.appEntries, styles: new Map(), css: '', classSet: new Set() })
+    assert.deepEqual(projection.appEntry, { ...entries.appEntry, styles: new Map(), css: '', classSet: new Set() })
     assert.deepEqual(projection.pageEntries, [])
     assert.deepEqual(projection.classSet, new Set())
 })

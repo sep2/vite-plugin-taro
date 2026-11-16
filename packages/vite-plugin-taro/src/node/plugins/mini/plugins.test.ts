@@ -13,13 +13,24 @@ import {
     miniAppCapsuleId,
     miniAppShellId,
     miniBootstrapId,
+    miniComponentCapsuleId,
+    miniComponentShellId,
+    miniCustomWrapperShellId,
     miniPageCapsuleId,
     miniPageShellId
 } from './module/module.ts'
 import { createPlacementRolldownOptions } from './placer/placer.ts'
 import { createMiniTargetPlugins } from './plugins.ts'
 
-test('expands Page entries from the App shell alongside fixed compiler inputs', async () => {
+const infrastructureEntries = [
+    { id: miniBootstrapId, name: 'bootstrap' },
+    { id: miniAppCapsuleId, fileName: 'app-capsule.js' },
+    { id: miniComponentShellId, fileName: 'comp.js' },
+    { id: miniComponentCapsuleId, fileName: 'component-capsule.js' },
+    { id: miniCustomWrapperShellId, fileName: 'custom-wrapper.js' }
+]
+
+test('expands infrastructure and Page entries from the sole App shell input', async () => {
     // These test-owned counters track asynchronous configuration readiness and the single page snapshot read.
     let pagesReady = false
     let pageReads = 0
@@ -52,45 +63,22 @@ test('expands Page entries from the App shell alongside fixed compiler inputs', 
         'build'
     )
     const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
-    assert.ok(typeof compiler?.options === 'function' && typeof compiler.buildStart === 'function')
-    const optionsHook = compiler.options
+    assert.ok(typeof compiler?.buildStart === 'function')
     assert.ok(compiler.configResolved)
-    const clientOptions = Reflect.apply(optionsHook, { environment: { name: 'client', config } }, [{}])
-    const ssrOptions = Reflect.apply(optionsHook, { environment: { name: 'ssr', config } }, [{}])
-    assert.equal(clientOptions.input, ssrOptions.input)
+    assert.deepEqual(config.build.rolldownOptions.input, { 'app.js': miniAppShellId })
     assert.equal(pageReads, 1)
-    assert.equal(config.build.rolldownOptions.input, undefined)
-    // Capture the concrete inputs supplied at the native options boundary.
-    const inputs: Record<string, string>[] = []
     const bundle = await rolldown({
         ...createPlacementRolldownOptions(),
-        input: '/unused-entry.js',
+        input: config.build.rolldownOptions.input,
         treeshake: false,
         plugins: [
             {
-                name: 'test:async-options',
-                async options(options) {
-                    await Promise.resolve()
-                    return options
-                }
-            },
-            {
                 name: compiler.name,
-                options(options) {
-                    return Reflect.apply(optionsHook, { environment: { config } }, [options])
-                },
                 buildStart: compiler.buildStart,
                 load: compiler.load
             },
             {
                 name: 'test:resolved-entry-sources',
-                options(options) {
-                    const input = options.input
-                    assert.ok(input && typeof input === 'object' && !Array.isArray(input))
-                    assert.equal(options.treeshake, false)
-                    inputs.push({ ...input })
-                    return null
-                },
                 resolveId: normalizePath,
                 load: (id) => `export const source = ${JSON.stringify(id)}`
             }
@@ -98,26 +86,27 @@ test('expands Page entries from the App shell alongside fixed compiler inputs', 
     })
     try {
         const output = await bundle.generate({ format: 'es' })
-        assert.equal(inputs.length, 1)
         assert.equal(pageReads, 1)
-        assert.deepEqual(
-            Object.keys(inputs[0]!).filter((name) => name.startsWith('pages/')),
-            []
-        )
         const pageEntries = pages.flatMap((page) => [
             { id: `${miniPageShellId}?route=${encodeURIComponent(page.path)}`, fileName: `${page.path}.js` },
             { id: `${miniPageCapsuleId}?route=${encodeURIComponent(page.path)}`, fileName: `${page.path}-capsule.js` }
         ])
-        for (const entry of pageEntries) {
-            const chunk = output.output.find((file) => file.fileName === entry.fileName)
-            assert.ok(chunk?.type === 'chunk' && chunk.isEntry, entry.fileName)
-            assert.equal(chunk.facadeModuleId, normalizePath(entry.id))
+        for (const entry of [...infrastructureEntries, ...pageEntries]) {
+            const chunk = output.output.find(
+                (file) => file.type === 'chunk' && file.facadeModuleId === normalizePath(entry.id)
+            )
+            assert.ok(chunk?.type === 'chunk' && chunk.isEntry, entry.id)
+            if (entry.fileName !== undefined) {
+                assert.equal(chunk.fileName, entry.fileName)
+            }
         }
         assert.deepEqual(
             output.output
                 .flatMap((chunk) => (chunk.type === 'chunk' && chunk.isEntry ? [chunk.facadeModuleId] : []))
                 .sort(),
-            [...Object.values(inputs[0]!), ...pageEntries.map((entry) => entry.id)].map(normalizePath).sort()
+            [miniAppShellId, ...infrastructureEntries.map((entry) => entry.id), ...pageEntries.map((entry) => entry.id)]
+                .map(normalizePath)
+                .sort()
         )
     } finally {
         await bundle.close()
@@ -280,7 +269,8 @@ for (const [target, createContract] of [
                 )
                 assert.equal(config.build.cssCodeSplit, false)
                 const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
-                assert.ok(typeof compiler?.options === 'function' && typeof compiler.buildStart === 'function')
+                assert.ok(typeof compiler?.buildStart === 'function')
+                assert.deepEqual(config.build.rolldownOptions.input, { 'app.js': miniAppShellId })
                 assert.ok(compiler.configResolved)
                 assert.ok(compiler.load && typeof compiler.load === 'object')
                 // Record emitted entries and style roots to verify both environments use the same page graph.
@@ -306,9 +296,9 @@ for (const [target, createContract] of [
                     },
                     [miniAppShellId]
                 )
-                assert.deepEqual(
-                    emitted,
-                    pages.flatMap((page) => [
+                assert.deepEqual(emitted, [
+                    ...infrastructureEntries.map((entry) => ({ type: 'chunk', ...entry })),
+                    ...pages.flatMap((page) => [
                         {
                             type: 'chunk',
                             id: `${miniPageShellId}?route=${encodeURIComponent(page.path)}`,
@@ -320,7 +310,7 @@ for (const [target, createContract] of [
                             fileName: `${page.path}-capsule.js`
                         }
                     ])
-                )
+                ])
                 assert.deepEqual(entryIds, [
                     miniAppCapsuleId,
                     ...pages.map((page) => `${miniPageCapsuleId}?route=${encodeURIComponent(page.path)}`)

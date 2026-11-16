@@ -8,14 +8,9 @@ import { pageMetadataKey } from '../../page/page-metadata-key.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import {
     appShellFileName,
-    componentShellFileName,
-    customWrapperShellFileName,
     miniAppCapsuleId,
     miniAppShellId,
     miniBootstrapId,
-    miniComponentCapsuleId,
-    miniComponentShellId,
-    miniCustomWrapperShellId,
     miniPageCapsuleId,
     miniPageShellId,
     miniTransportId,
@@ -39,9 +34,6 @@ export function createResolver(
 ) {
     const normalizedAppCapsulePath = normalizePath(miniAppCapsuleId)
     const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
-
-    // Construct fixed inputs and App/Page entries together so traversal roots and native paths share one definition.
-    const entryGraph = createEntryGraph(pages)
 
     // Provide constant-time route validation and access to each configured Page JSON object.
     const pageByPath = new Map(pages.map((page) => [page.path, page]))
@@ -76,10 +68,19 @@ export function createResolver(
     ])
 
     return {
-        ...entryGraph,
-
-        // Native configuration uses the same ordered page metadata as module resolution and entry construction.
-        pages,
+        appEntry: {
+            capsuleId: miniAppCapsuleId,
+            capsuleName: 'app-capsule',
+            shellId: miniAppShellId,
+            shellName: appShellFileName
+        },
+        pageEntries: pages.map((page) => ({
+            page,
+            capsuleId: createRouteModuleId({ moduleId: miniPageCapsuleId, pagePath: page.path }),
+            capsuleName: `${page.path}-capsule`,
+            shellId: createRouteModuleId({ moduleId: miniPageShellId, pagePath: page.path }),
+            shellName: `${page.path}.js`
+        })),
 
         resolveId(
             id: string,
@@ -122,41 +123,6 @@ export function createResolver(
                 })
             }
         }
-    }
-}
-
-/** Declares fixed native inputs and ordered App/Page entries for each build. */
-function createEntryGraph(pages: readonly VptPageOption[]) {
-    const appEntries = {
-        capsuleId: miniAppCapsuleId,
-        capsuleName: 'app-capsule',
-        shellId: miniAppShellId,
-        shellName: appShellFileName
-    }
-
-    const pageEntries = pages.map((page) => {
-        return {
-            capsuleId: createRouteModuleId({ moduleId: miniPageCapsuleId, pagePath: page.path }),
-            capsuleName: `${page.path}-capsule`,
-            shellId: createRouteModuleId({ moduleId: miniPageShellId, pagePath: page.path }),
-            shellName: `${page.path}.js`
-        }
-    })
-
-    return {
-        // Reuse the same App/Page records for graph roots and native output paths instead of a separate ownership list.
-        entries: {
-            appEntries,
-            pageEntries
-        },
-        input: Object.fromEntries([
-            ['bootstrap', miniBootstrapId],
-            [appEntries.shellName, appEntries.shellId],
-            [appEntries.capsuleName, appEntries.capsuleId],
-            [componentShellFileName, miniComponentShellId],
-            ['component-capsule', miniComponentCapsuleId],
-            [customWrapperShellFileName, miniCustomWrapperShellId]
-        ])
     }
 }
 

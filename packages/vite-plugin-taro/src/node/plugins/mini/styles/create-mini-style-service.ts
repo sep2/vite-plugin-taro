@@ -47,7 +47,7 @@ type StylesheetInput = Readonly<{ fileName: string; css: string; app: boolean }>
 /** A successful native conversion keyed by its exact projected source. */
 type ConvertedStylesheet = Readonly<{ css: string; source: string }>
 
-type MiniEntries = Awaited<ReturnType<typeof createResolver>>['entries']
+type MiniEntries = Pick<ReturnType<typeof createResolver>, 'appEntry' | 'pageEntries'>
 
 type ModuleGraph = Parameters<typeof projectMiniStyles>[2]
 
@@ -219,16 +219,16 @@ export function createMiniStyleService(contract: Pick<MiniContract, 'styles'>, p
         /** Resolves exact graph roots and captures the graph reader used by host calls outside plugin hooks. */
         async startBuild(context: BuildContext, entries: MiniEntries): Promise<void> {
             // Resolve through Rolldown rather than reconstructing real paths, whose drive casing and separators vary on Windows.
-            const resolveEntry = async (entry: typeof entries.appEntries) => ({
+            const resolveEntry = async <Entry extends MiniEntries['appEntry']>(entry: Entry) => ({
                 ...entry,
                 capsuleId: (await context.resolve(entry.capsuleId))!.id
             })
-            const [appEntries, pageEntries] = await Promise.all([
-                resolveEntry(entries.appEntries),
+            const [appEntry, pageEntries] = await Promise.all([
+                resolveEntry(entries.appEntry),
                 Promise.all(entries.pageEntries.map(resolveEntry))
             ])
             // Commit App and Pages together so finalization never observes a partially resolved ownership snapshot.
-            resolvedEntries = { appEntries, pageEntries }
+            resolvedEntries = { appEntry, pageEntries }
             graphContext = context
         },
 
@@ -370,7 +370,7 @@ function createFinalizeOutput(styles: MiniContract['styles'], minify: BuildOptio
                     ? previousOutput.classSet
                     : projection.classSet
             const inputs = [
-                { fileName: styles.globalFileName, css: projection.appEntries.css, app: true },
+                { fileName: styles.globalFileName, css: projection.appEntry.css, app: true },
                 ...projection.pageEntries.map((entry) => ({
                     fileName: entry.shellName.replace(/\.js$/, extension),
                     css: entry.css,

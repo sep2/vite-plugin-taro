@@ -185,8 +185,15 @@ async function startDevFixture(
                             const app = bundle['app-capsule.js']
                             const page = bundle[pageCapsuleFileName]
                             assert.ok(app?.type === 'chunk' && page?.type === 'chunk')
-                            assert.ok(app.moduleIds.includes(normalizePath(path.join(root, 'src/app.tsx'))))
-                            assert.ok(app.moduleIds.includes(miniAppCapsuleId))
+                            const appImplementation = Object.values(bundle).find(
+                                (file) => file.type === 'chunk' && file.moduleIds.includes(miniAppCapsuleId)
+                            )
+                            assert.ok(appImplementation?.type === 'chunk')
+                            assert.equal(app.facadeModuleId, miniAppCapsuleId)
+                            assert.ok(app === appImplementation || app.imports.includes(appImplementation.fileName))
+                            assert.ok(
+                                appImplementation.moduleIds.includes(normalizePath(path.join(root, 'src/app.tsx')))
+                            )
                             assert.ok(page.moduleIds.includes(normalizePath(pagePath)))
                             assert.ok(page.moduleIds.includes(`${miniPageCapsuleId}?route=pages%2Fhome%2Findex`))
                             assert.match(page.code, /resolvePageComponent\([`"']src\/pages\/home\/index\.tsx[`"']/)

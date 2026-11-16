@@ -213,10 +213,14 @@ test('resolves App/Page capsules in cascade order without mutating their entry m
     )
     const observed = projections.at(-1)!
     assert.deepEqual(observed.entries, {
-        appEntries: { ...entries.appEntries, capsuleId: 'resolved:/app.js' },
+        appEntry: { ...entries.appEntry, capsuleId: 'resolved:/app.js' },
         pageEntries: entries.pageEntries.map((entry) => ({ ...entry, capsuleId: `resolved:${entry.capsuleId}` }))
     })
-    assert.equal(observed.projection.appEntries.css, sources[0][1])
+    for (const [index, entry] of entries.pageEntries.entries()) {
+        assert.strictEqual(observed.entries.pageEntries[index]!.page, entry.page)
+        assert.strictEqual(observed.projection.pageEntries[index]!.page, entry.page)
+    }
+    assert.equal(observed.projection.appEntry.css, sources[0][1])
     assert.deepEqual(
         observed.projection.pageEntries.map((entry) => entry.css),
         sources.slice(1).map(([, css]) => css)
@@ -252,16 +256,16 @@ test('moves styles from App to Page during HMR without changing JavaScript candi
     const code = "const name = 'py-5.5'"
     const initial = await fixture.update(code)
     const before = projections.at(-1)!.projection
-    assert.deepEqual(before.appEntries.classSet, new Set(['py-5.5']))
+    assert.deepEqual(before.appEntry.classSet, new Set(['py-5.5']))
     assert.equal(before.pageEntries[0]!.css, '')
 
     fixture.graph.set('/app.js', { importedIds: [], dynamicallyImportedIds: [] })
     const updated = await fixture.update(code)
     const after = projections.at(-1)!.projection
-    assert.equal(after.appEntries.css, '')
-    assert.deepEqual(after.appEntries.classSet, new Set())
-    assert.equal(after.pageEntries[0]!.css, before.appEntries.css)
-    assert.deepEqual(after.pageEntries[0]!.classSet, before.appEntries.classSet)
+    assert.equal(after.appEntry.css, '')
+    assert.deepEqual(after.appEntry.classSet, new Set())
+    assert.equal(after.pageEntries[0]!.css, before.appEntry.css)
+    assert.deepEqual(after.pageEntries[0]!.classSet, before.appEntry.classSet)
     assert.deepEqual(updated, initial)
     assert.equal(fixture.css.mock.callCount(), 4)
     assert.equal(fixture.published.length, 4)

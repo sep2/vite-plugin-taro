@@ -8,9 +8,16 @@ import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
 import { createMiniGlobalPlugin } from './global/create-mini-global-plugin.ts'
 import type { MiniContract } from './mini-contract.ts'
 import {
+    appShellFileName,
     classifyMiniModule,
+    componentShellFileName,
+    customWrapperShellFileName,
     miniAppCapsuleId,
     miniAppShellId,
+    miniBootstrapId,
+    miniComponentCapsuleId,
+    miniComponentShellId,
+    miniCustomWrapperShellId,
     miniPageCapsuleId,
     miniTaroRuntimeId
 } from './module/module.ts'
@@ -53,8 +60,8 @@ function createMiniPlugin(
     placement: MiniPlacementPlugin,
     styles: Pick<MiniStylePlugin, 'startBuild'>
 ): Plugin {
-    // Resolved project configuration installs one resolver before plugin containers or native engines invoke options.
-    // Compilation and recovery hooks share its page metadata, native inputs and stylesheet traversal roots.
+    // Resolved project configuration installs the resolver before compilation hooks consume
+    // its page metadata and stylesheet traversal roots.
     let resolver: MiniResolver
 
     return {
@@ -111,25 +118,35 @@ function createMiniPlugin(
                     // images bloat the JS bundle toward the mini program package limit.
                     assetsInlineLimit: 0,
 
-                    target: esTarget
+                    target: esTarget,
+
+                    rolldownOptions: {
+                        input: { [appShellFileName]: miniAppShellId }
+                    }
                 }
             }
         },
 
-        options(options) {
-            return { ...options, input: resolver.input }
-        },
-
         /** Supplies the complete App/Page entry graph to styles at each compilation boundary. */
         buildStart() {
-            return styles.startBuild(this, resolver.entries)
+            return styles.startBuild(this, resolver)
         },
 
-        /** The App shell owns Page entry emission, including replay from the bundler's module cache. */
+        /** The App shell owns all other entries, including replay from the bundler's module cache. */
         load: {
             filter: { id: createExactModuleIdFilter(miniAppShellId) },
             handler() {
-                for (const entry of resolver.entries.pageEntries) {
+                // Rolldown allocates the shared runtime filename; native entry paths remain fixed.
+                this.emitFile({ type: 'chunk', id: miniBootstrapId, name: 'bootstrap' })
+                this.emitFile({
+                    type: 'chunk',
+                    id: resolver.appEntry.capsuleId,
+                    fileName: `${resolver.appEntry.capsuleName}.js`
+                })
+                this.emitFile({ type: 'chunk', id: miniComponentShellId, fileName: componentShellFileName })
+                this.emitFile({ type: 'chunk', id: miniComponentCapsuleId, fileName: 'component-capsule.js' })
+                this.emitFile({ type: 'chunk', id: miniCustomWrapperShellId, fileName: customWrapperShellFileName })
+                for (const entry of resolver.pageEntries) {
                     this.emitFile({ type: 'chunk', id: entry.shellId, fileName: entry.shellName })
                     this.emitFile({ type: 'chunk', id: entry.capsuleId, fileName: `${entry.capsuleName}.js` })
                 }
@@ -197,7 +214,7 @@ function createMiniPlugin(
                 const outputFiles = await createOutputFiles({
                     bundle,
                     contract,
-                    pages: resolver.pages,
+                    pages: resolver.pageEntries.map((entry) => entry.page),
                     subpackages,
                     isProduction: this.environment.config.isProduction,
                     getModuleInfo: (moduleId) => this.getModuleInfo(moduleId),

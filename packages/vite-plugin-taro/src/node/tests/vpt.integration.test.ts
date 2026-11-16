@@ -5,7 +5,7 @@ import { createContext, runInContext } from 'node:vm'
 import type { OutputAsset, OutputChunk } from 'rolldown'
 import { type BuildOptions, normalizePath, build as viteBuild } from 'vite'
 import vpt, { type VptOptions, type VptTarget } from '../../index.ts'
-import { classifyMiniModule } from '../plugins/mini/module/module.ts'
+import { classifyMiniModule, miniBootstrapId } from '../plugins/mini/module/module.ts'
 import { resolveVptRuntime } from '../utils/packages.ts'
 import { createMemoryBuildProject } from './create-memory-build-project.ts'
 
@@ -110,7 +110,15 @@ function requireChunk(output: BuildOutput, fileName: string): OutputChunk {
     return chunk
 }
 
-/** Native shells share one bootstrap entry rather than a separate facade or ambient System binding. */
+function requireBootstrapEntry(output: BuildOutput): OutputChunk {
+    const bootstrap = output.find(
+        (file): file is OutputChunk => file.type === 'chunk' && file.facadeModuleId === miniBootstrapId
+    )
+    assert.ok(bootstrap, 'Missing bootstrap entry')
+    return bootstrap
+}
+
+/** Native shells import the shared bootstrap entry's System export. */
 function assertNativeShells(output: BuildOutput): void {
     assert.equal(
         output.some((file) => file.fileName === 'common/vpt.js'),
@@ -120,11 +128,19 @@ function assertNativeShells(output: BuildOutput): void {
     const transport = requireAsset(output, 'common/vpt-transport.js')
     requireChunk(output, 'common/vpt-global.js')
     assert.doesNotMatch(String(transport.source), /registerModule|case ["']common\/vpt-(?:global|transport)\.js/)
-    assert.match(requireChunk(output, 'common/bootstrap.js').code, /require\(["']\.\/vpt-transport\.js["']\)/)
+    const bootstrap = requireBootstrapEntry(output)
+    const implementation = output.find(
+        (file): file is OutputChunk => file.type === 'chunk' && file.moduleIds.includes(miniBootstrapId)
+    )
+    assert.ok(implementation, 'Missing bootstrap implementation')
+    assert.match(implementation.code, /require\(["']\.\/vpt-transport\.js["']\)/)
     for (const fileName of ['app.js', 'pages/home/index.js', 'comp.js', 'custom-wrapper.js']) {
         const { code } = requireChunk(output, fileName)
         assert.doesNotMatch(code, /common\/vpt\.js/)
-        assert.equal([...code.matchAll(/\brequire\(["'](?:\.\.?\/)+common\/bootstrap\.js["']\)/g)].length, 1, fileName)
+        const relative = path.posix.relative(path.posix.dirname(fileName), bootstrap.fileName)
+        const specifier = relative.startsWith('.') ? relative : `./${relative}`
+        const bootstrapImport = new RegExp(`\\brequire\\(["']${RegExp.escape(specifier)}["']\\)`, 'g')
+        assert.equal([...code.matchAll(bootstrapImport)].length, 1, fileName)
         assert.match(code, /\.System\.importSync/)
         assert.doesNotMatch(code, /(?:globalThis|wx|my)\.System\.importSync/)
         assert.doesNotMatch(code, /^\s*import\s/m)
@@ -193,7 +209,7 @@ function assertPageRegistration(output: BuildOutput, target: VptTarget, route: s
         )
         return module.exports
     }
-    const runtime = load('common/bootstrap.js')
+    const runtime = load(requireBootstrapEntry(output).fileName)
     assert.ok(runtime && typeof runtime === 'object')
     assert.equal(Object.hasOwn(runtime, 'getPageQuery'), false)
     assert.equal(

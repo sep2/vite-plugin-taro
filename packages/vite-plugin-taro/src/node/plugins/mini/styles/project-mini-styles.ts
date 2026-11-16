@@ -1,7 +1,7 @@
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import type { createResolver } from '../resolve/resolver.ts'
 
-type MiniEntries = Awaited<ReturnType<typeof createResolver>>['entries']
+type MiniEntries = Pick<ReturnType<typeof createResolver>, 'appEntry' | 'pageEntries'>
 
 /** Projection needs captured CSS and candidates, not the retained compiler or its invalidation state. */
 type StyleSource = Readonly<{
@@ -38,27 +38,27 @@ export function projectMiniStyles(
     cssCodeSplit: boolean
 ) {
     const appRoots = cssCodeSplit
-        ? [entries.appEntries.capsuleId]
-        : [entries.appEntries.capsuleId, ...entries.pageEntries.map((entry) => entry.capsuleId)]
-    const appEntries = {
-        ...entries.appEntries,
+        ? [entries.appEntry.capsuleId]
+        : [entries.appEntry.capsuleId, ...entries.pageEntries.map((entry) => entry.capsuleId)]
+    const appEntry = {
+        ...entries.appEntry,
         ...projectStyles(appRoots, new Set<string>(), styleByModuleId, context)
     }
-    const appStyleIds = new Set(appEntries.styles.keys())
+    const appStyleIds = new Set(appEntry.styles.keys())
     const pageEntries = entries.pageEntries.map((entry) => ({
         ...entry,
         ...projectStyles(cssCodeSplit ? [entry.capsuleId] : [], appStyleIds, styleByModuleId, context)
     }))
 
     // This transaction-local union keeps shared JavaScript consistent with every App/Page stylesheet.
-    const classSet = new Set(appEntries.classSet)
+    const classSet = new Set(appEntry.classSet)
     for (const page of pageEntries) {
         for (const candidate of page.classSet) {
             classSet.add(candidate)
         }
     }
 
-    return { appEntries, pageEntries, classSet }
+    return { appEntry, pageEntries, classSet }
 }
 
 /** Traverses an ordered set of capsules without pruning dependency edges of excluded App-owned stylesheets. */

@@ -4,15 +4,16 @@ import type { createResolver } from '../plugins/mini/resolve/resolver.ts'
 export function createMiniStyleEntries(
     appId: string,
     pageIds: readonly string[]
-): Awaited<ReturnType<typeof createResolver>>['entries'] {
+): Pick<ReturnType<typeof createResolver>, 'appEntry' | 'pageEntries'> {
     return {
-        appEntries: {
+        appEntry: {
             capsuleId: appId,
             capsuleName: 'app-capsule',
             shellId: `${appId}?shell`,
             shellName: 'app.js'
         },
         pageEntries: pageIds.map((capsuleId, index) => ({
+            page: { path: `pages/page-${index}/index` },
             capsuleId,
             capsuleName: `pages/page-${index}/index-capsule`,
             shellId: `${capsuleId}?shell`,
