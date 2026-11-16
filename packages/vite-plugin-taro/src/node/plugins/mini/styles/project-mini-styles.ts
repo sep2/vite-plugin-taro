@@ -1,7 +1,7 @@
 import { normalizeModuleId } from '../../../utils/modules.ts'
-import type { createResolver } from '../resolve/resolver.ts'
+import type { createMiniResolver } from '../resolve/create-mini-resolver.ts'
 
-type MiniResolver = ReturnType<typeof createResolver>
+type MiniResolver = ReturnType<typeof createMiniResolver>
 type MiniEntries = {
     appEntry: MiniResolver['appEntry']
     pageEntries: ReturnType<MiniResolver['pageEntries']>

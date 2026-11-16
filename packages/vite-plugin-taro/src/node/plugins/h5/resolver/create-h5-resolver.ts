@@ -5,9 +5,16 @@ import { appComponentId } from '../../client/constant.ts'
 import { h5AppPath } from '../constant.ts'
 import { transformH5App } from '../transform-app.ts'
 
-/** Creates H5 application module resolution and specialization from resolved pages. */
-export function createModuleResolver(options: Readonly<VptOptions>, pages: readonly VptPageOption[]) {
+/** Creates H5 application module resolution and specialization for the current pages. */
+export function createH5Resolver(options: Readonly<VptOptions>) {
+    // setPages replaces the ordered snapshot consumed by subsequent App transforms.
+    let pages: readonly VptPageOption[] = []
+
     return {
+        setPages(resolvedPages: readonly VptPageOption[]) {
+            pages = resolvedPages
+        },
+
         resolveId({ id, projectRoot }: { id: string; projectRoot: string }): string | undefined {
             if (id === appComponentId) {
                 return resolveAppComponentPath({ appPath: options.app, projectRoot })

@@ -28,7 +28,7 @@ import { specializePageCapsule } from './specialize-page-capsule.ts'
 type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => string
 
 /** Creates fixed private-ID resolution and the source specializer for the current Mini Program pages. */
-export function createResolver(contract: Pick<MiniContract, 'options' | 'taro' | 'supportsPagePrerender'>) {
+export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'taro' | 'supportsPagePrerender'>) {
     const normalizedAppCapsulePath = normalizePath(miniAppCapsuleId)
     const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
 

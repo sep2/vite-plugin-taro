@@ -8,7 +8,7 @@ import { publishSourceGeneration } from '../../tests/publish-source-generation.t
 import vpt from '../../vpt.ts'
 import { miniAppShellId, miniBootstrapId } from './module/module.ts'
 
-test('builds the App and infrastructure with no discovered pages', async () => {
+test('builds the App and infrastructure with an omitted page list', async () => {
     const root = await createTestProject('mini-empty-app-')
     await mkdir(path.join(root, 'src'))
     await writeFile(path.join(root, 'src/app.tsx'), 'export default function App({ children }) { return children }')
@@ -31,20 +31,12 @@ test('builds the App and infrastructure with no discovered pages', async () => {
     }
 })
 
-test('serve resolves async page factories before publishing startup output', { timeout: 20_000 }, async (context) => {
+test('serve registers configured pages before publishing startup output', { timeout: 20_000 }, async (context) => {
     const root = await createTestProject('mini-app-session-')
     await mkdir(path.join(root, 'src'))
     await writeFile(path.join(root, 'src/app.tsx'), 'export default function App({ children }) { return children }')
-    await writeFile(
-        path.join(root, 'src/home.tsx'),
-        `import { defineVptPage } from 'virtual:vpt';
-        defineVptPage(async () => {
-            await Promise.resolve();
-            return { config: { navigationBarTitleText: 'Home' } };
-        });
-        export default function Home() { return null; }`
-    )
-    // Count option reads at the App-owned evaluation boundary.
+    await writeFile(path.join(root, 'src/home.tsx'), 'export default function Home() { return null; }')
+    // Count configured page reads at App entry registration.
     let pageReads = 0
     const completed = Promise.withResolvers<void>()
     const server = await createServer({
@@ -57,7 +49,7 @@ test('serve resolves async page factories before publishing startup output', { t
                 app: 'src/app.tsx',
                 get pages() {
                     pageReads += 1
-                    return undefined
+                    return [{ path: 'home', config: { navigationBarTitleText: 'Home' } }]
                 },
                 appJson: {},
                 projectConfigJson: {}
@@ -102,12 +94,7 @@ for (const [target, styleExtension] of [
             'src/pages/home.tsx': `
                 import { View } from '@tarojs/components'
                 import { lazy } from 'react'
-                import { defineVptPage } from 'virtual:vpt'
                 import './home.css'
-                defineVptPage(async () => {
-                    await Promise.resolve()
-                    return { entry: true, config: { ${JSON.stringify(titleKey)}: 'first-home' } }
-                })
                 const Feature = lazy(() => import('../feature'))
                 export default function Home() { return <View className="home">first-home<Feature /></View> }
             `,
@@ -116,9 +103,7 @@ for (const [target, styleExtension] of [
             'src/feature.tsx': 'export default function Feature() { return "lazy-feature" }',
             'src/pages/detail.tsx': `
                 import { View } from '@tarojs/components'
-                import { defineVptPage } from 'virtual:vpt'
                 import './detail.css'
-                defineVptPage(() => ({}))
                 export default function Detail() { return <View className="detail">detail-page</View> }
             `,
             'src/pages/detail.css': '.detail { color: blue; }'
@@ -144,6 +129,10 @@ for (const [target, styleExtension] of [
                 vpt({
                     target,
                     app: 'src/app.tsx',
+                    pages: [
+                        { path: 'pages/detail' },
+                        { path: 'pages/home', entry: true, config: { [titleKey]: 'Home' } }
+                    ],
                     appJson: {},
                     projectConfigJson: {}
                 }),
@@ -197,7 +186,7 @@ for (const [target, styleExtension] of [
             const app = JSON.parse(await readFile(path.join(root, 'dist/app.json'), 'utf8'))
             assert.deepEqual(app.pages, ['pages/home', 'pages/detail'])
             const home = JSON.parse(await readFile(path.join(root, 'dist/pages/home.json'), 'utf8'))
-            assert.equal(home[titleKey], marker)
+            assert.equal(home[titleKey], 'Home')
             const bootstrap = Object.values(output).find(
                 (file) => file.type === 'chunk' && file.facadeModuleId === miniBootstrapId
             )

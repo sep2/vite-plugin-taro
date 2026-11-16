@@ -23,7 +23,7 @@ import {
     taroTargetRuntimeId,
     vitePreloadId
 } from '../module/module.ts'
-import { createResolver } from './resolver.ts'
+import { createMiniResolver } from './create-mini-resolver.ts'
 
 const modules = {
     bootstrap: miniBootstrapId,
@@ -63,7 +63,7 @@ const contract = {
 } satisfies Pick<MiniContract, 'options' | 'taro' | 'supportsPagePrerender'>
 
 test('resolves fixed IDs immediately and Page IDs after setPages', () => {
-    const resolver = createResolver(contract)
+    const resolver = createMiniResolver(contract)
     const projectRoot = path.resolve('/project')
 
     assert.deepEqual(resolver.appEntry, {
@@ -111,7 +111,7 @@ for (const [target, createContract] of [
     test(`${target}: resolves the selected target host for every renderer configuration`, () => {
         for (const selection of [{}, { renderer: 'template' }, { renderer: 'dom' }] as const) {
             const targetContract = createContract({ ...contract.options, target, ...selection })
-            const resolver = createResolver(targetContract)
+            const resolver = createMiniResolver(targetContract)
 
             assert.equal(
                 resolver.resolveId(rendererHostId, undefined, path.resolve('/project')),
@@ -127,9 +127,9 @@ for (const [target, createContract] of [
 
 test('resolves custom renderer hosts independently of App/Page entries', () => {
     const targetContract = createTtMiniContract({ ...contract.options, target: 'tt', renderer: 'dom' })
-    const resolver = createResolver(targetContract)
+    const resolver = createMiniResolver(targetContract)
 
-    const customHostResolver = createResolver({
+    const customHostResolver = createMiniResolver({
         ...targetContract,
         taro: { ...targetContract.taro, hostPath: '/runtime/custom-host.ts' }
     })
@@ -150,7 +150,7 @@ test('preserves resolved Page order in the App-owned entries', () => {
     ]
     Object.freeze(pages)
     const input = Object.freeze({ ...contract, options: Object.freeze({ ...contract.options }) })
-    const resolver = createResolver(input)
+    const resolver = createMiniResolver(input)
     resolver.setPages(pages)
 
     const { appEntry } = resolver
@@ -174,11 +174,11 @@ test('preserves resolved Page order in the App-owned entries', () => {
             shellName: 'features/account/pages/a-first/index.js'
         }
     ])
-    assert.deepEqual(appEntry, createResolver(input).appEntry)
+    assert.deepEqual(appEntry, createMiniResolver(input).appEntry)
 })
 
 test('retains App entries with an empty resolved Page list', () => {
-    const resolver = createResolver(contract)
+    const resolver = createMiniResolver(contract)
 
     assert.deepEqual(resolver.appEntry, {
         capsuleId: modules.appCapsule,
@@ -190,7 +190,7 @@ test('retains App entries with an empty resolved Page list', () => {
 })
 
 test('setPages updates entries, route resolution and capsule metadata together', () => {
-    const resolver = createResolver(contract)
+    const resolver = createMiniResolver(contract)
     const { appEntry, resolveId, specialize } = resolver
     const projectRoot = path.resolve('/project')
     const generations: readonly (readonly VptPageOption[])[] = [
@@ -252,7 +252,7 @@ for (const supportsPagePrerender of [false, true]) {
             options: Object.freeze({ ...contract.options, pages: [page] }),
             supportsPagePrerender
         })
-        const resolver = createResolver(fixedContract)
+        const resolver = createMiniResolver(fixedContract)
         resolver.setPages([page])
         const result = resolver.specialize(
             'const options = __VPT_PAGE_OPTIONS__',
@@ -267,7 +267,7 @@ for (const supportsPagePrerender of [false, true]) {
 }
 
 test('rejects Page-private imports without one configured route origin', () => {
-    const resolver = createResolver(contract)
+    const resolver = createMiniResolver(contract)
     resolver.setPages(contract.options.pages)
     const projectRoot = path.resolve('/project')
 
@@ -286,7 +286,7 @@ test('rejects Page-private imports without one configured route origin', () => {
 })
 
 test('specializes the App capsule with the configured App JSON', () => {
-    const resolver = createResolver(contract)
+    const resolver = createMiniResolver(contract)
     resolver.setPages(contract.options.pages)
     const result = resolver.specialize('export default __VPT_APP_CONFIG__', modules.appCapsule)
 

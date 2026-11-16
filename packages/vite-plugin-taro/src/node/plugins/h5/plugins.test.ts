@@ -90,7 +90,7 @@ test('configures H5 runtime resolution and optimization', async () => {
     assert.deepEqual(optimizerAdapter.transform, applicationAdapter.transform)
 })
 
-test('shares configured page metadata between client and SSR after project initialization', async () => {
+test('shares configured page metadata between client and SSR', async () => {
     // This fixture-owned counter verifies that both environments consume one initialized page graph.
     let pageReads = 0
     const pages = [{ path: 'pages/about' }, { path: 'pages/home', entry: true }]
@@ -109,7 +109,7 @@ test('shares configured page metadata between client and SSR after project initi
         'serve'
     )
     const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:h5')
-    assert.ok(compiler?.configResolved)
+    assert.ok(compiler)
     assert.ok(compiler.transform && typeof compiler.transform === 'object')
     const source = 'const config = __VPT_H5_APP_CONFIG__; config.routes = __VPT_H5_ROUTES__;'
     for (const name of ['client', 'ssr']) {

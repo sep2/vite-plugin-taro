@@ -164,20 +164,22 @@ test('App loading validates pages before registering dependent entries', async (
     )
     const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
     assert.ok(compiler?.load && typeof compiler.load === 'object')
+    const load = compiler.load.handler
     // Observe registrations at the App-owned emission boundary.
     const emitted: Rolldown.EmittedFile[] = []
-    await assert.rejects(
-        Reflect.apply(
-            compiler.load.handler,
-            {
-                environment: { config },
-                emitFile(file: Rolldown.EmittedFile) {
-                    emitted.push(file)
-                    return ''
-                }
-            },
-            [miniAppShellId]
-        ),
+    assert.throws(
+        () =>
+            Reflect.apply(
+                load,
+                {
+                    environment: { config },
+                    emitFile(file: Rolldown.EmittedFile) {
+                        emitted.push(file)
+                        return ''
+                    }
+                },
+                [miniAppShellId]
+            ),
         /Only one page may set entry: true/
     )
     assert.deepEqual(emitted, [])
@@ -370,9 +372,7 @@ for (const [target, createContract] of [
                         return ''
                     }
                 }
-                const loading = Reflect.apply(compiler.load.handler, loadContext, [miniAppShellId])
-                assert.deepEqual(emitted, [], 'Entry registration awaits page resolution')
-                await loading
+                Reflect.apply(compiler.load.handler, loadContext, [miniAppShellId])
                 const renderContext = {
                     async resolve(id: string) {
                         entryIds.push(id)

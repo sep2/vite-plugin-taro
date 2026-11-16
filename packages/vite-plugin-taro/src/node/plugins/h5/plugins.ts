@@ -4,11 +4,11 @@ import type { VptOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { createExactModuleIdFilter, toViteFileImportPath } from '../../utils/modules.ts'
 import { resolveTaroRuntime } from '../../utils/packages.ts'
-import { resolvePages } from '../page/resolve-pages.ts'
+import { orderPages } from '../page/order-pages.ts'
 import { tailwindcssBasedir } from '../tailwind/tailwind-css.ts'
 import { h5AppPath } from './constant.ts'
 import { createStencilClientAdapter } from './create-stencil-client-adapter.ts'
-import { createModuleResolver } from './resolver/module-resolver.ts'
+import { createH5Resolver } from './resolver/create-h5-resolver.ts'
 
 /** Creates the plugins that own the H5 target. */
 export function createH5TargetPlugins(options: Readonly<VptOptions>): PluginOption[] {
@@ -22,22 +22,12 @@ export function createH5TargetPlugins(options: Readonly<VptOptions>): PluginOpti
 
 /** Configures H5 resolution and supplies the specialized physical application entry. */
 function createH5Plugin(options: Readonly<VptOptions>): Plugin {
-    // Resolved project configuration installs one page graph shared by application environments.
-    let moduleResolver: ReturnType<typeof createModuleResolver>
+    const resolver = createH5Resolver(options)
+
+    resolver.setPages(orderPages(options.pages ?? []))
 
     return {
         name: 'vpt:h5',
-        async configResolved(config) {
-            const pages = await resolvePages({
-                pages: options.pages,
-                target: options.target,
-                root: config.root,
-                define: config.define,
-                resolve: config.resolve
-            })
-            moduleResolver = createModuleResolver(options, pages)
-        },
-
         config() {
             return {
                 define: createH5Defines(),
@@ -128,7 +118,7 @@ function createH5Plugin(options: Readonly<VptOptions>): Plugin {
         resolveId: {
             order: 'pre',
             handler(id) {
-                return moduleResolver.resolveId({
+                return resolver.resolveId({
                     id,
                     projectRoot: this.environment.config.root
                 })
@@ -139,7 +129,7 @@ function createH5Plugin(options: Readonly<VptOptions>): Plugin {
             order: 'pre',
             filter: { id: createExactModuleIdFilter(h5AppPath) },
             handler(code, id) {
-                return moduleResolver.transform({
+                return resolver.transform({
                     code,
                     id,
                     projectRoot: this.environment.config.root,

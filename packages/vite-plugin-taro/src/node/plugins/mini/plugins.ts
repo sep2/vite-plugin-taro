@@ -3,7 +3,7 @@ import { esTarget } from '../../utils/constant.ts'
 import { createExactModuleIdFilter } from '../../utils/modules.ts'
 import { packageRequire, resolveTaroRuntime } from '../../utils/packages.ts'
 import type { AstTransformResult } from '../../utils/transform.ts'
-import { resolvePages } from '../page/resolve-pages.ts'
+import { orderPages } from '../page/order-pages.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
 import { createMiniGlobalPlugin } from './global/create-mini-global-plugin.ts'
 import type { MiniContract } from './mini-contract.ts'
@@ -29,7 +29,7 @@ import { createMiniPlacementPlugin, type MiniPlacementPlugin } from './placer/pl
 import { createMiniPolyfillPlugin } from './polyfill/create-mini-polyfill-plugin.ts'
 import { renderCapsule } from './render/capsule.ts'
 import { renderNative } from './render/native.ts'
-import { createResolver } from './resolve/resolver.ts'
+import { createMiniResolver } from './resolve/create-mini-resolver.ts'
 import { createMiniStylePlugin, type MiniStylePlugin } from './styles/plugins.ts'
 import { createMiniWatchPlugin } from './watch/create-mini-watch-plugin.ts'
 
@@ -58,7 +58,7 @@ function createMiniPlugin(
     placement: MiniPlacementPlugin,
     styles: Pick<MiniStylePlugin, 'bindEntries'>
 ): Plugin {
-    const resolver = createResolver(contract)
+    const resolver = createMiniResolver(contract)
 
     return {
         name: 'vpt:mini',
@@ -120,17 +120,8 @@ function createMiniPlugin(
         /** The App shell owns all other entries, including replay from the bundler's module cache. */
         load: {
             filter: { id: createExactModuleIdFilter(miniAppShellId) },
-            async handler() {
-                const config = this.environment.config
-
-                const pages = await resolvePages({
-                    pages: contract.options.pages,
-                    target: contract.options.target,
-                    root: config.root,
-                    define: config.define,
-                    resolve: config.resolve
-                })
-                resolver.setPages(pages)
+            handler() {
+                resolver.setPages(orderPages(contract.options.pages ?? []))
 
                 // Rolldown allocates the shared runtime filename; native entry paths remain fixed.
                 this.emitFile({ type: 'chunk', id: miniBootstrapId, name: 'bootstrap' })
