@@ -30,6 +30,7 @@ for (const [target, styleExtension] of [
                 export default function Home() { return <View className="home">first-home<Feature /></View> }
             `,
             'src/pages/home.css': '.home { color: red; }',
+            'src/pages/updated-home.css': '.home { color: green; }',
             'src/feature.tsx': 'export default function Feature() { return "lazy-feature" }',
             'src/pages/detail.tsx': `
                 import { View } from '@tarojs/components'
@@ -49,7 +50,7 @@ for (const [target, styleExtension] of [
         // Each completed build publishes its bundle; the next save gets a fresh completion promise.
         let output: Rolldown.OutputBundle = {}
         let completed = Promise.withResolvers<void>()
-        // The fixture-owned dependency forces an App shell reload after testing cached entry replay.
+        // The fixture-owned dependency forces an App shell reload independently of Page edits.
         let appLoads = 0
         const watcher = await build({
             root,
@@ -96,7 +97,12 @@ for (const [target, styleExtension] of [
 
         for (const change of [
             undefined,
-            { file: 'src/pages/home.tsx', source: sources['src/pages/home.tsx'].replace('first-home', 'second-home') },
+            {
+                file: 'src/pages/home.tsx',
+                source: sources['src/pages/home.tsx']
+                    .replace('first-home', 'second-home')
+                    .replace('./home.css', './updated-home.css')
+            },
             { file: 'app-input.txt', source: 'reload' }
         ]) {
             if (change) {
@@ -131,7 +137,14 @@ for (const [target, styleExtension] of [
                     assert.equal(await readFile(path.join(root, 'dist', fileName), 'utf8'), chunk.code)
                 }
                 const style = await readFile(path.join(root, `dist/pages/${page}.${styleExtension}`), 'utf8')
-                assert.match(style, page === 'home' ? /red/ : /blue/)
+                if (page === 'home') {
+                    assert.match(style, change ? /green/ : /red/)
+                    if (change) {
+                        assert.doesNotMatch(style, /red/)
+                    }
+                } else {
+                    assert.match(style, /blue/)
+                }
             }
             const javascript = Object.values(output)
                 .flatMap((file) => (file.type === 'chunk' ? [file.code] : []))
@@ -140,6 +153,6 @@ for (const [target, styleExtension] of [
             assert.ok(javascript.includes('detail-page'))
             assert.ok(javascript.includes('lazy-feature'))
         }
-        assert.ok(appLoads >= 2, 'The App shell must register its entries again after its dependency changes')
+        assert.ok(appLoads >= 2, 'The App dependency change reloads its owning shell')
     })
 }

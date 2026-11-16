@@ -76,10 +76,10 @@ async function createStyleFixture(
     const cssPost: Plugin = { name: 'vite:css-post', transform: (code) => ({ code, map: null }) }
     const config = plugin.config
     const configResolved = plugin.configResolved
-    const buildStart = plugin.buildStart
+    const renderStart = plugin.renderStart
     const transform = plugin.transform
     assert.ok(config && typeof config === 'object')
-    assert.ok(typeof configResolved === 'function' && typeof buildStart === 'function')
+    assert.ok(typeof configResolved === 'function' && typeof renderStart === 'function')
     assert.ok(transform && typeof transform === 'object')
     await Reflect.apply(config.handler, {}, [{ build: { cssMinify, ...build } }])
     // Retain diagnostics so tests can distinguish tolerated native CSS errors from rejected transactions.
@@ -113,7 +113,7 @@ async function createStyleFixture(
         addWatchFile() {},
         emitFile: testContext.mock.fn()
     }
-    await Reflect.apply(buildStart, context, [])
+    await Reflect.apply(renderStart, context, [])
     // Capture publication in memory; these tests never create source fixtures, output files, or watchers.
     const published: { fileName: string; source: string }[] = []
     const publish = async (fileName: string, source: string) => {
@@ -195,8 +195,8 @@ test('resolves App/Page capsules in cascade order without mutating their entry m
         fixture.graph.set(styleId, { importedIds: [], dynamicallyImportedIds: [] })
         await fixture.capture(styleId, css)
     }
-    assert.ok(typeof fixture.plugin.buildStart === 'function')
-    await Reflect.apply(fixture.plugin.buildStart, fixture.context, [])
+    assert.ok(typeof fixture.plugin.renderStart === 'function')
+    await Reflect.apply(fixture.plugin.renderStart, fixture.context, [])
     await fixture.update('export {}')
 
     assert.deepEqual(
@@ -240,8 +240,8 @@ test('keeps the previous resolved ownership snapshot when a Page resolution fail
         }
         return { id: `new:${id}` }
     })
-    assert.ok(typeof fixture.plugin.buildStart === 'function')
-    await assert.rejects(Reflect.apply(fixture.plugin.buildStart, fixture.context, []), /Page resolution failed/)
+    assert.ok(typeof fixture.plugin.renderStart === 'function')
+    await assert.rejects(Reflect.apply(fixture.plugin.renderStart, fixture.context, []), /Page resolution failed/)
     await fixture.update('export {}')
 
     assert.strictEqual(projections.at(-1)!.entries, previousEntries)

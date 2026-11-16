@@ -58,7 +58,7 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
 function createMiniPlugin(
     contract: MiniContract,
     placement: MiniPlacementPlugin,
-    styles: Pick<MiniStylePlugin, 'startBuild'>
+    styles: Pick<MiniStylePlugin, 'bindEntries'>
 ): Plugin {
     // Resolved project configuration installs the resolver before compilation hooks consume
     // its page metadata and stylesheet traversal roots.
@@ -127,9 +127,9 @@ function createMiniPlugin(
             }
         },
 
-        /** Supplies the complete App/Page entry graph to styles at each compilation boundary. */
-        buildStart() {
-            return styles.startBuild(this, resolver)
+        /** Binds stylesheet roots to the current graph before each complete output, including cached App loads. */
+        renderStart() {
+            return styles.bindEntries(this, resolver)
         },
 
         /** The App shell owns all other entries, including replay from the bundler's module cache. */

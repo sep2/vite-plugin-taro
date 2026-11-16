@@ -4,7 +4,7 @@ import type { MiniContract } from '../mini-contract.ts'
 import { createMiniStyleService, type MiniStyleService } from './create-mini-style-service.ts'
 
 /** Vite lifecycle adapter that publishes valid native CSS before patches, retaining last-good styles on CSS errors. */
-export type MiniStylePlugin = Plugin & Pick<MiniStyleService, 'startBuild' | 'finalizeUpdate'>
+export type MiniStylePlugin = Plugin & Pick<MiniStyleService, 'bindEntries' | 'finalizeUpdate'>
 
 /** Vite CSS request modes that do not represent graph-owned application stylesheets. */
 const ignoredStyleQueries = ['direct', 'inline', 'inline-css', 'raw', 'style-attr', 'transform-only', 'url'] as const
@@ -14,7 +14,7 @@ const ignoredStyleQueries = ['direct', 'inline', 'inline-css', 'raw', 'style-att
  *
  * Configuration captures native output policy before reserving Vite's CSS output as an intermediate carrier.
  * configResolved constructs the service and wraps Vite's successful CSS boundary, preserving hook metadata and context.
- * The Mini buildStart hook supplies its completed entries and graph context; watch hooks supply invalidation events.
+ * The Mini renderStart hook supplies its completed entries and graph context; watch hooks supply invalidation events.
  * generateBundle commits complete conversion results.
  * The development host uses finalizeUpdate to publish native styles before delivering patch factories.
  *
@@ -137,7 +137,7 @@ export function createMiniStylePlugin(contract: Pick<MiniContract, 'styles'>): M
             service.dispose()
         },
         /** Supplies exact graph roots and the graph reader used by host calls outside plugin hooks. */
-        startBuild: (context, entries) => service.startBuild(context, entries),
+        bindEntries: (context, entries) => service.bindEntries(context, entries),
         /** Publishes valid native CSS before JavaScript; CSS failures log errors and retain the last valid styles. */
         finalizeUpdate: (artifacts, writeStylesheet) => service.finalizeUpdate(artifacts, writeStylesheet)
     }

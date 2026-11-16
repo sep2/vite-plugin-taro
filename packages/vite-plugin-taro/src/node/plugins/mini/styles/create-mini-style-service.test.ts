@@ -26,15 +26,15 @@ for (const cssCodeSplit of [true, false]) {
                 return modules.get(id) ?? null
             }
         }
-        await service.startBuild(graph, entries)
-        assert.deepEqual(entries, originalEntries)
-
         const appCss = '.app-style { color: red; }'
         const pageCss = '.page-style { color: blue; }'
         assert.equal(await service.compileStyle(appCss, '/app.css'), undefined)
         assert.equal(await service.compileStyle(pageCss, '/page.css'), undefined)
         service.captureCss(appCss, '/app.css?v=1')
         service.captureCss(pageCss, '/page.css')
+
+        await service.bindEntries(graph, entries)
+        assert.deepEqual(entries, originalEntries)
 
         const artifacts = [{ code: 'export const marker = 1', filename: 'app.js', seq: 7 }]
         const output = await service.finalizeBuild(artifacts, graph)
@@ -73,6 +73,27 @@ for (const cssCodeSplit of [true, false]) {
         } else {
             assert.match(published[2].source, /\.app-style/)
         }
+        const nextModules = new Map([
+            ['/next-app-entry.js', { importedIds: ['/app.css'], dynamicallyImportedIds: [] }],
+            ['/next-page-entry.js', { importedIds: ['/next.css'], dynamicallyImportedIds: [] }],
+            ['/app.css', { importedIds: [], dynamicallyImportedIds: [] }],
+            ['/next.css', { importedIds: [], dynamicallyImportedIds: [] }]
+        ])
+        const nextGraph = {
+            resolve: async (id: string) => ({ id: `/next-${id}.js` }),
+            getModuleInfo(id: string) {
+                assert.equal(this, nextGraph)
+                return nextModules.get(id) ?? null
+            }
+        }
+        service.captureCss('.new-style { color: green; }', '/next.css')
+        await service.bindEntries(nextGraph, entries)
+        await service.finalizeUpdate(artifacts, publish)
+        assert.equal(published.length, 4)
+        assert.equal(published[3].fileName, cssCodeSplit ? 'pages/page-0/index.wxss' : 'assets/global.wxss')
+        assert.match(published[3].source, /\.new-style/)
+        assert.doesNotMatch(published[3].source, /\.page-style/)
+        assert.deepEqual(entries, originalEntries)
         service.dispose()
     })
 }

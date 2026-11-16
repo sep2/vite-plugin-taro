@@ -84,9 +84,9 @@ test('ordinary CSS clears retained Tailwind candidates while raw requests leave 
     const cssPost: Plugin = { name: 'vite:css-post', transform: (code) => ({ code, map: null }) }
     const config = styles.config
     const configResolved = styles.configResolved
-    const buildStart = styles.buildStart
+    const renderStart = styles.renderStart
     const transform = styles.transform
-    assert.ok(typeof configResolved === 'function' && typeof buildStart === 'function')
+    assert.ok(typeof configResolved === 'function' && typeof renderStart === 'function')
     assert.ok(transform && typeof transform === 'object')
     assert.ok(config && typeof config === 'object')
     await Reflect.apply(config.handler, {}, [{}])
@@ -105,7 +105,7 @@ test('ordinary CSS clears retained Tailwind candidates while raw requests leave 
         getModuleInfo: (id: string) => graph.get(id),
         addWatchFile() {}
     }
-    await Reflect.apply(buildStart, context, [])
+    await Reflect.apply(renderStart, context, [])
     // Inline candidates and source(none) avoid scanning or writing a fixture project.
     const tailwind = '@import "tailwindcss" source(none);\n@source inline("py-5.5");'
     const compiled: unknown = await Reflect.apply(transform.handler, context, [tailwind, styleId])

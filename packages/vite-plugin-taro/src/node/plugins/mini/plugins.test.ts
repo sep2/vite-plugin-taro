@@ -63,10 +63,13 @@ test('expands infrastructure and Page entries from the sole App shell input', as
         'build'
     )
     const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
-    assert.ok(typeof compiler?.buildStart === 'function')
+    assert.ok(typeof compiler?.renderStart === 'function')
+    const renderStart = compiler.renderStart
     assert.ok(compiler.configResolved)
     assert.deepEqual(config.build.rolldownOptions.input, { 'app.js': miniAppShellId })
     assert.equal(pageReads, 1)
+    // Count entry bindings across successive native output passes.
+    let outputs = 0
     const bundle = await rolldown({
         ...createPlacementRolldownOptions(),
         input: config.build.rolldownOptions.input,
@@ -74,7 +77,16 @@ test('expands infrastructure and Page entries from the sole App shell input', as
         plugins: [
             {
                 name: compiler.name,
-                buildStart: compiler.buildStart,
+                renderStart(...args) {
+                    outputs += 1
+                    for (const id of [
+                        miniAppCapsuleId,
+                        ...pages.map((page) => `${miniPageCapsuleId}?route=${encodeURIComponent(page.path)}`)
+                    ]) {
+                        assert.ok(this.getModuleInfo(normalizePath(id)), 'Style roots are loaded before binding')
+                    }
+                    return Reflect.apply(renderStart, this, args)
+                },
                 load: compiler.load
             },
             {
@@ -86,6 +98,13 @@ test('expands infrastructure and Page entries from the sole App shell input', as
     })
     try {
         const output = await bundle.generate({ format: 'es' })
+        assert.equal(outputs, 1)
+        const nextOutput = await bundle.generate({ format: 'es' })
+        assert.equal(outputs, 2)
+        assert.deepEqual(
+            nextOutput.output.map((file) => file.fileName),
+            output.output.map((file) => file.fileName)
+        )
         assert.equal(pageReads, 1)
         const pageEntries = pages.flatMap((page) => [
             { id: `${miniPageShellId}?route=${encodeURIComponent(page.path)}`, fileName: `${page.path}.js` },
@@ -254,7 +273,7 @@ for (const [target, createContract] of [
     })
 
     for (const command of ['build', 'serve'] as const) {
-        test(`${target}: ${command} loads and styles share the same App/Page entries`, async () => {
+        test(`${target}: ${command} binds styles on each output from the App-owned entries`, async () => {
             for (const pages of [[], [{ path: 'pages/home/index' }, { path: 'pages/detail/index' }]]) {
                 const contract = createContract({
                     target,
@@ -269,23 +288,13 @@ for (const [target, createContract] of [
                 )
                 assert.equal(config.build.cssCodeSplit, false)
                 const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
-                assert.ok(typeof compiler?.buildStart === 'function')
+                assert.ok(typeof compiler?.renderStart === 'function')
                 assert.deepEqual(config.build.rolldownOptions.input, { 'app.js': miniAppShellId })
                 assert.ok(compiler.configResolved)
                 assert.ok(compiler.load && typeof compiler.load === 'object')
                 // Record emitted entries and style roots to verify both environments use the same page graph.
                 const emitted: Rolldown.EmittedFile[] = []
                 const entryIds: string[] = []
-                await Reflect.apply(
-                    compiler.buildStart,
-                    {
-                        async resolve(id: string) {
-                            entryIds.push(id)
-                            return { id: normalizePath(id) }
-                        }
-                    },
-                    []
-                )
                 Reflect.apply(
                     compiler.load.handler,
                     {
@@ -296,6 +305,12 @@ for (const [target, createContract] of [
                     },
                     [miniAppShellId]
                 )
+                const renderContext = {
+                    async resolve(id: string) {
+                        entryIds.push(id)
+                        return { id: normalizePath(id) }
+                    }
+                }
                 assert.deepEqual(emitted, [
                     ...infrastructureEntries.map((entry) => ({ type: 'chunk', ...entry })),
                     ...pages.flatMap((page) => [
@@ -311,10 +326,15 @@ for (const [target, createContract] of [
                         }
                     ])
                 ])
-                assert.deepEqual(entryIds, [
-                    miniAppCapsuleId,
-                    ...pages.map((page) => `${miniPageCapsuleId}?route=${encodeURIComponent(page.path)}`)
-                ])
+                // Model successive outputs reusing the entries registered by one App load.
+                for (let output = 0; output < 2; output++) {
+                    entryIds.length = 0
+                    await Reflect.apply(compiler.renderStart, renderContext, [])
+                    assert.deepEqual(entryIds, [
+                        miniAppCapsuleId,
+                        ...pages.map((page) => `${miniPageCapsuleId}?route=${encodeURIComponent(page.path)}`)
+                    ])
+                }
             }
         })
     }

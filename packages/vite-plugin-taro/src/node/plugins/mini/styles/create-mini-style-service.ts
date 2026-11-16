@@ -71,7 +71,7 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * Creates the service that owns App/Page native-style compilation, graph projection, class rewriting, and publication.
  *
  * The Vite adapter constructs this service with its output policy during `configResolved`. The Mini compiler creates entry
- * metadata during `configResolved` and supplies it with the graph context at buildStart. The style adapter supplies successful
+ * metadata during `configResolved` and supplies it with the graph context at renderStart. The style adapter supplies successful
  * CSS captures and watch notifications, then commits complete-build results.
  *
  * ## Architectural invariant
@@ -166,7 +166,7 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * ### 5b. Development commit
  *
  * The development host calls `finalizeUpdate()` after Rolldown produces patch factories or a complete-output notification.
- * Finalization uses the graph reader passed to `startBuild()` by the Mini compiler's `buildStart` hook, observing the compiler's
+ * Finalization uses the graph reader passed to `bindEntries()` by the Mini compiler's `renderStart` hook, observing the compiler's
  * current graph. The host's atomic writer publishes valid native CSS before `finalizeUpdate()` returns converted patch factories.
  * CSS conversion errors retain only the affected file's last valid styles; they do not block valid patches or healthy stylesheets.
  * Captured Vite CSS literals are emptied first; factories, exports, changed IDs, and sequences remain intact.
@@ -181,7 +181,7 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  * - `policy.root`: resolved project root used by the Tailwind compiler;
  * - `policy.cssCodeSplit`: native-style ownership policy captured before disabling Vite's browser-only splitting;
  * - `policy.cssMinify`: native-style minification captured before disabling Vite's intermediate pass, then resolved once;
- * - `resolvedEntries`: App/Page metadata with graph-exact capsule identities resolved at the start of each build;
+ * - `resolvedEntries`: App/Page metadata with graph-exact capsule identities resolved before each complete output;
  * - `graphContext`: the active Rolldown graph reader needed by host calls made outside plugin hooks;
  * - `styleByModuleId`: the latest successful Vite CSS plus optional Tailwind state at one normalized module identity;
  * - `publishedStylesheets`: the last durably published bytes per development stylesheet for unchanged-write suppression;
@@ -206,9 +206,9 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
 export function createMiniStyleService(contract: Pick<MiniContract, 'styles'>, policy: StylePolicy) {
     // Construction fixes the output policy and transformer; all builds and HMR reuse this bounded conversion cache.
     const finalizeOutput = createFinalizeOutput(contract.styles, policy.cssMinify, policy.logger)
-    // startBuild atomically replaces these entry records with resolved capsules while preserving native output metadata.
+    // bindEntries atomically replaces these entry records with resolved capsules while preserving native output metadata.
     let resolvedEntries: MiniEntries
-    // startBuild installs this mutable context because the development host finalizes output outside a Rolldown plugin hook.
+    // bindEntries installs this mutable context because the development host finalizes output outside a Rolldown plugin hook.
     let graphContext: ModuleGraph
     // This mutable map is the only retained style store: Vite and Tailwind update separate fields at one module identity.
     const styleByModuleId = new Map<string, StyleModule>()
@@ -217,7 +217,7 @@ export function createMiniStyleService(contract: Pick<MiniContract, 'styles'>, p
 
     return {
         /** Resolves exact graph roots and captures the graph reader used by host calls outside plugin hooks. */
-        async startBuild(context: BuildContext, entries: MiniEntries): Promise<void> {
+        async bindEntries(context: BuildContext, entries: MiniEntries): Promise<void> {
             // Resolve through Rolldown rather than reconstructing real paths, whose drive casing and separators vary on Windows.
             const resolveEntry = async <Entry extends MiniEntries['appEntry']>(entry: Entry) => ({
                 ...entry,
