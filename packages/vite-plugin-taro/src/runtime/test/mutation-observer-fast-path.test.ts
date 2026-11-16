@@ -55,17 +55,22 @@ for (const target of ['wx', 'zfb', 'tt'] as const) {
                 const chunk = result.output[0]
                 assert.ok(chunk?.type === 'chunk')
                 const exports: { completion?: Promise<void> } = {}
+                // Each isolated runtime records diagnostics for its observer feature flag and build mode.
+                const warnings: unknown[][] = []
                 runInNewContext(chunk.code, {
                     exports,
                     require,
                     global: {},
-                    console,
+                    console: { ...console, warn: (...args: unknown[]) => warnings.push(args) },
                     setTimeout() {
                         assert.fail('Native delegates must not schedule template updates')
                     }
                 })
                 assert.ok(exports.completion)
                 await exports.completion
+                const warning =
+                    "[Taro Warning] 若要使用 MutationObserver，请在 Taro 编译配置中设置 'mini.runtime.enableMutationObserver: true'"
+                assert.deepEqual(warnings, !enabled && mode === 'development' ? [[warning], [warning]] : [])
             })
         }
     }

@@ -51,7 +51,17 @@ for (const mode of ['development', 'production']) {
                     }
                 }
             ],
-            transform: { define: { ...config.define, 'process.env.NODE_ENV': JSON.stringify(mode) } },
+            transform: {
+                define: {
+                    ...config.define,
+                    'process.env.NODE_ENV': JSON.stringify(mode),
+                    // Standalone CommonJS fixtures run without a Vite HMR context.
+                    'import.meta.hot': 'undefined'
+                }
+            },
+            onwarn(warning) {
+                assert.fail(warning.message)
+            },
             output: { format: 'cjs' },
             write: false
         })

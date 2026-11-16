@@ -58,7 +58,17 @@ test('template host preserves outlet branch markers through moves, replacements 
                 }
             }
         ],
-        transform: { define: { ...config.define, 'process.env.NODE_ENV': '"production"' } },
+        transform: {
+            define: {
+                ...config.define,
+                'process.env.NODE_ENV': '"production"',
+                // Standalone CommonJS fixtures run without a Vite HMR context.
+                'import.meta.hot': 'undefined'
+            }
+        },
+        onwarn(warning) {
+            assert.fail(warning.message)
+        },
         output: {
             file: outputFile,
             format: 'cjs',
