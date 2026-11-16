@@ -94,8 +94,8 @@ for (const [target, styleExtension] of [
         const original = structuredClone(input)
         const previousCalls = calls.length
         const plugins = vpt(input)
-        // Capture the resolved configuration to verify compiler inputs preserve Vite's original configuration references.
-        const configured = Promise.withResolvers<ResolvedConfig>()
+        // Capture configuration at each compiler's evaluation boundary to verify exact Vite-owned references.
+        const configured = Promise.withResolvers<Pick<ResolvedConfig, 'define' | 'resolve'>>()
         assert.equal(calls.length, previousCalls, 'Page resolution belongs to compiler initialization')
         const result = await build({
             root: project.root,
@@ -109,7 +109,17 @@ for (const [target, styleExtension] of [
                 {
                     name: 'test:resolver-project-config',
                     configResolved(config) {
-                        configured.resolve(config)
+                        if (target === 'h5') {
+                            configured.resolve(config)
+                        } else {
+                            assert.equal(calls.length, previousCalls, 'Mini page evaluation starts with App loading')
+                        }
+                    },
+                    buildStart() {
+                        if (target !== 'h5') {
+                            assert.equal(calls.length, previousCalls, 'Mini page evaluation follows buildStart')
+                            configured.resolve(this.environment.config)
+                        }
                     }
                 }
             ],

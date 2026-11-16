@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveConfig } from 'vite'
 import type { VptOptions } from '../../../options.ts'
-import { miniPageCapsuleId } from '../mini/module/module.ts'
+import { miniAppShellId, miniPageCapsuleId } from '../mini/module/module.ts'
 import { createXhsSkeleton } from './create-xhs-skeleton.ts'
 import { createXhsTemplate } from './create-xhs-template.ts'
 import { createXhsMiniContract, createXhsMiniPlugins } from './plugins.ts'
@@ -46,8 +46,12 @@ test('initializes XHS Pages with native data objects while preserving input opti
         (value) => value && typeof value === 'object' && 'name' in value && value.name === 'vpt:mini'
     )
     assert.ok(plugin && typeof plugin === 'object' && 'transform' in plugin)
-    assert.ok('configResolved' in plugin && typeof plugin.configResolved === 'function')
-    await Reflect.apply(plugin.configResolved, undefined, [{ root: process.cwd() }])
+    assert.ok('load' in plugin && plugin.load && typeof plugin.load === 'object' && 'handler' in plugin.load)
+    await Reflect.apply(
+        plugin.load.handler,
+        { environment: { config: { command: 'build', root: process.cwd() } }, emitFile: () => '' },
+        [miniAppShellId]
+    )
     const transform = plugin.transform
     assert.ok(transform && typeof transform === 'object' && 'handler' in transform)
     for (const page of input.pages!) {

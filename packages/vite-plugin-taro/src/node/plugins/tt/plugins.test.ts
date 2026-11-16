@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { VptOptions } from '../../../options.ts'
-import { miniPageCapsuleId } from '../mini/module/module.ts'
+import { miniAppShellId, miniPageCapsuleId } from '../mini/module/module.ts'
 import { createTtSkeleton } from './create-tt-skeleton.ts'
 import { createTtMiniContract, createTtMiniPlugins } from './plugins.ts'
 
@@ -52,8 +52,12 @@ test('uses ordinary Page initialization for every TT route while preserving call
         (plugin) => plugin && typeof plugin === 'object' && 'name' in plugin && plugin.name === 'vpt:mini'
     )
     assert.ok(plugin && typeof plugin === 'object' && 'transform' in plugin)
-    assert.ok('configResolved' in plugin && typeof plugin.configResolved === 'function')
-    await Reflect.apply(plugin.configResolved, undefined, [{ root: process.cwd() }])
+    assert.ok('load' in plugin && plugin.load && typeof plugin.load === 'object' && 'handler' in plugin.load)
+    await Reflect.apply(
+        plugin.load.handler,
+        { environment: { config: { command: 'build', root: process.cwd() } }, emitFile: () => '' },
+        [miniAppShellId]
+    )
     const transform = plugin.transform
     assert.ok(transform && typeof transform === 'object' && 'handler' in transform)
     assert.equal(typeof transform.handler, 'function')

@@ -70,8 +70,8 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
 /**
  * Creates the service that owns App/Page native-style compilation, graph projection, class rewriting, and publication.
  *
- * The Vite adapter constructs this service with its output policy during `configResolved`. The Mini compiler creates entry
- * metadata during `configResolved` and supplies it with the graph context at renderStart. The style adapter supplies successful
+ * The Vite adapter constructs this service with its output policy during `configResolved`. The Mini compiler resolves entry
+ * metadata while loading the App shell and supplies it with the graph context at renderStart. The style adapter supplies successful
  * CSS captures and watch notifications, then commits complete-build results.
  *
  * ## Architectural invariant

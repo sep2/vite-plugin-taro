@@ -60,23 +60,11 @@ function createMiniPlugin(
     placement: MiniPlacementPlugin,
     styles: Pick<MiniStylePlugin, 'bindEntries'>
 ): Plugin {
-    // Resolved project configuration installs the resolver before compilation hooks consume
-    // its page metadata and stylesheet traversal roots.
+    // Each App load installs the current resolver before emitting dependent entries for build and serve.
     let resolver: MiniResolver
 
     return {
         name: 'vpt:mini',
-        async configResolved(config) {
-            const pages = await resolvePages({
-                pages: contract.options.pages,
-                target: contract.options.target,
-                root: config.root,
-                define: config.define,
-                resolve: config.resolve
-            })
-            resolver = createResolver(contract, pages)
-        },
-
         config() {
             return {
                 define: {
@@ -135,7 +123,17 @@ function createMiniPlugin(
         /** The App shell owns all other entries, including replay from the bundler's module cache. */
         load: {
             filter: { id: createExactModuleIdFilter(miniAppShellId) },
-            handler() {
+            async handler() {
+                const config = this.environment.config
+                const pages = await resolvePages({
+                    pages: contract.options.pages,
+                    target: contract.options.target,
+                    root: config.root,
+                    define: config.define,
+                    resolve: config.resolve
+                })
+                resolver = createResolver(contract, pages)
+
                 // Rolldown allocates the shared runtime filename; native entry paths remain fixed.
                 this.emitFile({ type: 'chunk', id: miniBootstrapId, name: 'bootstrap' })
                 this.emitFile({
@@ -154,7 +152,8 @@ function createMiniPlugin(
         },
 
         resolveId(id, importer) {
-            return resolver.resolveId(id, importer, this.environment.config.root)
+            // The fixed App shell resolves before its load establishes the private module graph.
+            return resolver?.resolveId(id, importer, this.environment.config.root)
         },
 
         transform: {

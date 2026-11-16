@@ -31,7 +31,7 @@ const infrastructureEntries = [
 ]
 
 test('expands infrastructure and Page entries from the sole App shell input', async () => {
-    // These test-owned counters track asynchronous configuration readiness and the single page snapshot read.
+    // These test-owned counters track configuration readiness and each App-owned page snapshot.
     let pagesReady = false
     let pageReads = 0
     const pages = [{ path: 'pages/home/index' }, { path: 'pages/detail/index' }]
@@ -65,9 +65,10 @@ test('expands infrastructure and Page entries from the sole App shell input', as
     const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
     assert.ok(typeof compiler?.renderStart === 'function')
     const renderStart = compiler.renderStart
-    assert.ok(compiler.configResolved)
+    const load = compiler.load
+    assert.ok(load && typeof load === 'object')
     assert.deepEqual(config.build.rolldownOptions.input, { 'app.js': miniAppShellId })
-    assert.equal(pageReads, 1)
+    assert.equal(pageReads, 0)
     // Count entry bindings across successive native output passes.
     let outputs = 0
     const bundle = await rolldown({
@@ -87,7 +88,16 @@ test('expands infrastructure and Page entries from the sole App shell input', as
                     }
                     return Reflect.apply(renderStart, this, args)
                 },
-                load: compiler.load
+                load: {
+                    ...load,
+                    handler(...args) {
+                        return Reflect.apply(
+                            load.handler,
+                            { environment: { config }, emitFile: (file: Rolldown.EmittedFile) => this.emitFile(file) },
+                            args
+                        )
+                    }
+                }
             },
             {
                 name: 'test:resolved-entry-sources',
@@ -105,7 +115,7 @@ test('expands infrastructure and Page entries from the sole App shell input', as
             nextOutput.output.map((file) => file.fileName),
             output.output.map((file) => file.fileName)
         )
-        assert.equal(pageReads, 1)
+        assert.equal(pageReads, 2)
         const pageEntries = pages.flatMap((page) => [
             { id: `${miniPageShellId}?route=${encodeURIComponent(page.path)}`, fileName: `${page.path}.js` },
             { id: `${miniPageCapsuleId}?route=${encodeURIComponent(page.path)}`, fileName: `${page.path}-capsule.js` }
@@ -130,6 +140,46 @@ test('expands infrastructure and Page entries from the sole App shell input', as
     } finally {
         await bundle.close()
     }
+})
+
+test('App loading validates pages before registering dependent entries', async () => {
+    const config = await resolveConfig(
+        {
+            configFile: false,
+            plugins: createMiniTargetPlugins(
+                createWxMiniContract({
+                    target: 'wx',
+                    app: 'src/app.tsx',
+                    pages: [
+                        { path: 'pages/first', entry: true },
+                        { path: 'pages/second', entry: true }
+                    ],
+                    appJson: {},
+                    projectConfigJson: {}
+                })
+            )
+        },
+        'build'
+    )
+    const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
+    assert.ok(compiler?.load && typeof compiler.load === 'object')
+    // Observe registrations at the App-owned emission boundary.
+    const emitted: Rolldown.EmittedFile[] = []
+    await assert.rejects(
+        Reflect.apply(
+            compiler.load.handler,
+            {
+                environment: { config },
+                emitFile(file: Rolldown.EmittedFile) {
+                    emitted.push(file)
+                    return ''
+                }
+            },
+            [miniAppShellId]
+        ),
+        /Only one page may set entry: true/
+    )
+    assert.deepEqual(emitted, [])
 })
 
 test('native rendering resolves loader from each output generation rather than an ambient global', async () => {
@@ -275,10 +325,17 @@ for (const [target, createContract] of [
     for (const command of ['build', 'serve'] as const) {
         test(`${target}: ${command} binds styles on each output from the App-owned entries`, async () => {
             for (const pages of [[], [{ path: 'pages/home/index' }, { path: 'pages/detail/index' }]]) {
+                // Count configuration reads across App loads and output-only passes.
+                let pageReads = 0
+                // Supply a new page list for the next App load in either environment.
+                let currentPages = pages
                 const contract = createContract({
                     target,
                     app: 'src/app.tsx',
-                    pages,
+                    get pages() {
+                        pageReads += 1
+                        return currentPages
+                    },
                     appJson: {},
                     projectConfigJson: {}
                 })
@@ -290,21 +347,26 @@ for (const [target, createContract] of [
                 const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
                 assert.ok(typeof compiler?.renderStart === 'function')
                 assert.deepEqual(config.build.rolldownOptions.input, { 'app.js': miniAppShellId })
-                assert.ok(compiler.configResolved)
+                assert.equal(pageReads, 0)
                 assert.ok(compiler.load && typeof compiler.load === 'object')
+                assert.ok(typeof compiler.resolveId === 'function')
+                assert.equal(
+                    Reflect.apply(compiler.resolveId, { environment: { config } }, [miniAppShellId, undefined]),
+                    undefined
+                )
                 // Record emitted entries and style roots to verify both environments use the same page graph.
                 const emitted: Rolldown.EmittedFile[] = []
                 const entryIds: string[] = []
-                Reflect.apply(
-                    compiler.load.handler,
-                    {
-                        emitFile(file: Rolldown.EmittedFile) {
-                            emitted.push(file)
-                            return ''
-                        }
-                    },
-                    [miniAppShellId]
-                )
+                const loadContext = {
+                    environment: { config },
+                    emitFile(file: Rolldown.EmittedFile) {
+                        emitted.push(file)
+                        return ''
+                    }
+                }
+                const loading = Reflect.apply(compiler.load.handler, loadContext, [miniAppShellId])
+                assert.deepEqual(emitted, [], 'Entry registration awaits page resolution')
+                await loading
                 const renderContext = {
                     async resolve(id: string) {
                         entryIds.push(id)
@@ -335,6 +397,27 @@ for (const [target, createContract] of [
                         ...pages.map((page) => `${miniPageCapsuleId}?route=${encodeURIComponent(page.path)}`)
                     ])
                 }
+                assert.equal(pageReads, 1)
+                currentPages = [{ path: 'pages/updated/index' }]
+                emitted.length = 0
+                await Reflect.apply(compiler.load.handler, loadContext, [miniAppShellId])
+                assert.equal(pageReads, 2)
+                assert.deepEqual(emitted, [
+                    ...infrastructureEntries.map((entry) => ({ type: 'chunk', ...entry })),
+                    {
+                        type: 'chunk',
+                        id: `${miniPageShellId}?route=pages%2Fupdated%2Findex`,
+                        fileName: 'pages/updated/index.js'
+                    },
+                    {
+                        type: 'chunk',
+                        id: `${miniPageCapsuleId}?route=pages%2Fupdated%2Findex`,
+                        fileName: 'pages/updated/index-capsule.js'
+                    }
+                ])
+                entryIds.length = 0
+                await Reflect.apply(compiler.renderStart, renderContext, [])
+                assert.deepEqual(entryIds, [miniAppCapsuleId, `${miniPageCapsuleId}?route=pages%2Fupdated%2Findex`])
             }
         })
     }
@@ -358,7 +441,8 @@ for (const [target, createContract] of [
         const plugin = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
         assert.ok(plugin?.transform && typeof plugin.transform === 'object')
         assert.equal(plugin.transform.order, 'pre')
-        assert.ok(plugin.configResolved)
+        assert.ok(plugin.load && typeof plugin.load === 'object')
+        await Reflect.apply(plugin.load.handler, { environment: { config }, emitFile: () => '' }, [miniAppShellId])
         const appId = normalizePath(miniAppCapsuleId)
         const pageId = normalizePath(miniPageCapsuleId)
         const appSource = 'export const config = __VPT_APP_CONFIG__'

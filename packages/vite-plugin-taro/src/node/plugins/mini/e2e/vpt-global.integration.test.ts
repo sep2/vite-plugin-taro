@@ -17,12 +17,7 @@ const config = await resolveConfig(
     'build'
 )
 const options = config.build.rolldownOptions
-const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
-assert.ok(typeof compiler?.options === 'function')
-assert.ok(compiler.configResolved)
-const resolved: unknown = await Reflect.apply(compiler.options, { environment: { config } }, [options])
-assert.ok(resolved && typeof resolved === 'object' && 'input' in resolved)
-const configuredInput = resolved.input
+const configuredInput = options.input
 assert.ok(configuredInput && typeof configuredInput === 'object' && !Array.isArray(configuredInput))
 assert.equal(Object.hasOwn(configuredInput, 'vpt-global'), false)
 const outputOptions = options.output

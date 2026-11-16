@@ -39,14 +39,7 @@ for (const polyfills of [
 ]) {
     test(`loads polyfills ${JSON.stringify(polyfills)} without changing renderer bindings`, async () => {
         const config = await resolvePolyfillConfig('wx', polyfills, 'build')
-        const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
-        assert.ok(typeof compiler?.options === 'function')
-        assert.ok(compiler.configResolved)
-        const resolved: unknown = await Reflect.apply(compiler.options, { environment: { config } }, [
-            config.build.rolldownOptions
-        ])
-        assert.ok(resolved && typeof resolved === 'object' && 'input' in resolved)
-        const input = resolved.input
+        const input = config.build.rolldownOptions.input
         assert.ok(input && typeof input === 'object' && !Array.isArray(input))
         assert.equal(Object.hasOwn(input, 'polyfills'), false)
         assert.equal(Object.hasOwn(input, 'vpt-global'), false)
