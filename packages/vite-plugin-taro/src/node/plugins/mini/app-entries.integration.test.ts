@@ -36,7 +36,7 @@ test('serve registers configured pages before publishing startup output', { time
     await mkdir(path.join(root, 'src'))
     await writeFile(path.join(root, 'src/app.tsx'), 'export default function App({ children }) { return children }')
     await writeFile(path.join(root, 'src/home.tsx'), 'export default function Home() { return null; }')
-    // Count configured page reads at App entry registration.
+    // Verify that server initialization captures pages before the App entry is loaded.
     let pageReads = 0
     const completed = Promise.withResolvers<void>()
     const server = await createServer({
@@ -70,7 +70,7 @@ test('serve registers configured pages before publishing startup output', { time
         server: { host: '127.0.0.1', port: 0 }
     })
     context.after(() => server.close())
-    assert.equal(pageReads, 0)
+    assert.equal(pageReads, 1)
     await server.listen()
     await completed.promise
     assert.equal(pageReads, 1)

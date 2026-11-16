@@ -91,23 +91,39 @@ test('configures H5 runtime resolution and optimization', async () => {
 })
 
 test('shares configured page metadata between client and SSR', async () => {
-    // This fixture-owned counter verifies that both environments consume one initialized page graph.
+    // These fixture-owned values distinguish input readiness from the captured application snapshot.
     let pageReads = 0
+    let pagesReady = false
     const pages = [{ path: 'pages/about' }, { path: 'pages/home', entry: true }]
+    let currentPages = pages
     Object.freeze(pages)
+    const plugins = createH5TargetPlugins({
+        ...options,
+        get pages() {
+            assert.equal(pagesReady, true)
+            pageReads += 1
+            return currentPages
+        }
+    })
+    assert.equal(pageReads, 0)
     const config = await resolveConfig(
         {
             configFile: false,
-            plugins: createH5TargetPlugins({
-                ...options,
-                get pages() {
-                    pageReads += 1
-                    return pages
-                }
-            })
+            plugins: [
+                {
+                    name: 'test:async-page-configuration',
+                    async config() {
+                        await Promise.resolve()
+                        pagesReady = true
+                    }
+                },
+                plugins
+            ]
         },
         'serve'
     )
+    assert.equal(pageReads, 1)
+    currentPages = [{ path: 'pages/updated' }]
     const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:h5')
     assert.ok(compiler)
     assert.ok(compiler.transform && typeof compiler.transform === 'object')
@@ -120,6 +136,7 @@ test('shares configured page metadata between client and SSR', async () => {
         assert.ok(result && typeof result === 'object' && 'code' in result && typeof result.code === 'string')
         assert.match(result.code, /pages\/home/)
         assert.match(result.code, /pages\/about/)
+        assert.doesNotMatch(result.code, /pages\/updated/)
         assert.ok(result.code.indexOf('pages/home') < result.code.indexOf('pages/about'))
     }
     assert.equal(pageReads, 1)

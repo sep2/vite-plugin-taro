@@ -62,6 +62,10 @@ function createMiniPlugin(
 
     return {
         name: 'vpt:mini',
+        configResolved() {
+            resolver.setPages(orderPages(contract.options.pages ?? []))
+        },
+
         config() {
             return {
                 define: {
@@ -121,8 +125,6 @@ function createMiniPlugin(
         load: {
             filter: { id: createExactModuleIdFilter(miniAppShellId) },
             handler() {
-                resolver.setPages(orderPages(contract.options.pages ?? []))
-
                 // Rolldown allocates the shared runtime filename; native entry paths remain fixed.
                 this.emitFile({ type: 'chunk', id: miniBootstrapId, name: 'bootstrap' })
                 this.emitFile({

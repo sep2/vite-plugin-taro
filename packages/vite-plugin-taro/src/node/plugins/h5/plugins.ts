@@ -24,10 +24,12 @@ export function createH5TargetPlugins(options: Readonly<VptOptions>): PluginOpti
 function createH5Plugin(options: Readonly<VptOptions>): Plugin {
     const resolver = createH5Resolver(options)
 
-    resolver.setPages(orderPages(options.pages ?? []))
-
     return {
         name: 'vpt:h5',
+        configResolved() {
+            resolver.setPages(orderPages(options.pages ?? []))
+        },
+
         config() {
             return {
                 define: createH5Defines(),
