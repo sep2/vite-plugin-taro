@@ -22,8 +22,6 @@ target: 'wx'
 | `xhs` | 小红书小程序 |
 | `h5`  | Web 应用     |
 
-小红书产物根目录的 `package.json` 声明 `type: 'commonjs'`，开发者工具据此编译原生 JavaScript 模块。
-
 ## `renderer`
 
 小程序渲染器，默认 `template`。
