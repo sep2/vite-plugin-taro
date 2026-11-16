@@ -1,7 +1,11 @@
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import type { createResolver } from '../resolve/resolver.ts'
 
-type MiniEntries = Pick<ReturnType<typeof createResolver>, 'appEntry' | 'pageEntries'>
+type MiniResolver = ReturnType<typeof createResolver>
+type MiniEntries = {
+    appEntry: MiniResolver['appEntry']
+    pageEntries: ReturnType<MiniResolver['pageEntries']>
+}
 
 /** Projection needs captured CSS and candidates, not the retained compiler or its invalidation state. */
 type StyleSource = Readonly<{

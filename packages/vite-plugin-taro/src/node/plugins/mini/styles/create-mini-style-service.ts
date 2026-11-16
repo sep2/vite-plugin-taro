@@ -5,7 +5,6 @@ import { type BuildOptions, type Logger, normalizePath } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
 import type { MiniContract } from '../mini-contract.ts'
-import type { createResolver } from '../resolve/resolver.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { miniHtmlBase } from './mini-html-base.ts'
 import { minifyMiniStylesheet } from './minify-mini-stylesheet.ts'
@@ -47,7 +46,7 @@ type StylesheetInput = Readonly<{ fileName: string; css: string; app: boolean }>
 /** A successful native conversion keyed by its exact projected source. */
 type ConvertedStylesheet = Readonly<{ css: string; source: string }>
 
-type MiniEntries = Pick<ReturnType<typeof createResolver>, 'appEntry' | 'pageEntries'>
+type MiniEntries = Parameters<typeof projectMiniStyles>[0]
 
 type ModuleGraph = Parameters<typeof projectMiniStyles>[2]
 

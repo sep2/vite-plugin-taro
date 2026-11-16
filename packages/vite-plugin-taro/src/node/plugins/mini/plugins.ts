@@ -33,8 +33,6 @@ import { createResolver } from './resolve/resolver.ts'
 import { createMiniStylePlugin, type MiniStylePlugin } from './styles/plugins.ts'
 import { createMiniWatchPlugin } from './watch/create-mini-watch-plugin.ts'
 
-type MiniResolver = ReturnType<typeof createResolver>
-
 /** Creates the complete Mini Program plugin set. */
 export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] {
     const placement = createMiniPlacementPlugin(contract.automaticSubpackages)
@@ -60,8 +58,7 @@ function createMiniPlugin(
     placement: MiniPlacementPlugin,
     styles: Pick<MiniStylePlugin, 'bindEntries'>
 ): Plugin {
-    // Each App load installs the current resolver before emitting dependent entries for build and serve.
-    let resolver: MiniResolver
+    const resolver = createResolver(contract)
 
     return {
         name: 'vpt:mini',
@@ -117,7 +114,7 @@ function createMiniPlugin(
 
         /** Binds stylesheet roots to the current graph before each complete output, including cached App loads. */
         renderStart() {
-            return styles.bindEntries(this, resolver)
+            return styles.bindEntries(this, { appEntry: resolver.appEntry, pageEntries: resolver.pageEntries() })
         },
 
         /** The App shell owns all other entries, including replay from the bundler's module cache. */
@@ -125,6 +122,7 @@ function createMiniPlugin(
             filter: { id: createExactModuleIdFilter(miniAppShellId) },
             async handler() {
                 const config = this.environment.config
+
                 const pages = await resolvePages({
                     pages: contract.options.pages,
                     target: contract.options.target,
@@ -132,7 +130,7 @@ function createMiniPlugin(
                     define: config.define,
                     resolve: config.resolve
                 })
-                resolver = createResolver(contract, pages)
+                resolver.setPages(pages)
 
                 // Rolldown allocates the shared runtime filename; native entry paths remain fixed.
                 this.emitFile({ type: 'chunk', id: miniBootstrapId, name: 'bootstrap' })
@@ -144,7 +142,8 @@ function createMiniPlugin(
                 this.emitFile({ type: 'chunk', id: miniComponentShellId, fileName: componentShellFileName })
                 this.emitFile({ type: 'chunk', id: miniComponentCapsuleId, fileName: 'component-capsule.js' })
                 this.emitFile({ type: 'chunk', id: miniCustomWrapperShellId, fileName: customWrapperShellFileName })
-                for (const entry of resolver.pageEntries) {
+
+                for (const entry of resolver.pageEntries()) {
                     this.emitFile({ type: 'chunk', id: entry.shellId, fileName: entry.shellName })
                     this.emitFile({ type: 'chunk', id: entry.capsuleId, fileName: `${entry.capsuleName}.js` })
                 }
@@ -152,8 +151,7 @@ function createMiniPlugin(
         },
 
         resolveId(id, importer) {
-            // The fixed App shell resolves before its load establishes the private module graph.
-            return resolver?.resolveId(id, importer, this.environment.config.root)
+            return resolver.resolveId(id, importer, this.environment.config.root)
         },
 
         transform: {
@@ -213,7 +211,7 @@ function createMiniPlugin(
                 const outputFiles = await createOutputFiles({
                     bundle,
                     contract,
-                    pages: resolver.pageEntries.map((entry) => entry.page),
+                    pages: resolver.pageEntries().map((entry) => entry.page),
                     subpackages,
                     isProduction: this.environment.config.isProduction,
                     getModuleInfo: (moduleId) => this.getModuleInfo(moduleId),

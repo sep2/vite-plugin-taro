@@ -27,16 +27,15 @@ import { specializePageCapsule } from './specialize-page-capsule.ts'
 /** Resolves one exact plugin-private ID using its importer and configured project root. */
 type PrivateIdResolver = (importer: string | undefined, projectRoot: string) => string
 
-/** Creates the source specializer and entries from resolved Mini Program pages. */
-export function createResolver(
-    contract: Pick<MiniContract, 'options' | 'taro' | 'supportsPagePrerender'>,
-    pages: readonly VptPageOption[]
-) {
+/** Creates fixed private-ID resolution and the source specializer for the current Mini Program pages. */
+export function createResolver(contract: Pick<MiniContract, 'options' | 'taro' | 'supportsPagePrerender'>) {
     const normalizedAppCapsulePath = normalizePath(miniAppCapsuleId)
     const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
 
-    // Provide constant-time route validation and access to each configured Page JSON object.
-    const pageByPath = new Map(pages.map((page) => [page.path, page]))
+    // setPages replaces the ordered page snapshot and rebuilds its constant-time route index together.
+    let pages: readonly VptPageOption[] = []
+
+    const pageByPath = new Map<string, VptPageOption>()
 
     const privateIdResolvers = new Map<string, PrivateIdResolver>([
         // Preload needs only the initialized loader.
@@ -74,13 +73,24 @@ export function createResolver(
             shellId: miniAppShellId,
             shellName: appShellFileName
         },
-        pageEntries: pages.map((page) => ({
-            page,
-            capsuleId: createRouteModuleId({ moduleId: miniPageCapsuleId, pagePath: page.path }),
-            capsuleName: `${page.path}-capsule`,
-            shellId: createRouteModuleId({ moduleId: miniPageShellId, pagePath: page.path }),
-            shellName: `${page.path}.js`
-        })),
+
+        pageEntries() {
+            return pages.map((page) => ({
+                page,
+                capsuleId: createRouteModuleId({ moduleId: miniPageCapsuleId, pagePath: page.path }),
+                capsuleName: `${page.path}-capsule`,
+                shellId: createRouteModuleId({ moduleId: miniPageShellId, pagePath: page.path }),
+                shellName: `${page.path}.js`
+            }))
+        },
+
+        setPages(resolvedPages: readonly VptPageOption[]) {
+            pageByPath.clear()
+            for (const page of resolvedPages) {
+                pageByPath.set(page.path, page)
+            }
+            pages = resolvedPages
+        },
 
         resolveId(
             id: string,

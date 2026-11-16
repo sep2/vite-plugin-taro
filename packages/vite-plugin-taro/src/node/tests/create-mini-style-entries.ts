@@ -1,10 +1,10 @@
-import type { createResolver } from '../plugins/mini/resolve/resolver.ts'
+import type { projectMiniStyles } from '../plugins/mini/styles/project-mini-styles.ts'
 
 /** Supplies native entry metadata around test-owned capsule sources without loading production shells. */
 export function createMiniStyleEntries(
     appId: string,
     pageIds: readonly string[]
-): Pick<ReturnType<typeof createResolver>, 'appEntry' | 'pageEntries'> {
+): Parameters<typeof projectMiniStyles>[0] {
     return {
         appEntry: {
             capsuleId: appId,

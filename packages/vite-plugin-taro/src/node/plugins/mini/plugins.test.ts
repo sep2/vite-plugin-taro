@@ -17,7 +17,8 @@ import {
     miniComponentShellId,
     miniCustomWrapperShellId,
     miniPageCapsuleId,
-    miniPageShellId
+    miniPageShellId,
+    rendererHostId
 } from './module/module.ts'
 import { createPlacementRolldownOptions } from './placer/placer.ts'
 import { createMiniTargetPlugins } from './plugins.ts'
@@ -354,6 +355,11 @@ for (const [target, createContract] of [
                     Reflect.apply(compiler.resolveId, { environment: { config } }, [miniAppShellId, undefined]),
                     undefined
                 )
+                assert.equal(
+                    Reflect.apply(compiler.resolveId, { environment: { config } }, [rendererHostId, undefined]),
+                    contract.taro.hostPath
+                )
+                assert.equal(pageReads, 0)
                 // Record emitted entries and style roots to verify both environments use the same page graph.
                 const emitted: Rolldown.EmittedFile[] = []
                 const entryIds: string[] = []
