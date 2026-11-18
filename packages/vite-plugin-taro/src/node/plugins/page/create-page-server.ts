@@ -1,142 +1,208 @@
+import { createRequire } from 'node:module'
 import path from 'node:path'
+import { isDeepStrictEqual } from 'node:util'
 import { compileFunction } from 'node:vm'
-import type { OutputChunk, PluginContext } from 'rolldown'
+import type { OutputChunk } from 'rolldown'
 import type { DevOptions } from 'rolldown/experimental'
-import { catchError, defer, EMPTY, Subject, switchMap, tap } from 'rxjs'
-import { normalizePath } from 'vite'
+import {
+    buffer,
+    catchError,
+    concatMap,
+    defer,
+    EMPTY,
+    filter,
+    firstValueFrom,
+    ignoreElements,
+    merge,
+    of,
+    ReplaySubject,
+    Subject,
+    startWith,
+    switchMap,
+    tap,
+    withLatestFrom,
+    zip
+} from 'rxjs'
 import type { VptPageDeclaration, VptPageOption, VptTarget } from '../../../options.ts'
-import { dev, viteImportGlobPlugin } from '../../utils/vite-rolldown.ts'
-import { apiModuleId } from '../api/api-module-id.ts'
+import { dev } from '../../utils/vite-rolldown.ts'
+import { createPageModulesPlugin, pageEntryPrefix } from './create-page-modules-plugin.ts'
+import { orderPages } from './order-pages.ts'
 
 const entryId = '\0ps:entry'
-const registryId = '\0ps:registry'
-const apiSidecarPrefix = '\0ps:api:'
 
-type Output = Parameters<NonNullable<DevOptions['onOutput']>>[0]
 type Props = Readonly<{
     root: string
     target: VptTarget
-    /** Applies a snapshot synchronously. */
     publish: (pages: readonly VptPageOption[]) => void
     onError: (error: unknown) => void
 }>
 
-/** Builds the page entry incrementally with Vite's glob plugin and tree-shaking. */
-export async function createPageServer({ root, target, publish, onError }: Props): Promise<{ close(): Promise<void> }> {
-    const outputs = new Subject<Output>()
+type HotUpdate = Parameters<NonNullable<DevOptions['onHmrUpdates']>>[0]
+type BuildOutput = Parameters<NonNullable<DevOptions['onOutput']>>[0]
+type PageResult = Readonly<{ fileName: string; page: VptPageOption | undefined }>
+type Snapshot = Readonly<{ pages: readonly VptPageOption[]; results: ReadonlyMap<string, PageResult> }>
 
-    const subscription = outputs
+/** Evaluates page declarations in an incremental, tree-shaken Node bundle. */
+export async function createPageServer({ root, target, publish, onError }: Props): Promise<{ close(): Promise<void> }> {
+    const changedFiles = new Subject<string>()
+    const updates = new Subject<HotUpdate>()
+    const outputs = new Subject<BuildOutput>()
+
+    const pageModules = await createPageModulesPlugin(root, entryId, (file) => changedFiles.next(file))
+
+    const engine = await dev(
+        {
+            cwd: root,
+            input: entryId,
+            platform: 'node',
+            treeshake: true,
+            resolve: { alias: { '/src': path.join(root, 'src') } },
+            plugins: [pageModules]
+        },
+        { format: 'cjs', exports: 'named', dynamicImportInCjs: false, chunkFileNames: '[name]-[hash:16].cjs' },
+        {
+            watch: { skipWrite: true },
+            hotUpdate: true,
+            rebuildStrategy: 'never',
+            onHmrUpdates: (result) => updates.next(result),
+            onOutput: (result) => outputs.next(result)
+        }
+    )
+
+    // Each HMR result closes one batch, including empty and failed batches.
+    const rebuilds = zip(updates, changedFiles.pipe(buffer(updates))).pipe(
+        concatMap(([update, files]) => {
+            if (update instanceof Error) {
+                return of(update)
+            }
+            if (files.length === 0) {
+                return EMPTY
+            }
+            return defer(() => engine.ensureLatestBuildOutput()).pipe(
+                ignoreElements(),
+                catchError((error: unknown) => of(error instanceof Error ? error : new Error(String(error))))
+            )
+        })
+    )
+
+    // The first snapshot completes startup; subsequent snapshots also serve as the reuse baseline.
+    const snapshots = new ReplaySubject<Snapshot>(1)
+    const initial = firstValueFrom(snapshots)
+
+    const subscription = merge(rebuilds, outputs)
         .pipe(
-            switchMap((result) =>
+            withLatestFrom(snapshots.pipe(startWith(undefined))),
+            switchMap(([output, previous]) =>
                 defer(() => {
-                    if (result instanceof Error) {
-                        throw result
+                    if (output instanceof Error) {
+                        throw output
                     }
-                    return evaluatePages(result.output.find((file) => file.type === 'chunk')!, target)
+                    const chunks = output.output.filter((file): file is OutputChunk => file.type === 'chunk')
+                    return evaluatePages(root, target, chunks, previous?.results)
                 }).pipe(
-                    tap(publish),
+                    filter((snapshot) => snapshot !== undefined),
+                    tap((snapshot) => {
+                        if (!isDeepStrictEqual(previous?.pages, snapshot.pages)) {
+                            publish(snapshot.pages)
+                        }
+                    }),
                     catchError((error: unknown) => {
+                        if (previous === undefined) {
+                            throw error
+                        }
                         onError(error)
                         return EMPTY
                     })
                 )
             )
         )
-        .subscribe()
+        .subscribe(snapshots)
 
-    const engine = await dev(
-        {
-            cwd: root,
-            input: entryId,
-            treeshake: true,
-            resolve: { alias: { '/src': path.join(root, 'src') } },
-            plugins: [
-                viteImportGlobPlugin({ root }),
-                createGlobUpdatesPlugin(root),
-                {
-                    name: 'ps:entry',
-                    resolveId(id, importer) {
-                        if (id === entryId || id === registryId) {
-                            return id
-                        }
-                        if (id === apiModuleId && importer) {
-                            return apiSidecarPrefix + path.relative(root, importer).split(path.sep).join('/')
-                        }
-                    },
-                    load(id) {
-                        if (id === entryId) {
-                            return `
-                                import.meta.glob('/src/**/*.tsx', { eager: true });
-                                export { factories as default } from ${JSON.stringify(registryId)};
-                            `
-                        }
-                        if (id === registryId) {
-                            return 'export const factories = {};'
-                        }
-                        if (id.startsWith(apiSidecarPrefix)) {
-                            const filename = JSON.stringify(`/${id.slice(apiSidecarPrefix.length)}`)
-                            return `
-                                import { factories } from ${JSON.stringify(registryId)};
-                                export function defineVptPage(factory) { factories[${filename}] = factory; }
-                            `
-                        }
-                    }
-                }
-            ]
-        },
-        { format: 'cjs', exports: 'named', codeSplitting: false },
-        {
-            onOutput: (result) => outputs.next(result),
-            rebuildStrategy: 'never',
-            hotUpdate: true,
-            watch: { skipWrite: true },
-            onHmrUpdates: (result) => {
-                return result instanceof Error
-                    ? outputs.next(result)
-                    : void engine.ensureLatestBuildOutput().catch(onError)
-            }
-        }
+    function close(): Promise<void> {
+        subscription.unsubscribe()
+        snapshots.complete()
+        return engine.close()
+    }
+
+    try {
+        await Promise.all([engine.run(), initial])
+
+        return { close }
+    } catch (error) {
+        await close()
+        throw error
+    }
+}
+
+async function evaluatePages(
+    root: string,
+    target: VptTarget,
+    chunks: readonly OutputChunk[],
+    previous: ReadonlyMap<string, PageResult> | undefined
+): Promise<Snapshot | undefined> {
+    const entries = chunks.flatMap(({ facadeModuleId, fileName }) =>
+        facadeModuleId?.startsWith(pageEntryPrefix)
+            ? [{ route: facadeModuleId.slice(pageEntryPrefix.length), fileName }]
+            : []
     )
-
-    await engine.run()
-
-    return {
-        close() {
-            subscription.unsubscribe()
-            return engine.close()
+    if (
+        previous?.size === entries.length &&
+        entries.every(({ route, fileName }) => previous.get(route)?.fileName === fileName)
+    ) {
+        return
+    }
+    entries.sort((a, b) => {
+        if (a.route === b.route) {
+            return 0
         }
+        return a.route < b.route ? -1 : 1
+    })
+
+    const load = createChunkLoader(root, chunks)
+    // Collect the results and ordered input for this build before the server accepts either.
+    const results = new Map<string, PageResult>()
+    const pages: VptPageOption[] = []
+    for (const { route, fileName } of entries) {
+        const cached = previous?.get(route)
+        const page =
+            cached?.fileName === fileName ? cached.page : await evaluatePage(route, load(fileName).default, target)
+        results.set(route, { fileName, page })
+        if (page) {
+            pages.push(page)
+        }
+    }
+    return { pages: orderPages(pages), results }
+}
+
+async function evaluatePage(route: string, factory: VptPageDeclaration | undefined, target: VptTarget) {
+    if (factory !== undefined) {
+        return { ...(await factory({ target })), path: route }
     }
 }
 
-/** Re-expands the page glob when a matching file is added or removed. */
-function createGlobUpdatesPlugin(root: string) {
-    const sourceDir = normalizePath(path.resolve(root, 'src'))
-
-    return {
-        name: 'ps:glob-updates',
-        buildStart(this: PluginContext) {
-            this.addWatchFile(sourceDir)
-        },
-        hotUpdate({ file, type, modules }: { file: string; type: 'create' | 'update' | 'delete'; modules: string[] }) {
-            if (type === 'update' || !file.startsWith(`${sourceDir}/`)) {
-                return
-            }
-            const relative = file.slice(sourceDir.length + 1)
-            if (relative.endsWith('.tsx') && !/(^|\/)(\.|node_modules\/)/.test(relative)) {
-                return [...modules, entryId]
-            }
+function createChunkLoader(root: string, chunks: readonly OutputChunk[]) {
+    const files = new Map(chunks.map((chunk) => [chunk.fileName, chunk]))
+    // Fresh CommonJS module instances are shared by all factories evaluated from this output.
+    const loaded = new Map<string, { exports: { default?: VptPageDeclaration } }>()
+    function load(fileName: string) {
+        const cached = loaded.get(fileName)
+        if (cached) {
+            return cached.exports
         }
+        const chunk = files.get(fileName)!
+        const filename = path.resolve(root, fileName)
+        const require = createRequire(filename)
+        const module: { exports: { default?: VptPageDeclaration } } = { exports: {} }
+        loaded.set(fileName, module)
+        compileFunction(chunk.code, ['module', 'exports', 'require'], { filename })(
+            module,
+            module.exports,
+            (id: string) => {
+                const dependency = path.posix.join(path.posix.dirname(fileName), id)
+                return id.startsWith('.') && files.has(dependency) ? load(dependency) : require(id)
+            }
+        )
+        return module.exports
     }
-}
-
-function evaluatePages(chunk: Pick<OutputChunk, 'code' | 'fileName'>, target: VptTarget): Promise<VptPageOption[]> {
-    // Each evaluation gets fresh CommonJS exports in the host realm.
-    const module = { exports: {} as { default: Record<string, VptPageDeclaration> } }
-
-    compileFunction(chunk.code, ['module', 'exports'], { filename: chunk.fileName })(module, module.exports)
-
-    return Array.fromAsync(Object.entries(module.exports.default), async ([filename, factory]) => ({
-        ...(await factory({ target })),
-        path: filename.slice('/src/'.length, -'.tsx'.length)
-    }))
+    return load
 }
