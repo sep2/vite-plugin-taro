@@ -86,7 +86,7 @@ test('publishes registered async page factories with route paths and target cont
     ])
 })
 
-test('skips unrelated files and does not execute an unchanged page program', { timeout: 10_000 }, async (t) => {
+test('skips bundle generation for unrelated files and isolated component edits', { timeout: 10_000 }, async (t) => {
     const root = await createTestProject('page-cost-')
     const src = path.join(root, 'src')
     const home = path.join(src, 'home.tsx')
@@ -96,7 +96,7 @@ test('skips unrelated files and does not execute an unchanged page program', { t
         import { defineVptPage } from 'virtual:vpt';
         import { title } from './settings';
         defineVptPage(() => { process.emit(${JSON.stringify(event)}); return { config: { title } }; });
-        export default () => ${JSON.stringify(component)};
+        export default function Home() { return ${JSON.stringify(component)}; }
     `
     await mkdir(src)
     await writeFile(home, source('before'))
@@ -155,8 +155,53 @@ test('skips unrelated files and does not execute an unchanged page program', { t
     component = Promise.withResolvers()
     await writeFile(home, source('after'))
     await component.promise
-    assert.ok(generated.mock.callCount() > before)
+    assert.equal(generated.mock.callCount(), before)
     assert.equal(factory.mock.callCount(), 2)
+})
+
+test('rebuilds when page configuration uses a component body', { timeout: 10_000 }, async (t) => {
+    const root = await createTestProject('page-component-dependency-')
+    const src = path.join(root, 'src')
+    await mkdir(src)
+    const api = "import { defineVptPage } from 'virtual:vpt';"
+    const local = path.join(src, 'local.tsx')
+    const shared = path.join(src, 'shared.tsx')
+    const localSource = (title: string) => `${api}
+        defineVptPage(() => ({ config: { title: Local() } }));
+        export default function Local() { return ${JSON.stringify(title)}; }
+    `
+    const sharedSource = (title: string) => `${api}
+        defineVptPage(() => ({}));
+        export default () => ${JSON.stringify(title)};
+    `
+    await writeFile(local, localSource('Local'))
+    await writeFile(shared, sharedSource('Shared'))
+    await writeFile(
+        path.join(src, 'consumer.tsx'),
+        `${api}
+        import Shared from './shared';
+        defineVptPage(() => ({ config: { title: Shared() } }));
+    `
+    )
+    // The waiter follows semantic publications, not individual native watcher events.
+    let next = Promise.withResolvers<readonly VptPageOption[]>()
+    const server = await createPageServer({
+        root,
+        target: 'wx',
+        publish: (pages) => next.resolve(pages),
+        onError: (error) => next.reject(error)
+    })
+    t.after(() => server.close())
+    const titles = (pages: readonly VptPageOption[]) => pages.map((page) => page.config?.title)
+    assert.deepEqual(titles(await next.promise), ['Shared', 'Local', undefined])
+
+    next = Promise.withResolvers()
+    await publishSourceGeneration(local, localSource('Local update'))
+    assert.deepEqual(titles(await next.promise), ['Shared', 'Local update', undefined])
+
+    next = Promise.withResolvers()
+    await publishSourceGeneration(shared, sharedSource('Shared update'))
+    assert.deepEqual(titles(await next.promise), ['Shared update', 'Local update', undefined])
 })
 
 test('reuses unaffected page results across local edits and shared dependency edits', {
