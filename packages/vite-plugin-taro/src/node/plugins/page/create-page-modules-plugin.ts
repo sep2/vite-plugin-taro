@@ -30,16 +30,18 @@ export async function createPageModulesPlugin(
     entryId: string,
     invalidate: (file: string) => void
 ): Promise<PageModulesPlugin> {
-    const sourceDir = normalizePath(path.resolve(root, 'src'))
+    const sourcePath = path.resolve(root, 'src')
+    const sourceDir = normalizePath(sourcePath)
     // File events maintain page membership and the signature used to classify component edits.
-    const routes = await discoverRoutes(sourceDir)
+    const routes = await discoverRoutes(sourcePath, sourceDir)
 
     return {
         name: 'ps:modules',
         buildStart() {
-            this.addWatchFile(sourceDir)
+            this.addWatchFile(sourcePath)
         },
-        async hotUpdate({ file, type, modules }) {
+        async hotUpdate({ file: changedFile, type, modules }) {
+            const file = normalizePath(changedFile)
             if (!isPageSource(file, sourceDir)) {
                 if (modules.length > 0) {
                     invalidate(file)
@@ -62,13 +64,15 @@ export async function createPageModulesPlugin(
                 return [...modules, entryId]
             }
             if (modules.length > 0) {
-                const info = this.getModuleInfo(file)
+                const moduleId = modules[0]!
+                // The graph is keyed by the original module ID, not the normalized watcher path.
+                const info = this.getModuleInfo(moduleId)
                 // The page wrapper imports only for registration; another importer could observe the default export.
                 const componentOnly =
                     typeof signature === 'string' &&
                     signature === previous &&
                     modules.length === 1 &&
-                    modules[0] === file &&
+                    normalizePath(moduleId) === file &&
                     info?.importers.length === 1 &&
                     info.importers[0] === pageEntryPrefix + route &&
                     info.dynamicImporters.length === 0
@@ -87,10 +91,11 @@ export async function createPageModulesPlugin(
                 return id
             }
             if (id === apiModuleId && importer) {
-                if (!isPageSource(importer, sourceDir)) {
+                const file = normalizePath(importer)
+                if (!isPageSource(file, sourceDir)) {
                     return emptyId
                 }
-                return declarationPrefix + routeOf(importer, sourceDir)
+                return declarationPrefix + routeOf(file, sourceDir)
             }
         },
         load(id) {
@@ -129,11 +134,11 @@ export async function createPageModulesPlugin(
     }
 }
 
-async function discoverRoutes(sourceDir: string): Promise<Map<string, PageSignature>> {
+async function discoverRoutes(sourcePath: string, sourceDir: string): Promise<Map<string, PageSignature>> {
     const files = await Array.fromAsync(
         glob('**/*.tsx', {
-            cwd: sourceDir,
-            exclude: ['**/node_modules'],
+            cwd: sourcePath,
+            exclude: (entry) => entry.name === 'node_modules',
             withFileTypes: true
         })
     )
