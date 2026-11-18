@@ -1,28 +1,118 @@
-import { createServer } from 'vite'
+import path from 'node:path'
+import { compileFunction } from 'node:vm'
+import type { OutputChunk } from 'rolldown'
+import type { DevOptions } from 'rolldown/experimental'
+import { catchError, defer, EMPTY, Subject, switchMap, tap } from 'rxjs'
+import type { VptPageDeclaration, VptPageOption, VptTarget } from '../../../options.ts'
+import { dev, viteImportGlobPlugin } from '../../utils/vite-rolldown.ts'
+import { apiModuleId } from '../api/api-module-id.ts'
 
-const entryId = 'virtual:ps/entry'
+const entryId = '\0ps:entry'
+const registryId = '\0ps:registry'
+const apiSidecarPrefix = '\0ps:api:'
 
-type Props = Readonly<{ root: string }>
+type Output = Parameters<NonNullable<DevOptions['onOutput']>>[0]
+type Props = Readonly<{
+    root: string
+    target: VptTarget
+    /** Applies a snapshot synchronously. */
+    publish: (pages: readonly VptPageOption[]) => void
+    onError: (error: unknown) => void
+}>
 
-/** Creates a headless Vite dev server whose lifetime is owned by the caller. */
-export async function createPageServer({ root }: Props): Promise<{ close(): Promise<void> }> {
-    const server = await createServer({
-        root,
-        configFile: false,
-        envDir: false,
-        publicDir: false,
-        appType: 'custom',
-        logLevel: 'silent',
-        optimizeDeps: { noDiscovery: true, include: [] },
-        plugins: [
-            {
-                name: 'ps:entry',
-                resolveId: (id) => (id === entryId ? `\0${id}` : undefined),
-                load: (id) => (id === `\0${entryId}` ? "export default import.meta.glob('/src/**/*.tsx')" : undefined)
+/** Builds the page entry incrementally with Vite's glob plugin and tree-shaking. */
+export async function createPageServer({ root, target, publish, onError }: Props): Promise<{ close(): Promise<void> }> {
+    const outputs = new Subject<Output>()
+
+    const subscription = outputs
+        .pipe(
+            switchMap((result) =>
+                defer(() => {
+                    if (result instanceof Error) {
+                        throw result
+                    }
+                    return evaluatePages(result.output.find((file) => file.type === 'chunk')!, target)
+                }).pipe(
+                    tap(publish),
+                    catchError((error: unknown) => {
+                        onError(error)
+                        return EMPTY
+                    })
+                )
+            )
+        )
+        .subscribe()
+
+    const engine = await dev(
+        {
+            cwd: root,
+            input: entryId,
+            treeshake: true,
+            resolve: { alias: { '/src': path.join(root, 'src') } },
+            plugins: [
+                viteImportGlobPlugin({ root }),
+                {
+                    name: 'ps:entry',
+                    resolveId(id, importer) {
+                        if (id === entryId || id === registryId) {
+                            return id
+                        }
+                        if (id === apiModuleId && importer) {
+                            return apiSidecarPrefix + path.relative(root, importer).split(path.sep).join('/')
+                        }
+                    },
+                    load(id) {
+                        if (id === entryId) {
+                            return `
+                                import.meta.glob('/src/**/*.tsx', { eager: true });
+                                export { factories as default } from ${JSON.stringify(registryId)};
+                            `
+                        }
+                        if (id === registryId) {
+                            return 'export const factories = {};'
+                        }
+                        if (id.startsWith(apiSidecarPrefix)) {
+                            const filename = JSON.stringify(`/${id.slice(apiSidecarPrefix.length)}`)
+                            return `
+                                import { factories } from ${JSON.stringify(registryId)};
+                                export function defineVptPage(factory) { factories[${filename}] = factory; }
+                            `
+                        }
+                    }
+                }
+            ]
+        },
+        { format: 'cjs', exports: 'named', codeSplitting: false },
+        {
+            onOutput: (result) => outputs.next(result),
+            rebuildStrategy: 'never',
+            watch: { skipWrite: true },
+            onHmrUpdates: (result) => {
+                return result instanceof Error
+                    ? outputs.next(result)
+                    : void engine.ensureLatestBuildOutput().catch(onError)
             }
-        ],
-        server: { middlewareMode: true, ws: false }
-    })
+        }
+    )
 
-    return { close: () => server.close() }
+    await engine.run()
+
+    return {
+        close() {
+            subscription.unsubscribe()
+            return engine.close()
+        }
+    }
+}
+
+function evaluatePages(chunk: Pick<OutputChunk, 'code' | 'fileName'>, target: VptTarget): Promise<VptPageOption[]> {
+    // Each evaluation gets fresh CommonJS exports in the host realm.
+    const module = { exports: {} as { default: Record<string, VptPageDeclaration> } }
+
+    compileFunction(chunk.code, ['module', 'exports'], { filename: chunk.fileName })(module, module.exports)
+
+    return Array.fromAsync(Object.entries(module.exports.default), async ([filename, factory]) => ({
+        ...(await factory({ target })),
+        path: filename.slice('/src/'.length, -'.tsx'.length)
+    }))
 }
