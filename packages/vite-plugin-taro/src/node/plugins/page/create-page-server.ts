@@ -1,8 +1,9 @@
 import path from 'node:path'
 import { compileFunction } from 'node:vm'
-import type { OutputChunk } from 'rolldown'
+import type { OutputChunk, PluginContext } from 'rolldown'
 import type { DevOptions } from 'rolldown/experimental'
 import { catchError, defer, EMPTY, Subject, switchMap, tap } from 'rxjs'
+import { normalizePath } from 'vite'
 import type { VptPageDeclaration, VptPageOption, VptTarget } from '../../../options.ts'
 import { dev, viteImportGlobPlugin } from '../../utils/vite-rolldown.ts'
 import { apiModuleId } from '../api/api-module-id.ts'
@@ -51,6 +52,7 @@ export async function createPageServer({ root, target, publish, onError }: Props
             resolve: { alias: { '/src': path.join(root, 'src') } },
             plugins: [
                 viteImportGlobPlugin({ root }),
+                createGlobUpdatesPlugin(root),
                 {
                     name: 'ps:entry',
                     resolveId(id, importer) {
@@ -86,6 +88,7 @@ export async function createPageServer({ root, target, publish, onError }: Props
         {
             onOutput: (result) => outputs.next(result),
             rebuildStrategy: 'never',
+            hotUpdate: true,
             watch: { skipWrite: true },
             onHmrUpdates: (result) => {
                 return result instanceof Error
@@ -101,6 +104,27 @@ export async function createPageServer({ root, target, publish, onError }: Props
         close() {
             subscription.unsubscribe()
             return engine.close()
+        }
+    }
+}
+
+/** Re-expands the page glob when a matching file is added or removed. */
+function createGlobUpdatesPlugin(root: string) {
+    const sourceDir = normalizePath(path.resolve(root, 'src'))
+
+    return {
+        name: 'ps:glob-updates',
+        buildStart(this: PluginContext) {
+            this.addWatchFile(sourceDir)
+        },
+        hotUpdate({ file, type, modules }: { file: string; type: 'create' | 'update' | 'delete'; modules: string[] }) {
+            if (type === 'update' || !file.startsWith(`${sourceDir}/`)) {
+                return
+            }
+            const relative = file.slice(sourceDir.length + 1)
+            if (relative.endsWith('.tsx') && !/(^|\/)(\.|node_modules\/)/.test(relative)) {
+                return [...modules, entryId]
+            }
         }
     }
 }

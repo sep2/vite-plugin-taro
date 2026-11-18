@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { DevEngine, dev, viteImportGlobPlugin } from 'rolldown/experimental'
@@ -8,12 +8,35 @@ import { createTestProject } from '../../tests/create-test-project.ts'
 import { publishSourceGeneration } from '../../tests/publish-source-generation.ts'
 import { createPageServer } from './create-page-server.ts'
 
-test('builds the empty virtual entry and closes its engine', async (t) => {
+test('updates an initially empty glob on page creation and deletion', { timeout: 10_000 }, async (t) => {
     const root = await createTestProject('page-server-')
+    const filename = path.join(root, 'src/home.tsx')
+    await mkdir(path.dirname(filename))
     const closed = t.mock.method(DevEngine.prototype, 'close')
-    const output = Promise.withResolvers<readonly VptPageOption[]>()
-    const server = await createPageServer({ root, target: 'wx', publish: output.resolve, onError: output.reject })
+    // Select the expected snapshot across watcher notifications for each file operation.
+    let count = 0
+    let output = Promise.withResolvers<readonly VptPageOption[]>()
+    const server = await createPageServer({
+        root,
+        target: 'wx',
+        publish(pages) {
+            if (pages.length === count) {
+                output.resolve(pages)
+            }
+        },
+        onError: (error) => output.reject(error)
+    })
     t.after(() => server.close())
+    assert.deepEqual(await output.promise, [])
+
+    count = 1
+    output = Promise.withResolvers()
+    await publishSourceGeneration(filename, "import { defineVptPage } from 'virtual:vpt'; defineVptPage(() => ({}));")
+    assert.deepEqual(await output.promise, [{ path: 'home' }])
+
+    count = 0
+    output = Promise.withResolvers()
+    await rm(filename)
     assert.deepEqual(await output.promise, [])
     await server.close()
     assert.equal(closed.mock.callCount(), 1)
