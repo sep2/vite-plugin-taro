@@ -2,13 +2,29 @@ import assert from 'node:assert/strict'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
-import test from 'node:test'
+import test, { type TestContext } from 'node:test'
 import { DevEngine, dev, viteImportGlobPlugin } from 'rolldown/experimental'
 import type { VptPageOption } from '../../../options.ts'
+import { createMemoryBuildProject } from '../../tests/create-memory-build-project.ts'
 import { createTestProject } from '../../tests/create-test-project.ts'
 import { publishSourceGeneration } from '../../tests/publish-source-generation.ts'
 import { createPageServer } from './create-page-server.ts'
 
+function createMemoryPageProject(t: TestContext, files: Readonly<Record<string, string>>): string {
+    const project = createMemoryBuildProject(files)
+    t.after(() => project[Symbol.dispose]())
+    const create = DevEngine.create.bind(DevEngine)
+    // Node can discover VFS files directly; Rolldown needs the fixture plugin to resolve and load them.
+    t.mock.method(DevEngine, 'create', (...[input, output, options]: Parameters<typeof create>) =>
+        create({ ...input, plugins: [input.plugins, project.plugin] }, output, {
+            ...options,
+            watch: { ...options?.watch, enabled: false }
+        })
+    )
+    return project.root
+}
+
+// Tests driven by Rolldown's native watcher use on-disk fixtures.
 test('updates the page manifest as files and declarations change', { timeout: 10_000 }, async (t) => {
     const root = await createTestProject('page-server-')
     const filename = path.join(root, 'src/home.tsx')
@@ -55,31 +71,26 @@ test('updates the page manifest as files and declarations change', { timeout: 10
 })
 
 test('publishes registered async page factories with route paths and target context', async (t) => {
-    const root = await createTestProject('page-glob-')
-    for (const file of [
-        'src/home.tsx',
-        'src/nested/about.tsx',
-        'src/node_modules/ignored.tsx',
-        'src/settings.ts',
-        'outside.tsx'
-    ]) {
-        const filename = path.join(root, file)
-        await mkdir(path.dirname(filename), { recursive: true })
-        await writeFile(
-            filename,
-            `import { defineVptPage } from 'virtual:vpt';
-            defineVptPage(async ({ target }) => {
-                await new Promise(resolve => setImmediate(resolve));
-                return { config: { target } };
-            });
-            export default () => 'UI_ONLY';`
-        )
-    }
-    await writeFile(path.join(root, 'src/component.tsx'), 'throw Error("Unrelated TSX executed")')
-    await writeFile(path.join(root, 'src/types.tsx'), "import type {} from 'virtual:vpt'; throw Error('Type-only')")
+    const page = `
+        import { defineVptPage } from 'virtual:vpt';
+        defineVptPage(async ({ target }) => {
+            await new Promise(resolve => setImmediate(resolve));
+            return { config: { target } };
+        });
+        export default () => 'UI_ONLY';
+    `
+    const root = createMemoryPageProject(t, {
+        'src/home.tsx': page,
+        'src/nested/about.tsx': page,
+        'src/node_modules/ignored.tsx': page,
+        'src/settings.ts': page,
+        'outside.tsx': page,
+        'src/component.tsx': 'throw Error("Unrelated TSX executed")',
+        'src/types.tsx': "import type {} from 'virtual:vpt'; throw Error('Type-only')"
+    })
     const output = Promise.withResolvers<readonly VptPageOption[]>()
     const server = await createPageServer({ root, target: 'wx', publish: output.resolve, onError: output.reject })
-    t.after(() => server.close())
+    await server.close()
     assert.deepEqual(await output.promise, [
         { path: 'home', config: { target: 'wx' } },
         { path: 'nested/about', config: { target: 'wx' } }
@@ -258,12 +269,8 @@ test('reuses unaffected page results across local edits and shared dependency ed
 })
 
 test('rejects invalid initial configuration and closes its engine', async (t) => {
-    const root = await createTestProject('page-invalid-')
-    const src = path.join(root, 'src')
-    await mkdir(src)
     const source = "import { defineVptPage } from 'virtual:vpt'; defineVptPage(() => ({ entry: true }));"
-    await writeFile(path.join(src, 'a.tsx'), source)
-    await writeFile(path.join(src, 'b.tsx'), source)
+    const root = createMemoryPageProject(t, { 'src/a.tsx': source, 'src/b.tsx': source })
     const close = t.mock.method(DevEngine.prototype, 'close')
     await assert.rejects(
         createPageServer({
