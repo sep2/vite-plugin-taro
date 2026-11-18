@@ -140,29 +140,27 @@ async function evaluatePages(
     chunks: readonly OutputChunk[],
     previous: ReadonlyMap<string, PageResult> | undefined
 ): Promise<Snapshot | undefined> {
-    const entries = chunks.flatMap(({ facadeModuleId, fileName }) =>
-        facadeModuleId?.startsWith(pageEntryPrefix)
-            ? [{ route: facadeModuleId.slice(pageEntryPrefix.length), fileName }]
-            : []
+    const entries = new Map(
+        chunks.flatMap(({ facadeModuleId, fileName }) =>
+            facadeModuleId?.startsWith(pageEntryPrefix)
+                ? [[facadeModuleId.slice(pageEntryPrefix.length), fileName] as const]
+                : []
+        )
     )
+    const routes = [...entries.keys()]
     if (
-        previous?.size === entries.length &&
-        entries.every(({ route, fileName }) => previous.get(route)?.fileName === fileName)
+        previous?.size === routes.length &&
+        routes.every((route) => previous.get(route)?.fileName === entries.get(route))
     ) {
         return
     }
-    entries.sort((a, b) => {
-        if (a.route === b.route) {
-            return 0
-        }
-        return a.route < b.route ? -1 : 1
-    })
 
     const load = createChunkLoader(root, chunks)
     // Collect the results and ordered input for this build before the server accepts either.
     const results = new Map<string, PageResult>()
     const pages: VptPageOption[] = []
-    for (const { route, fileName } of entries) {
+    for (const route of routes.sort()) {
+        const fileName = entries.get(route)!
         const cached = previous?.get(route)
         const page =
             cached?.fileName === fileName ? cached.page : await evaluatePage(route, load(fileName).default, target)

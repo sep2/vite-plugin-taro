@@ -195,10 +195,8 @@ function pageSignature(source: string, program: ReturnType<typeof parseSync>['pr
     ) {
         return null
     }
-    const body = component.body
-    if (!body) {
-        return null
-    }
+    // Oxc emits bodyless TypeScript declarations as TSDeclareFunction.
+    const body = component.body!
     // A named default component may be used by its own module, even without another importer.
     const binding = component.type === 'FunctionDeclaration' ? component.id : null
     if (binding) {

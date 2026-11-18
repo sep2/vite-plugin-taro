@@ -3,24 +3,30 @@ import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import test, { type TestContext } from 'node:test'
-import { DevEngine, dev, viteImportGlobPlugin } from 'rolldown/experimental'
+import { DevEngine, type DevOptions, dev, viteImportGlobPlugin } from 'rolldown/experimental'
 import type { VptPageOption } from '../../../options.ts'
 import { createMemoryBuildProject } from '../../tests/create-memory-build-project.ts'
 import { createTestProject } from '../../tests/create-test-project.ts'
 import { publishSourceGeneration } from '../../tests/publish-source-generation.ts'
 import { createPageServer } from './create-page-server.ts'
 
-function createMemoryPageProject(t: TestContext, files: Readonly<Record<string, string>>): string {
+function createMemoryPageProject(
+    t: TestContext,
+    files: Readonly<Record<string, string>>,
+    configure?: (options: DevOptions) => DevOptions
+): string {
     const project = createMemoryBuildProject(files)
     t.after(() => project[Symbol.dispose]())
     const create = DevEngine.create.bind(DevEngine)
     // Node can discover VFS files directly; Rolldown needs the fixture plugin to resolve and load them.
-    t.mock.method(DevEngine, 'create', (...[input, output, options]: Parameters<typeof create>) =>
-        create({ ...input, plugins: [input.plugins, project.plugin] }, output, {
-            ...options,
-            watch: { ...options?.watch, enabled: false }
-        })
-    )
+    t.mock.method(DevEngine, 'create', (...[input, output, options]: Parameters<typeof create>) => {
+        const watchless = { ...options, watch: { ...options?.watch, enabled: false } }
+        return create(
+            { ...input, plugins: [input.plugins, project.plugin] },
+            output,
+            configure?.(watchless) ?? watchless
+        )
+    })
     return project.root
 }
 
@@ -71,20 +77,25 @@ test('updates the page manifest as files and declarations change', { timeout: 10
 })
 
 test('publishes registered async page factories with route paths and target context', async (t) => {
-    const page = `
+    const page = (settings: string) => `
         import { defineVptPage } from 'virtual:vpt';
+        import { title } from ${JSON.stringify(settings)};
         defineVptPage(async ({ target }) => {
             await new Promise(resolve => setImmediate(resolve));
-            return { config: { target } };
+            return { config: { target, title } };
         });
         export default () => 'UI_ONLY';
     `
     const root = createMemoryPageProject(t, {
-        'src/home.tsx': page,
-        'src/nested/about.tsx': page,
-        'src/node_modules/ignored.tsx': page,
-        'src/settings.ts': page,
-        'outside.tsx': page,
+        'src/home.tsx': page('./settings'),
+        'src/nested/about.tsx': page('../settings'),
+        'src/node_modules/ignored.tsx': page('../settings'),
+        'src/settings.ts': `
+            import { defineVptPage } from 'virtual:vpt';
+            defineVptPage(() => { throw Error('Non-TSX declaration executed'); });
+            export const title = 'Shared';
+        `,
+        'outside.tsx': page('./src/settings'),
         'src/component.tsx': 'throw Error("Unrelated TSX executed")',
         'src/types.tsx': "import type {} from 'virtual:vpt'; throw Error('Type-only')"
     })
@@ -92,8 +103,8 @@ test('publishes registered async page factories with route paths and target cont
     const server = await createPageServer({ root, target: 'wx', publish: output.resolve, onError: output.reject })
     await server.close()
     assert.deepEqual(await output.promise, [
-        { path: 'home', config: { target: 'wx' } },
-        { path: 'nested/about', config: { target: 'wx' } }
+        { path: 'home', config: { target: 'wx', title: 'Shared' } },
+        { path: 'nested/about', config: { target: 'wx', title: 'Shared' } }
     ])
 })
 
@@ -300,7 +311,8 @@ test('validates snapshots and recovers from errors without publishing unchanged 
     await writeFile(home, source('return { entry: true };'))
     await writeFile(path.join(src, 'about.tsx'), source('return {};'))
     const publish = t.mock.fn()
-    const failed = Promise.withResolvers<unknown>()
+    // Each failed generation must report its own error without disturbing the accepted snapshot.
+    let failed = Promise.withResolvers<unknown>()
     const updated = Promise.withResolvers<readonly VptPageOption[]>()
     const server = await createPageServer({
         root,
@@ -311,12 +323,17 @@ test('validates snapshots and recovers from errors without publishing unchanged 
                 updated.resolve(pages)
             }
         },
-        onError: failed.resolve
+        onError: (error) => failed.resolve(error)
     })
     t.after(() => server.close())
     assert.deepEqual(publish.mock.calls[0]?.arguments[0], [{ path: 'home', entry: true }, { path: 'about' }])
 
-    await writeFile(home, source('throw Error("broken factory");'))
+    await publishSourceGeneration(home, `${source('return {};')} const = 0;`)
+    assert.match(String(await failed.promise), /Expected|Unexpected/)
+    assert.equal(publish.mock.callCount(), 1)
+
+    failed = Promise.withResolvers()
+    await publishSourceGeneration(home, source('throw Error("broken factory");'))
     assert.match(String(await failed.promise), /broken factory/)
     const unchanged = Promise.withResolvers<void>()
     process.once(evaluated, unchanged.resolve)
@@ -329,6 +346,55 @@ test('validates snapshots and recovers from errors without publishing unchanged 
     await writeFile(home, source('return { entry: true, prerender: true };'))
     assert.deepEqual(await updated.promise, [{ path: 'home', entry: true, prerender: true }, { path: 'about' }])
     assert.equal(publish.mock.callCount(), 2)
+})
+
+test('reports failed output and reuses factories when the compiler replays the same chunks', async (t) => {
+    const event = 'page-server:replayed-factory'
+    const evaluated = t.mock.fn()
+    process.on(event, evaluated)
+    t.after(() => {
+        process.off(event, evaluated)
+    })
+    const observed = Promise.withResolvers<{
+        replay: () => void | Promise<void>
+        fail: (error: Error) => void | Promise<void>
+    }>()
+    const root = createMemoryPageProject(
+        t,
+        {
+            'src/home.tsx': `
+                import process from 'node:process';
+                import { defineVptPage } from 'virtual:vpt';
+                defineVptPage(() => { process.emit(${JSON.stringify(event)}); return {}; });
+            `
+        },
+        (options) => {
+            const onOutput = options.onOutput!
+            return {
+                ...options,
+                onOutput(result) {
+                    observed.resolve({ replay: () => onOutput(result), fail: onOutput })
+                    return onOutput(result)
+                }
+            }
+        }
+    )
+    const publish = t.mock.fn()
+    const onError = t.mock.fn()
+    const server = await createPageServer({ root, target: 'wx', publish, onError })
+    t.after(() => server.close())
+    assert.deepEqual(publish.mock.calls[0]?.arguments[0], [{ path: 'home' }])
+
+    const { fail, replay } = await observed.promise
+    const error = new Error('Output generation failed')
+    await fail(error)
+    await replay()
+    // Let any unexpected asynchronous factory evaluation and publication finish.
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    assert.equal(onError.mock.callCount(), 1)
+    assert.equal(onError.mock.calls[0]?.arguments[0], error)
+    assert.equal(evaluated.mock.callCount(), 1)
+    assert.equal(publish.mock.callCount(), 1)
 })
 
 test('publishes the latest program without waiting for a superseded factory', { timeout: 10_000 }, async (t) => {
