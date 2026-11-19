@@ -18,7 +18,6 @@ const { variant } = Astro.props
         <span class="window-title">微信开发者工具 · VPT</span>
     </div>
     <LazyVideo
-        class="hmr-video"
         src="/vpt-hmr-demo.mp4"
         ariaLabel="微信开发者工具中的 React 热更新演示"
         width={1988}
@@ -88,16 +87,5 @@ const { variant } = Astro.props
     .window-title {
         padding-inline: 4rem;
         text-align: center;
-    }
-
-    .hmr-video {
-        display: block;
-        width: 100%;
-        height: auto;
-        aspect-ratio: 1988 / 1624;
-        margin: 0;
-        border: 0;
-        border-radius: 0;
-        background: var(--vpt-video-background);
     }
 </style>
