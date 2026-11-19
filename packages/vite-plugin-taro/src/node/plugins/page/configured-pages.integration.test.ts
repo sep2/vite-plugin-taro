@@ -1,9 +1,20 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { build } from 'vite'
+import { build, resolveConfig } from 'vite'
 import type { VptOptions, VptPageOption } from '../../../options.ts'
 import { createMemoryBuildProject } from '../../tests/create-memory-build-project.ts'
 import vpt from '../../vpt.ts'
+
+for (const target of ['wx', 'h5'] as const) {
+    test(`${target}: rejects configuration without pages`, async () => {
+        // @ts-expect-error Verify the runtime diagnostic for untyped Vite configs.
+        const plugins = vpt({ target, app: 'src/app.tsx', appJson: {}, projectConfigJson: {} })
+        await assert.rejects(
+            resolveConfig({ configFile: false, plugins }, 'build'),
+            /VPT pages option must be an array/
+        )
+    })
+}
 
 const configuredPages: VptPageOption[] = [
     { path: 'pages/detail' },
@@ -18,8 +29,8 @@ for (const [target, styleExtension] of [
     ['xhs', 'css'],
     ['h5', 'css']
 ] as const) {
-    for (const pages of [undefined, [], configuredPages]) {
-        const name = pages === undefined ? 'omitted' : pages.length === 0 ? 'empty' : 'configured'
+    for (const pages of [[], configuredPages]) {
+        const name = pages.length === 0 ? 'empty' : 'configured'
         test(`${target}: builds ${name} pages through the public plugin`, async () => {
             using project = createMemoryBuildProject({
                 'index.html': '<html><body><div id="app"></div></body></html>',
@@ -40,9 +51,7 @@ for (const [target, styleExtension] of [
             const options: VptOptions = { target, app: 'src/app.tsx', pages, appJson: {}, projectConfigJson: {} }
             const original = structuredClone(options)
             Object.freeze(options)
-            if (pages !== undefined) {
-                Object.freeze(pages)
-            }
+            Object.freeze(pages)
             const result = await build({
                 root: project.root,
                 configFile: false,
@@ -52,7 +61,7 @@ for (const [target, styleExtension] of [
             })
             assert.ok(!Array.isArray(result) && 'output' in result)
             assert.deepEqual(options, original)
-            const routes = pages?.length ? ['pages/home', 'pages/detail'] : []
+            const routes = pages.length > 0 ? ['pages/home', 'pages/detail'] : []
             const javascript = result.output.flatMap((file) => (file.type === 'chunk' ? [file.code] : [])).join('\n')
             assert.doesNotMatch(javascript, /Unlisted module executed|Unlisted factory executed/)
             if (target === 'h5') {

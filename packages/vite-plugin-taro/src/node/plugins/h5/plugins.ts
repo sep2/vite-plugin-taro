@@ -27,7 +27,7 @@ function createH5Plugin(options: Readonly<VptOptions>): Plugin {
     return {
         name: 'vpt:h5',
         configResolved() {
-            resolver.setPages(orderPages(options.pages ?? []))
+            resolver.setPages(orderPages(options.pages))
         },
 
         config() {

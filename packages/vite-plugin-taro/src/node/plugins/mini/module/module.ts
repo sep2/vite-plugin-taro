@@ -60,6 +60,9 @@ export const appShellFileName = 'app.js'
 /** Forces Taro's recursive native Component entry to emit at its configured root path. */
 export const componentShellFileName = 'comp.js'
 
+/** Forces Taro's recursive native Component entry to emit at its configured root path. */
+export const componentCapsuleFileName = 'component-capsule.js'
+
 /** Forces Taro's CustomWrapper native shell to emit at its configured root path. */
 export const customWrapperShellFileName = 'custom-wrapper.js'
 

@@ -10,6 +10,7 @@ import type { MiniContract } from './mini-contract.ts'
 import {
     appShellFileName,
     classifyMiniModule,
+    componentCapsuleFileName,
     componentShellFileName,
     customWrapperShellFileName,
     miniAppCapsuleId,
@@ -63,7 +64,7 @@ function createMiniPlugin(
     return {
         name: 'vpt:mini',
         configResolved() {
-            resolver.setPages(orderPages(contract.options.pages ?? []))
+            resolver.setPages(orderPages(contract.options.pages))
         },
 
         config() {
@@ -133,7 +134,7 @@ function createMiniPlugin(
                     fileName: `${resolver.appEntry.capsuleName}.js`
                 })
                 this.emitFile({ type: 'chunk', id: miniComponentShellId, fileName: componentShellFileName })
-                this.emitFile({ type: 'chunk', id: miniComponentCapsuleId, fileName: 'component-capsule.js' })
+                this.emitFile({ type: 'chunk', id: miniComponentCapsuleId, fileName: componentCapsuleFileName })
                 this.emitFile({ type: 'chunk', id: miniCustomWrapperShellId, fileName: customWrapperShellFileName })
 
                 for (const entry of resolver.pageEntries()) {

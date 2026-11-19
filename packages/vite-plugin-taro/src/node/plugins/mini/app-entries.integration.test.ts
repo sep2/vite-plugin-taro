@@ -3,20 +3,24 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { build, createServer, type Rolldown } from 'vite'
+import { createMemoryBuildProject } from '../../tests/create-memory-build-project.ts'
 import { createTestProject } from '../../tests/create-test-project.ts'
 import { publishSourceGeneration } from '../../tests/publish-source-generation.ts'
 import vpt from '../../vpt.ts'
 import { miniAppShellId, miniBootstrapId } from './module/module.ts'
 
-test('builds the App and infrastructure with an omitted page list', async () => {
-    const root = await createTestProject('mini-empty-app-')
-    await mkdir(path.join(root, 'src'))
-    await writeFile(path.join(root, 'src/app.tsx'), 'export default function App({ children }) { return children }')
+test('builds the App and infrastructure with an empty page list', async () => {
+    using project = createMemoryBuildProject({
+        'src/app.tsx': 'export default function App({ children }) { return children }'
+    })
     const result = await build({
-        root,
+        root: project.root,
         configFile: false,
         logLevel: 'silent',
-        plugins: [vpt({ target: 'wx', app: 'src/app.tsx', appJson: {}, projectConfigJson: {} })],
+        plugins: [
+            project.plugin,
+            vpt({ target: 'wx', app: 'src/app.tsx', pages: [], appJson: {}, projectConfigJson: {} })
+        ],
         build: { write: false, minify: false }
     })
     assert.ok(!Array.isArray(result) && 'output' in result)

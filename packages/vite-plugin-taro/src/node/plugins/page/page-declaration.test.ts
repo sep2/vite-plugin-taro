@@ -4,9 +4,13 @@ import test from 'node:test'
 import type { defineVptPage } from 'virtual:vpt'
 import type { VptOptions, VptPageDeclaration, VptPageOptionNoPath, VptTarget } from '../../../index.ts'
 
-test('typechecks optional and explicit page lists', () => {
+test('typechecks required page lists', () => {
     const configure = (_options: VptOptions): void => {}
-    const options = { target: 'wx', app: 'src/app.tsx', appJson: {}, projectConfigJson: {} } satisfies VptOptions
+    const options = { target: 'wx', app: 'src/app.tsx', appJson: {}, projectConfigJson: {} } satisfies Omit<
+        VptOptions,
+        'pages'
+    >
+    // @ts-expect-error The pages option is required.
     configure(options)
     configure({ ...options, pages: [] })
     configure({ ...options, pages: [{ path: 'pages/home', entry: true }] })
