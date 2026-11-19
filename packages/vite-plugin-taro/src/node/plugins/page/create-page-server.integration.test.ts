@@ -137,6 +137,8 @@ test('skips bundle generation for unrelated files and isolated component edits',
     t.mock.method(DevEngine, 'create', (...[input, output, options]: Parameters<typeof create>) =>
         create(input, output, {
             ...options,
+            // Measure completed saves, not overlapping native filesystem notifications.
+            watch: { ...options?.watch, usePolling: true, compareContentsForPolling: true },
             onHmrUpdates(result) {
                 const before = generated.mock.callCount()
                 options?.onHmrUpdates?.(result)
@@ -175,7 +177,7 @@ test('skips bundle generation for unrelated files and isolated component edits',
     assert.equal(await notes.promise, 0)
     const before = generated.mock.callCount()
     component = Promise.withResolvers()
-    await writeFile(home, source('after'))
+    await publishSourceGeneration(home, source('after'))
     await component.promise
     assert.equal(generated.mock.callCount(), before)
     assert.equal(factory.mock.callCount(), 2)
