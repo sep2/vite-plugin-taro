@@ -108,11 +108,13 @@ import HomeSectionHeading from './home-section-heading.astro'
                         <section class="steps-card">
                             <div class="steps-orbit" aria-hidden="true"></div>
                             <span class="style-update-flash" aria-hidden="true"></span>
-                            <span class="style-hmr-toast" aria-hidden="true"><i>↯</i><b>WXSS 已更新</b><small>24 ms</small></span>
-                            <span class="metric-label style-copy">
-                                <span>今日步数</span>
-                                <span class="style-copy-updated" aria-hidden="true">今日步数</span>
-                            </span>
+                            <div class="steps-heading">
+                                <span class="metric-label style-copy">
+                                    <span>今日步数</span>
+                                    <span class="style-copy-updated" aria-hidden="true">今日步数</span>
+                                </span>
+                                <span class="style-hmr-toast" aria-hidden="true"><i>↯</i><b>WXSS 已更新</b><small>24 ms</small></span>
+                            </div>
                             <strong>12,680</strong>
                             <small class="style-copy">
                                 <span>目标 16,000 步</span>
@@ -836,9 +838,10 @@ import HomeSectionHeading from './home-section-heading.astro'
         overflow: hidden;
     }
 
+    /* Keep the skin and orbits behind the content within the card's isolated stacking context. */
     .steps-card::before {
         position: absolute;
-        z-index: 0;
+        z-index: -2;
         inset: 0;
         border-radius: inherit;
         background:
@@ -850,7 +853,7 @@ import HomeSectionHeading from './home-section-heading.astro'
 
     .steps-card::after {
         position: absolute;
-        z-index: 1;
+        z-index: -1;
         top: -2.5rem;
         right: -1.4rem;
         width: 7rem;
@@ -860,13 +863,9 @@ import HomeSectionHeading from './home-section-heading.astro'
         content: '';
     }
 
-    .steps-card > * {
-        position: relative;
-        z-index: 2;
-    }
-
     .steps-orbit {
         position: absolute;
+        z-index: -1;
         top: -0.8rem;
         right: 1.6rem;
         width: 3.8rem;
@@ -877,7 +876,7 @@ import HomeSectionHeading from './home-section-heading.astro'
 
     .style-update-flash {
         position: absolute;
-        z-index: 3;
+        z-index: 1;
         inset: 0.18rem;
         border: 1px solid rgba(255, 248, 218, 0.92);
         border-radius: inherit;
@@ -885,14 +884,18 @@ import HomeSectionHeading from './home-section-heading.astro'
         pointer-events: none;
     }
 
+    .steps-heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
     .style-hmr-toast {
         display: flex;
-        position: absolute;
-        z-index: 4;
-        top: 0.72rem;
-        right: 0.72rem;
         align-items: center;
         gap: 0.22rem;
+        margin-inline-start: auto;
         padding: 0.25rem 0.42rem;
         border: 1px solid rgba(139, 58, 45, 0.14);
         border-radius: 999px;
