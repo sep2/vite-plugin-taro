@@ -31,5 +31,4 @@ const history = createHashHistory({ window: browserWindow })
 const mountApp = config.tabBar ? handleAppMountWithTabbar : handleAppMount
 mountApp(config, history)
 
-// @ts-expect-error Taro's implementation receives the React adapter object despite declaring a string.
 createRouter(history, app, config, React)

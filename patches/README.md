@@ -6,19 +6,19 @@ pnpm applies one combined patch to each package version. We maintain **25 featur
 
 | Package | Ordered feature patches | Purpose |
 | --- | --- | --- |
-| `@tarojs/plugin-html@4.3.2` | `01-html-elements` | Populate upstream HTML inline/block element sets and share their pure classifications and semantic classes between templates and native DOM hosts. |
-| `@tarojs/plugin-framework-react@4.3.2` | `01-react19-root-api` | Use React 19 concurrent roots for App and standalone native-component entries; make standalone native-component setup explicitly synchronous with `flushSync`. |
+| `@tarojs/plugin-html@4.3.3` | `01-html-elements` | Populate upstream HTML inline/block element sets and share their pure classifications and semantic classes between templates and native DOM hosts. |
+| `@tarojs/plugin-framework-react@4.3.3` | `01-react19-root-api` | Use React 19 concurrent roots for App and standalone native-component entries; make standalone native-component setup explicitly synchronous with `flushSync`. |
 | | `02-mini-app-page-rendering` | Create custom App containers as logical roots and place Page children in an opaque outlet inside the singleton React App. |
 | | `03-h5-router-container` | Give H5 Page children a dedicated `taro_router` container so routing CSS does not target unrelated App siblings. |
 | | `04-page-prerender` | Deduplicate queued and rendered Page identities for caller-controlled prerendering. Preserve the original queue, render/unmount flow, mount signature and native update scheduling. |
 | | `05-page-host-context` | Select the existing Mini Page root's host type and present native Pages through root updates. |
-| `@tarojs/react@4.3.2` | `01-react19-reconciler` | Target the pinned React 19 reconciler contract directly: concurrent roots, commit updates, scoped event priorities, error callbacks and distinct synchronous callback/work flushing. Remove legacy render APIs and align declarations. |
+| `@tarojs/react@4.3.3` | `01-react19-reconciler` | Target the pinned React 19 reconciler contract directly: concurrent roots, commit updates, scoped event priorities, error callbacks and distinct synchronous callback/work flushing. Remove legacy render APIs and align declarations. |
 | | `02-renderer-host` | Delegate node creation, form classification and commit boundaries through VPT's private renderer-host import, and expose the generic host type. |
 | | `03-page-host-context` | Delegate Page-root type and child host-context selection to required host callbacks. |
 | | `04-event-handler-replacement` | Add replacement React callbacks before removing their predecessors, preserving continuous native subscriptions and logical handler order. |
 | | `05-style-update-batching` | Expose a synchronous style-prop boundary so the WX DOM host serializes and forwards the final logical style once. |
 | | `06-development-element-attributes` | Omit direct React-element host attributes during development, preserving React 19 Fast Refresh and production output. |
-| `@tarojs/runtime@4.3.2` | `01-mini-app-page-rendering` | Construct the App host as a scheduler, derive initial reset paths from the root prefix, and stop App serialization at the Page outlet. |
+| `@tarojs/runtime@4.3.3` | `01-mini-app-page-rendering` | Construct the App host as a scheduler, derive initial reset paths from the root prefix, and stop App serialization at the Page outlet. |
 | | `02-page-lifecycle` | Support object-or-factory Page data and caller-owned Page mounting with Taro lifecycle ordering and teardown. |
 | | `03-delegate-dom` | Delegate DOM presentation and context lookup/invalidation to the selected host, and create replacement text through ownerDocument. Taro retains logical state, event identities and mutation records; template defaults retain payload preparation and epoch-based context caching. |
 | | `04-clone-delegation` | Construct clones through existing presentation delegates, preserving fresh identity, parent links and dynamic style accessors. |
@@ -138,7 +138,7 @@ pnpm build:plugin
 To work on one package:
 
 ```sh
-pnpm patches:build @tarojs/runtime@4.3.2
+pnpm patches:build @tarojs/runtime@4.3.3
 ```
 
 The composer:
@@ -163,13 +163,13 @@ For example, editing the runtime's first feature (Bash example; use an absolute 
 repo="$PWD"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-pnpm patch @tarojs/runtime@4.3.2 --ignore-existing --edit-dir "$work/package"
+pnpm patch @tarojs/runtime@4.3.3 --ignore-existing --edit-dir "$work/package"
 git -C "$work/package" init --quiet --object-format=sha1
 git -C "$work/package" -c core.autocrlf=false add --force --all
 
 # For a later feature, apply all earlier feature files here with git apply --index.
 base="$(git -C "$work/package" write-tree)"
-feature="$repo/patches/series/@tarojs__runtime@4.3.2/01-mini-app-page-rendering.patch"
+feature="$repo/patches/series/@tarojs__runtime@4.3.3/01-mini-app-page-rendering.patch"
 git -C "$work/package" apply --index "$feature"
 
 # Edit the extracted package files now. For a new feature, omit the preceding apply.
@@ -179,7 +179,7 @@ git -C "$work/package" diff --cached --binary --full-index \
   --no-color --no-ext-diff --no-textconv --no-renames \
   --src-prefix=a/ --dst-prefix=b/ "$base" -- > "$feature"
 
-pnpm patches:build @tarojs/runtime@4.3.2
+pnpm patches:build @tarojs/runtime@4.3.3
 pnpm install
 ```
 

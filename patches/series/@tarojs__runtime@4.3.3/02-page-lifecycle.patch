@@ -11,9 +11,18 @@ index 6d4fe8cd6474c57f5e5be14962ebcd9513e35dcf..e9652dff89780d17f3f89e410a687382
  declare function createComponentConfig(component: React.ComponentClass, componentName?: string, data?: Record<string, unknown>): any;
  declare function createRecursiveComponentConfig(componentName?: string, forceCustomWrapper?: boolean): any;
 diff --git a/dist/dsl/common.js b/dist/dsl/common.js
-index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..2d981033285f2c4266a3f4c12a774cac68656375 100644
+index 5829433a38c2b6b2a1304e1a5cd742a2694763e2..2d981033285f2c4266a3f4c12a774cac68656375 100644
 --- a/dist/dsl/common.js
 +++ b/dist/dsl/common.js
+@@ -2,7 +2,7 @@ import { hooks, ensure, isEnableTTDom, isUndefined, EMPTY_OBJ, EventChannel, get
+ import { raf as _raf } from '../bom/raf.js';
+ import { taroWindowProvider } from '../bom/window.js';
+ import { PAGE_INIT, OPTIONS, EXTERNAL_CLASSES, BEHAVIORS, CONTEXT_ACTIONS, VIEW, ON_HIDE, ON_READY, ON_SHOW, ON_LOAD, CUSTOM_WRAPPER } from '../constants/index.js';
+-import { Current, getCurrentInstance } from '../current.js';
++import { Current } from '../current.js';
+ import { eventHandler } from '../dom/event.js';
+ import { bumpNearestCtxEpochForRoot } from '../dom/nearest-ctx.js';
+ import { eventCenter } from '../emitter/emitter.js';
 @@ -70,9 +70,8 @@ function createPageConfig(component, pageName, data, pageConfig) {
      // 小程序 Page 构造器是一个傲娇小公主，不能把复杂的对象挂载到参数上
      const id = pageName !== null && pageName !== void 0 ? pageName : `taro_page_${pageId()}`;
@@ -26,7 +35,7 @@ index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..2d981033285f2c4266a3f4c12a774cac
      function setCurrentRouter(page) {
          const router = process.env.TARO_PLATFORM === 'web' ? page.$taroPath : page.route || page.__route__ || page.$taroPath;
          Current.router = {
-@@ -87,87 +86,40 @@ function createPageConfig(component, pageName, data, pageConfig) {
+@@ -87,89 +86,40 @@ function createPageConfig(component, pageName, data, pageConfig) {
              Current.router.exitState = page.exitState;
          }
      }
@@ -49,6 +58,8 @@ index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..2d981033285f2c4266a3f4c12a774cac
 -                this.$taroParams = uniqueOptions;
 -            }
 -            setCurrentRouter(this);
+-            // 鸿蒙ASCF小程序特殊处理，完成 _taroInstance 初始化绑定
+-            getCurrentInstance();
 -            // 初始化当前页面的上下文信息
 -            if (process.env.TARO_PLATFORM !== 'web') {
 -                taroWindowProvider.trigger(CONTEXT_ACTIONS.INIT, $taroPath);
@@ -128,7 +139,7 @@ index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..2d981033285f2c4266a3f4c12a774cac
                  // 触发生命周期
                  safeExecute(this.$taroPath, ON_READY);
                  // 通过事件触发子组件的生命周期
-@@ -176,7 +128,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
+@@ -178,7 +128,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
              });
          },
          [ONSHOW](options = {}) {
@@ -137,7 +148,7 @@ index 42e8c951dd54de41bf48c731aaa1197d1a8c85f9..2d981033285f2c4266a3f4c12a774cac
                  // 设置 Current 的 page 和 router
                  Current.page = this;
                  setCurrentRouter(this);
-@@ -238,7 +190,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
+@@ -240,7 +190,7 @@ function createPageConfig(component, pageName, data, pageConfig) {
                      return exec();
                  }
                  if (isDefer) {

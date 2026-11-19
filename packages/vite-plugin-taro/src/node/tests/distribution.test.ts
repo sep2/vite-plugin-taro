@@ -18,7 +18,7 @@ const runtimePackageRoot = path.resolve(runtimePackageDistRoot, '..')
 const runtimePackageRequire = createRequire(runtimePackageEntry)
 const compilerSizeLimit = 2_250_000
 // Includes modular APIs, eager components, router, four Mini adapters, declarations, and source maps.
-const runtimePackageSizeLimit = 5_080_000
+const runtimePackageSizeLimit = 5_100_000
 const runtimeCjsFilePattern = /^index\.cjs\.(?:d\.ts|js(?:\.map)?)$/
 
 const platformJavaScriptFiles: ReadonlyArray<readonly [dependencyId: string, outputPath: string]> = [
@@ -183,7 +183,7 @@ test('publishes a compiler that depends on the unified Taro runtime package', as
     assert.equal(packageJson.devDependencies['@tarojs/plugin-platform-h5'], undefined)
     assert.equal(packageJson.devDependencies['@tailwindcss-mangle/engine'], '0.2.0')
     assert.equal(packageJson.devDependencies['@weapp-core/escape'], '8.0.0')
-    assert.equal(packageJson.devDependencies['@weapp-tailwindcss/postcss'], '4.0.2')
+    assert.equal(packageJson.devDependencies['@weapp-tailwindcss/postcss'], '4.0.5')
     assert.equal(packageJson.devDependencies['weapp-tailwindcss'], undefined)
     assert.equal(packageJson.dependencies['weapp-tailwindcss'], undefined)
     assert.doesNotMatch(compiler, /from\s*['"]weapp-tailwindcss/)

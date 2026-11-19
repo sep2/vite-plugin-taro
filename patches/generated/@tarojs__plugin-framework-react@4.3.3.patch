@@ -1,5 +1,5 @@
 diff --git a/dist/runtime.js b/dist/runtime.js
-index f9f3fbeab6d4633fbebbdbcab098a652280b380e..f3506cbdb608c8ce5f26b35e2f641e86bc145e8a 100644
+index 58c748ecbbcb0b0f3af6c5c6bedda192bd396da1..77fc5beadbc21ac9e557b2a5ed77d9e60c0871d3 100644
 --- a/dist/runtime.js
 +++ b/dist/runtime.js
 @@ -152,7 +152,6 @@ var taroHooks = /*#__PURE__*/Object.freeze({
@@ -121,7 +121,7 @@ index f9f3fbeab6d4633fbebbdbcab098a652280b380e..f3506cbdb608c8ce5f26b35e2f641e86
              hasLoaded = new Promise(resolve => { loadResolver = resolve; });
              Current.page = this;
              this.config = pageConfig || {};
-@@ -641,7 +655,7 @@ function createNativePageConfig(Component, pageName, data, react, reactDOM, page
+@@ -643,7 +657,7 @@ function createNativePageConfig(Component, pageName, data, react, reactDOM, page
                  safeExecute($taroPath, ONLOAD, this.$taroParams);
                  loadResolver();
                  pageElement.ctx = this;
