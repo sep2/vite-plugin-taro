@@ -1,5 +1,21 @@
 # vite-plugin-taro-runtime
 
+## 0.8.11
+
+### 变更
+
+- cea2cc31：将内置 Taro 更新至 `4.3.3`，同步 React 渲染器、平台适配包和小程序生命周期补丁。
+
+### 升级说明
+
+从 `0.8.10` 升级到 `0.8.11`：运行时随插件自动升级。
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.8.11 vite@8.3.8
+```
+
+如果应用直接依赖运行时，执行 `pnpm add --save-exact vite-plugin-taro-runtime@0.8.11`，使插件和运行时版本一致。重启开发服务器并重新构建应用。
+
 ## 0.8.10
 
 ### 变更

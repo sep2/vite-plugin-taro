@@ -1,5 +1,23 @@
 # vite-plugin-taro
 
+## 0.8.11
+
+### 变更
+
+- ef87d83f、97e1e9c2：支持为一个页面设置 `entry: true`，将其在所有构建目标中排到首位，其余页面保持声明顺序。
+- 6c05bb02、97e1e9c2：统一小程序 App 和页面入口的生成方式，确保完整构建和增量重建使用同一份页面清单。
+- cea2cc31：更新 Vite 至 `8.3.8`、Rolldown 至 `1.2.19`、`@weapp-tailwindcss/postcss` 至 `4.0.5`，并同步 Taro 依赖至 `4.3.3`。
+
+### 升级说明
+
+从 `0.8.10` 升级到 `0.8.11`，同时更新插件和 Vite：
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.8.11 vite@8.3.8
+```
+
+运行时随插件自动升级。如果项目在 `overrides` 或 `resolutions` 中固定了 Vite 或 Rolldown，将对应版本同步到 `8.3.8` 或 `1.2.19`。已有 `pages` 配置无需修改；需要指定首页时，在该页面配置中添加 `entry: true`。安装后重启开发服务器并重新构建应用。
+
 ## 0.8.10
 
 ### 修复
