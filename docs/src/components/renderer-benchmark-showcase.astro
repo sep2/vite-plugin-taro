@@ -31,7 +31,7 @@ const format = (value: number) => value.toLocaleString('en-US', { maximumFractio
                 最快的全功能<br />
                 <span>React 小程序框架</span>
             </h2>
-            <p class="benchmark-lead">完整的 React 19（支持 React Compiler）、原生组件与跨端能力，配上极致的渲染路径。VPT DOM 对比原版 Taro 采用的 setData 渲染架构，让速度与完整体验兼得。</p>
+            <p class="benchmark-lead">完整的 React 19（支持 React Compiler）、原生组件与跨端能力。无需 wxml，零 setData，超越递归模版的极速渲染性能，API 全兼容 Taro。</p>
             <div class="benchmark-links">
                 <HomeLink href="/guides/configuration/#renderer">开启 DOM 渲染</HomeLink>
                 <a class="benchmark-source" href={source} target="_blank" rel="noopener noreferrer">
@@ -47,7 +47,7 @@ const format = (value: number) => value.toLocaleString('en-US', { maximumFractio
                 <span>比 Taro 更快，实测为证。</span>
             </div>
             <strong>{multiplier}<small>倍</small></strong>
-            <p class="score-comparison">VPT 相对 Taro 递归模板的平均性能达 <span>{multiplier}</span> 倍，已达到原生渲染水平</p>
+            <p class="score-comparison">VPT DOM 相对 Taro 递归模板的平均性能达 <span>{multiplier}</span> 倍，已达到原生渲染水平</p>
         </aside>
     </div>
 
@@ -57,8 +57,8 @@ const format = (value: number) => value.toLocaleString('en-US', { maximumFractio
                 <h3>少一点等待，多一点流畅</h3>
             </div>
             <div class="chart-legend" role="group" aria-label="图表图例">
-                <span><i class="dom-key" aria-hidden="true"></i>VPT DOM</span>
-                <span><i class="template-key" aria-hidden="true"></i>Taro setData</span>
+                <span><i class="dom-key" aria-hidden="true"></i>VPT</span>
+                <span><i class="template-key" aria-hidden="true"></i>Taro</span>
             </div>
         </header>
         <div class="chart-grid">
@@ -69,14 +69,14 @@ const format = (value: number) => value.toLocaleString('en-US', { maximumFractio
                         <span class="speedup">{item.speedup.toFixed(1)}×</span>
                     </header>
                     <div class="bar-row">
-                        <span>DOM</span>
+                        <span>VPT</span>
                         <div class="bar-track" aria-hidden="true">
                             <i class="dom-bar" style={`width: ${item.dom.median / item.scale * 100}%`}></i>
                         </div>
                         <b>{format(item.dom.median)} ms</b>
                     </div>
                     <div class="bar-row">
-                        <span>setData</span>
+                        <span>Taro</span>
                         <div class="bar-track" aria-hidden="true">
                             <i class="template-bar" style={`width: ${item.template.median / item.scale * 100}%`}></i>
                         </div>

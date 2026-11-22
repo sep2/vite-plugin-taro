@@ -65,7 +65,7 @@ test('the performance readout presents its multiplier with the comparison label'
     assert.match(label, /<svg class="score-mark"[^>]*aria-hidden="true"/)
     assert.match(
         readout,
-        /<p class="score-comparison">VPT 相对 Taro 递归模板的平均性能达 <span>\{multiplier\}<\/span> 倍，已达到原生渲染水平<\/p>/
+        /<p class="score-comparison">VPT DOM 相对 Taro 递归模板的平均性能达 <span>\{multiplier\}<\/span> 倍，已达到原生渲染水平<\/p>/
     )
     assert.match(readout, /<strong>\{multiplier\}<small>倍<\/small><\/strong>/)
     assert.equal(translateHomeText('倍', 'en'), '×')
@@ -79,11 +79,11 @@ test('the score uses the shared sans-serif typography and aligned numerals', () 
     assert.match(styles, /font-variant-numeric: lining-nums tabular-nums/)
 })
 
-test('the displayed comparison identifies the baseline as setData', () => {
-    const visibleCopy = Array.from(component.matchAll(/>([^<>{}]+)</g), (match) => match[1]!.trim()).join(' ')
-    assert.match(visibleCopy, /Taro setData/)
-    assert.match(component, /<span>setData<\/span>/)
-    assert.doesNotMatch(visibleCopy, /\btemplate\b/i)
+test('the legend and chart rows label the comparison VPT and Taro', () => {
+    assert.match(component, /<i class="dom-key" aria-hidden="true"><\/i>VPT<\/span>/)
+    assert.match(component, /<i class="template-key" aria-hidden="true"><\/i>Taro<\/span>/)
+    assert.match(component, /<div class="bar-row">\s*<span>VPT<\/span>/)
+    assert.match(component, /<div class="bar-row">\s*<span>Taro<\/span>/)
 })
 
 test('benchmark text, case labels, and accessible names translate in place', () => {
