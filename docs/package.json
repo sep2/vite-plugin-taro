@@ -12,11 +12,11 @@
         "astro": "ASTRO_TELEMETRY_DISABLED=1 astro"
     },
     "dependencies": {
-        "@astrojs/markdown-remark": "^7.3.9",
+        "@astrojs/markdown-remark": "^7.3.10",
         "@astrojs/starlight": "^0.43.1",
-        "astro": "^7.4.12",
+        "astro": "^7.4.13",
         "canvas-confetti": "^1.9.4",
-        "mdast-util-mdx-jsx": "^3.2.1",
+        "mdast-util-mdx-jsx": "^3.2.2",
         "remark-mdx": "^3.1.1",
         "remark-parse": "^11.0.0",
         "remark-stringify": "^11.0.0",
