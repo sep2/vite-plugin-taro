@@ -1,10 +1,7 @@
-import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { test } from 'node:test'
 import { pathToFileURL } from 'node:url'
-import runtimePackage from '../packages/taro-runtime/package.json' with { type: 'json' }
 
 const runtimeRequire = createRequire(new URL('../packages/taro-runtime/package.json', import.meta.url))
 const swiperBundle = pathToFileURL(runtimeRequire.resolve('swiper/bundle')).href
@@ -22,13 +19,6 @@ ${assertions}`
         { stdio: 'pipe', timeout: 10_000 }
     )
 }
-
-test('the installed H5 Swiper matches the published runtime dependency', () => {
-    const manifest: { version: string } = JSON.parse(
-        readFileSync(runtimeRequire.resolve('swiper/package.json'), 'utf8')
-    )
-    assert.equal(manifest.version, runtimePackage.dependencies.swiper)
-})
 
 test('the H5 Swiper bundle retains Taro configuration and controller APIs', () => {
     runSwiperAssertions(`

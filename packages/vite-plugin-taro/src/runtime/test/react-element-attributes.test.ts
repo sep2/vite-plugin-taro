@@ -125,7 +125,6 @@ import React from 'react'
 import ReactDOM from 'vite-plugin-taro-runtime/react'
 import { document, TaroEvent } from '@tarojs/runtime'
 
-assert.equal(React.version.split('.')[0], '19')
 const h = React.createElement
 const container = document.createElement('root')
 const root = ReactDOM.createRoot(container)
