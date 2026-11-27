@@ -1,5 +1,15 @@
 # vite-plugin-taro-runtime
 
+## 0.8.12
+
+### 变更
+
+- 48f7c5ac：将 `abortcontroller-polyfill` 依赖范围更新为 `^1.7.8`。
+
+### 升级说明
+
+运行时随插件从 `0.8.11` 自动升级到 `0.8.12`。执行 `pnpm add -D --save-exact vite-plugin-taro@0.8.12` 即可；直接依赖运行时的应用请同步执行 `pnpm add --save-exact vite-plugin-taro-runtime@0.8.12`。
+
 ## 0.8.11
 
 ### 变更
