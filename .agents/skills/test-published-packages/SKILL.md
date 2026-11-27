@@ -6,20 +6,15 @@ compatibility: Requires Node.js 26+, npm, WeChat DevTools, wechatide, and an aut
 
 # Test Published Packages
 
-Reuse a ready WeChat DevTools session or initialize it through [wechatide-skill](../miniprogram-dev-skill/SKILL.md). Set `VITE_VPT_WECHAT_APP_ID` to an authorized test AppID; keep it out of logs and replies.
+Set `VITE_VPT_WECHAT_APP_ID` to an authorized test AppID in `packages/create-vite-taro/.env.local`, or export it to override the repo setting. Keep the value out of logs and replies.
 
-From this skill directory, run both renderers:
-
-```sh
-node scripts/test-published-packages.ts
-```
-
-To test one renderer:
+Run from the repository root:
 
 ```sh
-node scripts/test-published-packages.ts --renderer template
-node scripts/test-published-packages.ts --renderer dom
+node --env-file-if-exists=packages/create-vite-taro/.env.local .agents/skills/test-published-packages/scripts/test-published-packages.ts
 ```
+
+The runner checks the current WeChat DevTools session and tests both renderers. Append `--renderer template` or `--renderer dom` to select one. If the status check fails, use its diagnostic and the [DevTools readiness guide](../miniprogram-dev-skill/references/environment-readiness.md) to identify the next step.
 
 Run once to completion. If backgrounded to respect tool timeouts, track its PID, log, and exit code under `packages/vite-plugin-taro/tmp/` in the repository.
 

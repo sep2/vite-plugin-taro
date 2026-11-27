@@ -13,7 +13,7 @@
 
 ## Skill 安装时检查
 
-在本 skill **根目录**、非沙箱执行：
+在本 skill **根目录**执行：
 
 ```bash
 node skills/installer/scripts/check-installation.mjs

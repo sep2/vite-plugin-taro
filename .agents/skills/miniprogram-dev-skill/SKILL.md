@@ -48,7 +48,7 @@ related-skills:
 
 ## 运行前门禁（必须）
 
-**禁止在沙箱 / sandbox 中运行 `wechatide`。** 须在非沙箱、可访问本机桌面的 shell 中执行；环境强制沙箱时先向用户说明并改用非沙箱，勿反复重试。
+在当前 shell 中执行下方状态检查，以 `wechatide` 的实际返回判断能否连接本机开发者工具。如果系统拒绝访问，报告具体错误和所需权限。
 
 需要 `wechatide` 时按下面做；完整规则见 [运行前检查](references/environment-readiness.md)。
 
