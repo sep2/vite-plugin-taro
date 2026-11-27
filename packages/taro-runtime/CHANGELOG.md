@@ -1,5 +1,15 @@
 # vite-plugin-taro-runtime
 
+## 0.8.13
+
+### 变更
+
+- b899295b：H5 手势库 `hammerjs` 的依赖范围更新至 `^2.0.9`。
+
+### 升级说明
+
+运行时随插件从 `0.8.12` 自动升级到 `0.8.13`。执行 `pnpm add -D --save-exact vite-plugin-taro@0.8.13 vite@8.4.0` 即可；如果应用直接依赖运行时，请同时执行 `pnpm add --save-exact vite-plugin-taro-runtime@0.8.13`。
+
 ## 0.8.12
 
 ### 变更

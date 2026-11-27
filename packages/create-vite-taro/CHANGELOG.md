@@ -1,5 +1,21 @@
 # create-vite-taro
 
+## 0.8.13
+
+### 变更
+
+- b899295b：默认模板使用 Vite `8.4.0`，与插件要求的版本一致。
+
+### 升级说明
+
+生成器从 `0.8.12` 升级到 `0.8.13`。使用新版模板创建项目：
+
+```sh
+pnpm create vite-taro@0.8.13 my-app
+```
+
+已有项目请执行 `pnpm add -D --save-exact vite-plugin-taro@0.8.13 vite@8.4.0`。若项目固定了 Rolldown，将其覆盖版本同步为 `1.3.4`。
+
 ## 0.8.12
 
 ### 变更

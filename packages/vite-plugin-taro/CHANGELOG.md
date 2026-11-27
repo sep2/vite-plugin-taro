@@ -1,5 +1,23 @@
 # vite-plugin-taro
 
+## 0.8.13
+
+### 变更
+
+- b899295b：插件使用 Vite `8.4.0` 和 Rolldown `1.3.4`，小程序样式转换器 `@weapp-tailwindcss/postcss` 更新至 `4.0.8`。
+- 071a6abf、34622b5a：小程序首包和热更新补丁共享同一个全局对象；HMR 运行时可在应用模块加载器之前启动。
+- 679abdef：小程序开发构建保留函数和类的原名。同名类的首包和补丁兼容 ES2018，高阶组件可继续使用 React Fast Refresh。
+
+### 升级说明
+
+从 `0.8.12` 升级到 `0.8.13` 时，插件和 Vite 需一起更新：
+
+```sh
+pnpm add -D --save-exact vite-plugin-taro@0.8.13 vite@8.4.0
+```
+
+如果项目在 `overrides` 中固定了 Rolldown，请将其改为 `1.3.4` 后重新安装依赖。重启开发服务器以加载新的 HMR 运行时。
+
 ## 0.8.12
 
 ### 变更
