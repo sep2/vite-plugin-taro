@@ -241,8 +241,7 @@ test('adapts physical wx development output without changing configured filename
                 host: '127.0.0.1',
                 port: 4321,
                 implement: 'previous runtime',
-                lazy: true,
-                skipCommonRuntimeInjection: false
+                lazy: true
             }
         }
     })
@@ -273,7 +272,6 @@ test('adapts physical wx development output without changing configured filename
     assert.equal(devMode.host, '127.0.0.1')
     assert.equal(devMode.port, 4321)
     assert.equal(devMode.lazy, false)
-    assert.equal(devMode.skipCommonRuntimeInjection, true)
     assertRuntimeWrapper(devMode.implement)
     assert.ok(typeof devMode.implement === 'string')
     assert.match(devMode.implement, /groupUpdates/, 'WX must detect the active framework on the native Page instance')
@@ -578,8 +576,7 @@ test('leaves naming unspecified when Vite has no configured output', async (cont
     assert.deepEqual(adapted.experimental?.devMode, {
         implement:
             typeof adapted.experimental?.devMode === 'object' ? adapted.experimental.devMode.implement : undefined,
-        lazy: false,
-        skipCommonRuntimeInjection: true
+        lazy: false
     })
 })
 

@@ -93,7 +93,6 @@ test('real HMR factories reuse the registered binding without rediscovering the 
             experimental: {
                 devMode: {
                     lazy: false,
-                    skipCommonRuntimeInjection: true,
                     implement: `import { vptGlobal } from "${vptGlobalOutputPath}"; __rolldown_runtime__ = __createRuntime(vptGlobal);`
                 }
             },

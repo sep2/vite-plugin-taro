@@ -71,7 +71,7 @@ export function createMiniDevOptionsPlugin({ server, hmrMode }: { server: ViteDe
             rolldownOptions.experimental ??= {}
             const existingDevMode = rolldownOptions.experimental.devMode
             rolldownOptions.experimental.devMode = {
-                // Retain configured devMode fields while the three explicit Mini invariants below win.
+                // Retain configured devMode fields while the Mini runtime and eager graph settings below win.
                 ...(typeof existingDevMode === 'object' ? existingDevMode : {}),
                 // Bundle the selected adapter and pass the shared provider into its lexical globalThis wrapper at startup.
                 // This needs neither the application's virtual binding nor its HMR registry. Patch adapters initialize delivery
@@ -79,10 +79,7 @@ export function createMiniDevOptionsPlugin({ server, hmrMode }: { server: ViteDe
                 implement: await bundleRuntimeSource(hmrMode.runtimeFile),
                 // Produce a complete output graph on the initial build. Lazy per-request compilation cannot establish the closed
                 // App/Page graph, native companions, style sidecars, and build identity required before any patch is admitted.
-                lazy: false,
-                // The adapter imports and bundles Rolldown's exported DevRuntime, including its module registry and helpers.
-                // Disable the deprecated automatic injection so there is only one base runtime implementation.
-                skipCommonRuntimeInjection: true
+                lazy: false
             }
 
             /*

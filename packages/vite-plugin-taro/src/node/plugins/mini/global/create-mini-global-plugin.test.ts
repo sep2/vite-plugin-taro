@@ -196,7 +196,6 @@ for (const { minify, pathStyle } of [false, true].flatMap((minify) =>
                 experimental: {
                     devMode: {
                         implement: `import { vptGlobal } from "${vptGlobalOutputPath}"; __rolldown_runtime__ = __createRuntime(vptGlobal);`,
-                        skipCommonRuntimeInjection: true,
                         lazy: false
                     }
                 },
