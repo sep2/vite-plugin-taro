@@ -115,11 +115,11 @@ path: 'pages/profile/index'
 源码: src/pages/profile/index.tsx
 ```
 
-页面文件必须默认导出 React 组件。页面顺序决定小程序 `app.json.pages`、H5 路由顺序和页面样式合并顺序；第一项是默认首页。
+页面文件必须默认导出 React 组件。首页排在第一位，其余页面保持声明顺序。这个顺序决定 H5 路由顺序和页面样式合并顺序；小程序按同一顺序将主包页面列入 `app.json.pages`，将分包页面列入各自分包的 `pages`。
 
 ### `pages[].entry`
 
-可选布尔值。设置 `entry: true` 将该页面作为首页，排在页面清单第一位，其余页面保持声明顺序：
+可选布尔值。设置 `entry: true` 将该页面作为首页，输出排在页面清单第一位，其余页面保持声明顺序：
 
 ```ts
 pages: [
@@ -128,7 +128,21 @@ pages: [
 ]
 ```
 
-以上配置在所有平台生成的页面顺序为 `pages/home/index`、`pages/profile/index`。最多允许一个页面设置 `entry: true`，多个标记会报错。省略或设为 `false` 时不主动选择首页；全部页面均未标记时，使用数组第一项。
+最多一个页面可以设置 `entry: true`。
+
+### `pages[].subpackage`
+
+手动页面分包，一般不需要此设置。如果全自动分包不能满足需求，可以设置 `subpackage` 为手动分包的包名。设置后，页面路由为 `/<subpackage>/<path>`，源码仍从 `src/<path>.tsx` 读取。例如，把页面 `src/pages/profile.tsx` 放到 `extra` 分包：
+
+```ts
+pages: [
+    { path: 'home' },
+    { path: 'pages/profile', subpackage: 'extra' }
+]
+```
+
+从首页调用 `Taro.navigateTo({ url: '/extra/pages/profile' })` 打开该页面。
+
 
 ### `pages[].config`
 
@@ -197,8 +211,8 @@ appJson: {
 
 | 字段                          | 来源                      |
 |-------------------------------|---------------------------|
-| `pages`                       | 根据 `pages` 选项生成     |
-| `subPackages` / `subpackages` | 根据自动分包结果生成      |
+| `pages`                       | 主包页面，按首页和声明顺序排列 |
+| `subPackages` / `subpackages` | 根据页面声明和自动分包结果生成      |
 | `routes`                      | 根据 `pages` 生成 H5 路由 |
 
 即使传入这些字段，vpt 也会用构建结果替换它们。
@@ -355,8 +369,6 @@ hmr: {
 
 | vpt 配置                   | WX 输出                       | ZFB / TB 输出                | TT 输出                       |
 |----------------------------|-------------------------------|------------------------------|-------------------------------|
-| `appJson` 和 `pages`       | `app.json`                    | `app.json`                   | `app.json`                    |
-| `pages[].config`           | `${path}.json`                | `${path}.json`               | `${path}.json`                |
 | `projectConfigJson`        | `project.config.json`         | `mini.project.json`          | `project.config.json`         |
 | `projectPrivateConfigJson` | `project.private.config.json` | `.mini-ide/project-ide.json` | `project.private.config.json` |
 | `sitemapJson`（可选）      | 提供时生成 `sitemap.json`     | —                            | —                             |

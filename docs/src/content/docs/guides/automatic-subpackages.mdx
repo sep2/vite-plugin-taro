@@ -99,6 +99,8 @@ function ReportEntry() {
 
 和 Web 一样，做个骨架屏，然后通过 `React.lazy()` 和 `<Suspense>` 去动态加载真正的页面组件。这个组件就会被自动分包。
 
+如果确实需要原生的页面分包，可以手动设置 [`pages[].subpackage`](/guides/configuration/#pagessubpackage)。
+
 当然，页面内容也可以使用原生组件；按照[原生组件](/guides/native-components/)设置后，可以通过同样的 `<Suspense>` 按需加载。
 
 ## 设计原则
