@@ -5,6 +5,7 @@ import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } 
 import { createAppConfig } from '../../../utils/project-config.ts'
 import { appComponentId } from '../../client/constant.ts'
 import { pageMetadataKey } from '../../page/page-metadata-key.ts'
+import { type ResolvedPage, resolvePage } from '../../page/resolve-page.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import {
     appShellFileName,
@@ -33,9 +34,9 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
     const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
 
     // setPages replaces the ordered page snapshot and rebuilds its constant-time route index together.
-    let pages: readonly VptPageOption[] = []
+    let pages: readonly ResolvedPage[] = []
 
-    const pageByPath = new Map<string, VptPageOption>()
+    const pageByPath = new Map<string, ResolvedPage>()
 
     const privateIdResolvers = new Map<string, PrivateIdResolver>([
         // Preload needs only the initialized loader.
@@ -52,7 +53,7 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
             (importer, projectRoot) => {
                 const page = requireConfiguredPage({ moduleId: importer, pageByPath })
 
-                return resolvePageComponentPath({ pagePath: page.path, projectRoot })
+                return resolvePageComponentPath({ pagePath: page.sourcePath, projectRoot })
             }
         ],
         [
@@ -84,12 +85,12 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
             }))
         },
 
-        setPages(resolvedPages: readonly VptPageOption[]) {
+        setPages(declarations: readonly VptPageOption[]) {
+            pages = declarations.map(resolvePage)
             pageByPath.clear()
-            for (const page of resolvedPages) {
+            for (const page of pages) {
                 pageByPath.set(page.path, page)
             }
-            pages = resolvedPages
         },
 
         resolveId(
@@ -147,8 +148,8 @@ function requireConfiguredPage({
     pageByPath
 }: {
     moduleId: string | undefined
-    pageByPath: ReadonlyMap<string, VptPageOption>
-}): VptPageOption {
+    pageByPath: ReadonlyMap<string, ResolvedPage>
+}): ResolvedPage {
     const queryIndex = moduleId?.indexOf('?') ?? -1
     const pagePath = queryIndex === -1 ? undefined : new URLSearchParams(moduleId?.slice(queryIndex + 1)).get('route')
     const page = pagePath ? pageByPath.get(pagePath) : undefined

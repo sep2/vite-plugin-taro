@@ -1,5 +1,7 @@
 import type { projectMiniStyles } from '../plugins/mini/styles/project-mini-styles.ts'
 
+import { resolvePage } from '../plugins/page/resolve-page.ts'
+
 /** Supplies native entry metadata around test-owned capsule sources without loading production shells. */
 export function createMiniStyleEntries(
     appId: string,
@@ -13,7 +15,7 @@ export function createMiniStyleEntries(
             shellName: 'app.js'
         },
         pageEntries: pageIds.map((capsuleId, index) => ({
-            page: { path: `pages/page-${index}/index` },
+            page: resolvePage({ path: `pages/page-${index}/index` }),
             capsuleId,
             capsuleName: `pages/page-${index}/index-capsule`,
             shellId: `${capsuleId}?shell`,

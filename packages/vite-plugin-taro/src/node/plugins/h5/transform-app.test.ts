@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
 import type { VptOptions } from '../../../options.ts'
+import { resolvePage } from '../page/resolve-page.ts'
 import { transformH5App } from './transform-app.ts'
 
 const options: VptOptions = {
@@ -15,7 +16,8 @@ const options: VptOptions = {
             }
         },
         {
-            path: 'pages/about/index'
+            path: 'detail',
+            subpackage: 'orders'
         }
     ],
     appJson: {
@@ -39,7 +41,7 @@ test('specializes the physical H5 App configuration and routes', () => {
         code: source,
         id,
         options,
-        pages: options.pages!,
+        pages: options.pages.map(resolvePage),
         projectRoot
     })
 
@@ -47,7 +49,9 @@ test('specializes the physical H5 App configuration and routes', () => {
     assert.match(result.code, /"pages":\s*\[\s*["']pages\/home\/index["']/)
     assert.doesNotMatch(result.code, /stale\/page/)
     assert.match(result.code, /path:\s*["']pages\/home\/index["']/)
-    assert.match(result.code, /path:\s*["']pages\/about\/index["']/)
+    assert.match(result.code, /path:\s*["']orders\/detail["']/)
+    const detailSource = path.resolve(projectRoot, 'src/detail.tsx').replaceAll('\\', '/')
+    assert.ok(result.code.includes(`import(${JSON.stringify(`/@fs/${detailSource}`)})`))
     assert.match(result.code, /"navigationBarTitleText":\s*["']Home["']/)
     const pageComponentPath = path.resolve(projectRoot, 'src/pages/home/index.tsx').replaceAll('\\', '/')
     assert.ok(result.code.includes(`import(${JSON.stringify(`/@fs/${pageComponentPath}`)})`))
@@ -69,7 +73,7 @@ test('preserves H5 configuration, route overrides, and escaped paths without sou
         pages: [
             { path: pagePath, config },
             { path: 'pages/overrides/index', config: { path: 'override', load: 'configured-load' } }
-        ],
+        ].map(resolvePage),
         projectRoot,
         sourcemap: false
     })
@@ -106,7 +110,7 @@ test('preserves tabbar configuration for the H5 router mount', () => {
         code: source,
         id,
         options: { ...options, appJson: { ...options.appJson, tabBar } },
-        pages: options.pages!,
+        pages: options.pages.map(resolvePage),
         projectRoot
     })
     const observed: unknown = Function(`${result.code}\nreturn config.tabBar`)()
@@ -120,7 +124,7 @@ test('rejects an H5 App missing its specialization placeholders', () => {
                 code: 'export default {}',
                 id,
                 options,
-                pages: options.pages!,
+                pages: options.pages.map(resolvePage),
                 projectRoot
             }),
         /Expected one placeholder __VPT_H5_APP_CONFIG__, found 0/

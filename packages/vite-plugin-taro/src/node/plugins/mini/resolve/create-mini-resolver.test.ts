@@ -88,7 +88,7 @@ test('resolves fixed IDs immediately and Page IDs after setPages', () => {
     resolver.setPages(contract.options.pages)
     assert.deepEqual(resolver.pageEntries(), [
         {
-            page: contract.options.pages[0],
+            page: { ...contract.options.pages[0], sourcePath: 'pages/home/index' },
             capsuleId: `${modules.pageCapsule}?route=pages%2Fhome%2Findex`,
             capsuleName: 'pages/home/index-capsule',
             shellId: `${modules.pageShell}?route=pages%2Fhome%2Findex`,
@@ -155,19 +155,16 @@ test('preserves resolved Page order in the App-owned entries', () => {
 
     const { appEntry } = resolver
     const pageEntries = resolver.pageEntries()
-    for (const [index, page] of pages.entries()) {
-        assert.strictEqual(pageEntries[index]!.page, page)
-    }
     assert.deepEqual(pageEntries, [
         {
-            page: pages[0],
+            page: { ...pages[0], sourcePath: 'pages/z-last/index' },
             capsuleId: `${modules.pageCapsule}?route=pages%2Fz-last%2Findex`,
             capsuleName: 'pages/z-last/index-capsule',
             shellId: `${modules.pageShell}?route=pages%2Fz-last%2Findex`,
             shellName: 'pages/z-last/index.js'
         },
         {
-            page: pages[1],
+            page: { ...pages[1], sourcePath: 'features/account/pages/a-first/index' },
             capsuleId: `${modules.pageCapsule}?route=features%2Faccount%2Fpages%2Fa-first%2Findex`,
             capsuleName: 'features/account/pages/a-first/index-capsule',
             shellId: `${modules.pageShell}?route=features%2Faccount%2Fpages%2Fa-first%2Findex`,
@@ -175,6 +172,22 @@ test('preserves resolved Page order in the App-owned entries', () => {
         }
     ])
     assert.deepEqual(appEntry, createMiniResolver(input).appEntry)
+})
+
+test('resolves a named package entry by public route and loads its declared component', () => {
+    const resolver = createMiniResolver(contract)
+    resolver.setPages([{ path: 'detail', subpackage: 'orders' }])
+    const [entry] = resolver.pageEntries()
+    assert.ok(entry)
+    assert.equal(entry.page.path, 'orders/detail')
+    assert.equal(entry.page.subpackage, 'orders')
+    assert.equal(entry.shellName, 'orders/detail.js')
+    const root = path.resolve('/project')
+    assert.equal(resolver.resolveId(pageCapsuleId, entry.shellId, root), entry.capsuleId)
+    assert.equal(
+        resolver.resolveId(pageComponentId, entry.capsuleId, root),
+        normalizePath(path.join(root, 'src/detail.tsx'))
+    )
 })
 
 test('retains App entries with an empty resolved Page list', () => {
@@ -208,10 +221,11 @@ test('setPages updates entries, route resolution and capsule metadata together',
         assert.equal(resolver.specialize, specialize)
         assert.deepEqual(
             resolver.pageEntries().map((entry) => entry.page),
-            pages
+            pages.map((page) => ({ ...page, sourcePath: page.path }))
         )
         for (const [index, entry] of resolver.pageEntries().entries()) {
-            assert.equal(entry.page, pages[index])
+            const declaration = pages[index]!
+            assert.equal(entry.page.sourcePath, declaration.path)
             assert.equal(resolveId(pageCapsuleId, entry.shellId, projectRoot), entry.capsuleId)
             assert.equal(
                 resolveId(pageComponentId, entry.capsuleId, projectRoot),
@@ -220,13 +234,16 @@ test('setPages updates entries, route resolution and capsule metadata together',
             const result = specialize('const options = __VPT_PAGE_OPTIONS__', entry.capsuleId, false)
             assert.ok(result)
             assert.deepEqual(Function(`${result.code}; return options`)(), {
-                ...entry.page,
+                ...declaration,
                 prerender: entry.page.prerender === true
             })
         }
         const app = specialize('const config = __VPT_APP_CONFIG__', appEntry.capsuleId, false)
         assert.ok(app && 'meta' in app)
-        assert.equal(app.meta[pageMetadataKey], pages)
+        assert.deepEqual(
+            app.meta[pageMetadataKey],
+            resolver.pageEntries().map((entry) => entry.page)
+        )
         assert.deepEqual(
             Function(`${app.code}; return config`)().pages,
             pages.map((page) => page.path)
@@ -291,7 +308,10 @@ test('specializes the App capsule with the configured App JSON', () => {
     const result = resolver.specialize('export default __VPT_APP_CONFIG__', modules.appCapsule)
 
     assert.ok(result && 'meta' in result)
-    assert.equal(result.meta[pageMetadataKey], contract.options.pages)
+    assert.deepEqual(
+        result.meta[pageMetadataKey],
+        resolver.pageEntries().map((entry) => entry.page)
+    )
     assert.match(result.code, /"pages":\s*\[\s*["']pages\/home\/index["']/)
     assert.doesNotMatch(result.code, /stale\/page/)
     assert.match(result.code, /"navigationBarTitleText":\s*["']Example["']/)

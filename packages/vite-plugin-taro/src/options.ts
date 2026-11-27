@@ -30,12 +30,15 @@ export type VptHmrOptions = Readonly<{
 /** Configures one Taro page. */
 export type VptPageOption = {
     /**
-     * Taro route and output path without a file extension.
+     * Page path within its package, without a file extension.
      *
      * The plugin resolves the page component from `src/${path}.tsx`, relative to the Vite project root. For example,
-     * `pages/home/index` resolves to `src/pages/home/index.tsx` and keeps that output route for every target.
+     * `pages/home/index` resolves to `src/pages/home/index.tsx` on every target.
      */
     path: string
+
+    /** Package root prefixed to the public route. For example, detail in orders is served at /orders/detail. */
+    subpackage?: string
 
     /**
      * Selects this page as the application entry. At most one page may set `entry: true`.

@@ -2,17 +2,18 @@ import { normalizePath } from 'vite'
 import type { VptOptions, VptPageOption } from '../../../../options.ts'
 import { normalizeModuleId, resolveAppComponentPath } from '../../../utils/modules.ts'
 import { appComponentId } from '../../client/constant.ts'
+import { type ResolvedPage, resolvePage } from '../../page/resolve-page.ts'
 import { h5AppPath } from '../constant.ts'
 import { transformH5App } from '../transform-app.ts'
 
 /** Creates H5 application module resolution and specialization for the current pages. */
 export function createH5Resolver(options: Readonly<VptOptions>) {
     // setPages replaces the ordered snapshot consumed by subsequent App transforms.
-    let pages: readonly VptPageOption[] = []
+    let pages: readonly ResolvedPage[] = []
 
     return {
-        setPages(resolvedPages: readonly VptPageOption[]) {
-            pages = resolvedPages
+        setPages(declarations: readonly VptPageOption[]) {
+            pages = declarations.map(resolvePage)
         },
 
         resolveId({ id, projectRoot }: { id: string; projectRoot: string }): string | undefined {
