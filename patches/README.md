@@ -1,11 +1,12 @@
 # Dependency patch series
 
-pnpm applies one combined patch to each package version. We maintain **25 feature patches across 5 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output. Feature filenames are numbered consecutively from `01` in each package’s application order.
+pnpm applies one combined patch to each package version. We maintain **26 feature patches across 6 packages**, with explicit application order in [`series.json`](./series.json). The files in `series/` are authoritative; `generated/` is reproducible installation output. Feature filenames are numbered consecutively from `01` in each package’s application order.
 
 ## Feature inventory
 
 | Package | Ordered feature patches | Purpose |
 | --- | --- | --- |
+| `@taroify/core@1.0.6` | `01-transition-node-ref` | Pass the transition child’s host ref to `CSSTransition` on WeChat so Popup and Backdrop can animate under React 19. |
 | `@tarojs/plugin-html@4.3.3` | `01-html-elements` | Populate upstream HTML inline/block element sets and share their pure classifications and semantic classes between templates and native DOM hosts. |
 | `@tarojs/plugin-framework-react@4.3.3` | `01-react19-root-api` | Use React 19 concurrent roots for App and standalone native-component entries; make standalone native-component setup explicitly synchronous with `flushSync`. |
 | | `02-mini-app-page-rendering` | Create custom App containers as logical roots and place Page children in an opaque outlet inside the singleton React App. |

@@ -1,0 +1,21 @@
+diff --git a/transition/transition.js b/transition/transition.js
+index 588a71ff4b4ee0b6804ab8eab656605da476f7f6..372e9b273faf32ed7889099190e3bf508dac2c7b 100644
+--- a/transition/transition.js
++++ b/transition/transition.js
+@@ -2,7 +2,6 @@ import * as React from "react";
+ import { cloneElement, isValidElement, useMemo, useRef, useState, } from "react";
+ import { CSSTransition } from "react-transition-group";
+ import { prefixClassname } from "../styles/index.js";
+-import { inWechat } from "../utils/base.js";
+ export var TransitionName;
+ (function (TransitionName) {
+     TransitionName["Fade"] = "fade";
+@@ -42,7 +41,7 @@ export default function Transition(props) {
+     const setRef = (value) => {
+         ref.current = value;
+     };
+-    return (React.createElement(CSSTransition, { in: inProp, nodeRef: inWechat ? undefined : ref, mountOnEnter: mountOnEnter, unmountOnExit: unmountOnExit, timeout: timeout, appear: appear, classNames: transactionName, style: {
++    return (React.createElement(CSSTransition, { in: inProp, nodeRef: ref, mountOnEnter: mountOnEnter, unmountOnExit: unmountOnExit, timeout: timeout, appear: appear, classNames: transactionName, style: {
+             ...childrenStyle,
+             display: enter && !exited ? "" : "none",
+         }, onEnter: (node, isAppearing) => {

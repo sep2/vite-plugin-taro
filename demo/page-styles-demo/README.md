@@ -38,6 +38,18 @@ pnpm test:page-styles-demo
 
 The root `app.wxss` / `app.acss` / `app.ttss` imports `assets/global.*`. Each route owns its sibling `pages/<name>/<name>.*` stylesheet.
 
+## WeChat subpackage Popup (#52)
+
+Build the dedicated fixture from the repository root:
+
+```bash
+pnpm --filter page-styles-demo exec vite build fixtures/popup --outDir ../../tmp/subpackage-popup
+```
+
+Import `demo/page-styles-demo/tmp/subpackage-popup` into WeChat DevTools. On Home tap **Order details**, then **Show order**. The React Popup should appear fixed to the bottom of `/orders/detail`. Only that page imports `@taroify/core/popup/style`; the build test checks that its WXSS reaches the Popup rule and no copy is emitted outside `orders/`.
+
+With React 19, this fixture uses the workspace’s [Taroify 1.0.6 transition patch](../../patches/series/@taroify__core@1.0.6/01-transition-node-ref.patch) so Popup and Backdrop pass their host refs to `CSSTransition` on WeChat. Standalone apps using that version of Taroify need the same dependency patch. Tap the backdrop to dismiss the Popup, then tap **Show order** to open it again.
+
 ## Native rendering and HMR checklist
 
 1. Open Red. Confirm red direct, wrapper, and deep cards; purple shared card; yellow module badge; gray Blue-only leak probe.

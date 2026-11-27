@@ -31,6 +31,7 @@ allowBuilds:
   esbuild: true
 
 patchedDependencies:
+  '@taroify/core@1.0.6': patches/generated/@taroify__core@1.0.6.patch
   '@tarojs/plugin-html@4.3.3': patches/generated/@tarojs__plugin-html@4.3.3.patch
   '@tarojs/plugin-framework-react@4.3.3': patches/generated/@tarojs__plugin-framework-react@4.3.3.patch
   '@tarojs/react@4.3.3': patches/generated/@tarojs__react@4.3.3.patch

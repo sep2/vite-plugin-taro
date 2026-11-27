@@ -5,5 +5,5 @@
         "lib": ["ESNext", "DOM"],
         "types": ["node"]
     },
-    "include": ["vite.config.ts", "scripts"]
+    "include": ["vite.config.ts", "fixtures/popup/vite.config.ts", "scripts"]
 }
