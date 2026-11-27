@@ -885,7 +885,9 @@ test('coalesces one full-file save into one wx patch with custom React filters',
 })
 
 test('publishes and acknowledges cumulative wx patches without replacing the App runtime', async (context) => {
-    const fixture = await startDevFixture(createLogger('silent'), '127.0.0.1', createOptions(), 'memory')
+    const fixture = await startDevFixture(createLogger('error'), '127.0.0.1', createOptions(), 'memory', undefined, {
+        'src/pages/home/index.tsx': renderPage('hot generation 0')
+    })
     context.after(fixture.close)
 
     const initialInfoSource = await waitForFile(
@@ -900,10 +902,11 @@ test('publishes and acknowledges cumulative wx patches without replacing the App
         maximumWaitAttempts
     )
 
-    await publishSourceGeneration(fixture.pagePath, renderPage('first hot generation'))
+    // Overwrite equal-length generations in place: the native watcher observes a content edit on the same file.
+    await writeFile(fixture.pagePath, renderPage('hot generation 1'), { flag: 'r+' })
     const firstPublishedPatches = await waitForFile(
         fixture.patchesPath,
-        (source) => source.includes('first hot generation'),
+        (source) => source.includes('hot generation 1'),
         maximumWaitAttempts
     )
     const firstPatches = await waitForStableFile(
@@ -923,14 +926,14 @@ test('publishes and acknowledges cumulative wx patches without replacing the App
 
     // Runtime receipts are intentionally conflated for one short quiet window before the next source generation is admitted.
     await delay(50)
-    await publishSourceGeneration(fixture.pagePath, renderPage('second hot generation'))
+    await writeFile(fixture.pagePath, renderPage('hot generation 2'), { flag: 'r+' })
     const secondPatches = await waitForFile(
         fixture.patchesPath,
-        (source) => source.includes('second hot generation'),
+        (source) => source.includes('hot generation 2'),
         maximumWaitAttempts
     )
 
-    assert.doesNotMatch(secondPatches, /first hot generation/)
+    assert.doesNotMatch(secondPatches, /hot generation 1/)
     assert.equal(await readFile(fixture.infoPath, 'utf8'), initialInfoSource)
     assert.equal(await readFile(fixture.appStylePath, 'utf8'), initialAppStyle)
 })
