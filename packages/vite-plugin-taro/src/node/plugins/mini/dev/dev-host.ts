@@ -309,13 +309,7 @@ export async function createMiniDevHost({
                     hostActions.next({ kind: 'output', result: result })
                 },
                 rebuildStrategy: hmrMode.rebuildStrategy === 'always' ? 'always' : 'never',
-                watch: {
-                    // Normalize platform filesystem notifications before compilation. In particular, a single Windows full-file
-                    // save can emit separate truncate and write events. Rolldown's debounce folds those physical events into one
-                    // logical source generation; the RxJS result stream still preserves every callback emitted after compilation.
-                    skipWrite: false,
-                    useDebounce: true
-                }
+                watch: { skipWrite: false }
             }
         )
     }

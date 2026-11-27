@@ -54,7 +54,7 @@ test('adapts a real DevEngine callback into one publication', async () => {
     }
     const engine = await dev(rolldownOptions, output, {
         rebuildStrategy: 'never',
-        watch: { skipWrite: true, useDebounce: false },
+        watch: { skipWrite: true, watcher: { useDebounce: false } },
         onHmrUpdates(result) {
             hmrResults.next(result)
         }
@@ -180,7 +180,7 @@ test('surfaces a real transform failure and accepts a later recovery generation'
     }
     const engine = await dev(rolldownOptions, output, {
         rebuildStrategy: 'never',
-        watch: { skipWrite: true, useDebounce: false },
+        watch: { skipWrite: true, watcher: { useDebounce: false } },
         onHmrUpdates(result) {
             hmrResults.next(result)
         },
