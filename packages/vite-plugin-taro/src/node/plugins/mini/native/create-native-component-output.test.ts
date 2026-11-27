@@ -53,7 +53,6 @@ test('emits surviving native folders into their planned packages', async (contex
 
 function createChunk(fileName: string, moduleIds: string[]): Rolldown.OutputChunk {
     return {
-        __rolldown_external_memory_handle__: () => ({ freed: false }),
         type: 'chunk',
         code: '',
         name: path.posix.basename(fileName, '.js'),
