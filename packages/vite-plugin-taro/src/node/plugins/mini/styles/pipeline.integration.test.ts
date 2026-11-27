@@ -126,10 +126,7 @@ test('minifies App/Page CSS, clears removed Page styles, and suppresses identica
         rebuildStrategy: 'never',
         watch: {
             skipWrite: true,
-            useDebounce: false,
-            usePolling: true,
-            pollInterval: 20,
-            compareContentsForPolling: true
+            watcher: { useDebounce: false, usePolling: true, pollInterval: 20, compareContentsForPolling: true }
         },
         onHmrUpdates(result) {
             if (result instanceof Error) {
@@ -319,10 +316,7 @@ test('respects cssMinify:false while rendering Tailwind CSS and matching patch f
         watch: {
             // This suite inspects patch factories in memory; only writeStyle needs to materialize the native stylesheet.
             skipWrite: true,
-            useDebounce: false,
-            usePolling: true,
-            pollInterval: 20,
-            compareContentsForPolling: true
+            watcher: { useDebounce: false, usePolling: true, pollInterval: 20, compareContentsForPolling: true }
         },
         onHmrUpdates(result) {
             if (result instanceof Error) {

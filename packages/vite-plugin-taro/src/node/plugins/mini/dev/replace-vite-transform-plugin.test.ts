@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
 import { build, type RolldownPluginOption } from 'rolldown'
-import { defineParallelPlugin, viteTransformPlugin } from 'rolldown/experimental'
+import { viteTransformPlugin } from 'rolldown/experimental'
 import { createMemoryBuildProject } from '../../../tests/create-memory-build-project.ts'
 import { replaceViteTransformPlugin } from './replace-vite-transform-plugin.ts'
 
@@ -20,15 +20,13 @@ const original = {
 
 test('replaces only the native transform across nested and promised plugin options', async () => {
     const other = { name: 'fixture:other' }
-    const parallel = defineParallelPlugin(import.meta.filename)(undefined)
     const nested = [original]
-    const plugins: RolldownPluginOption[] = [undefined, null, false, other, parallel, Promise.resolve(nested)]
+    const plugins: RolldownPluginOption[] = [undefined, null, false, other, Promise.resolve(nested)]
     const result = await replaceViteTransformPlugin(plugins, config)
     assert.ok(Array.isArray(result))
-    assert.deepEqual(result.slice(0, 5), [undefined, null, false, other, parallel])
+    assert.deepEqual(result.slice(0, 4), [undefined, null, false, other])
     assert.strictEqual(result[3], other)
-    assert.strictEqual(result[4], parallel)
-    const replaced = await result[5]
+    const replaced = await result[4]
     assert.ok(Array.isArray(replaced))
     assert.notStrictEqual(replaced, nested)
     assert.notStrictEqual(replaced[0], original)

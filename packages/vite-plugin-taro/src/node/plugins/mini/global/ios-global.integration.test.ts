@@ -3,7 +3,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { createContext, runInContext } from 'node:vm'
 import { build } from 'rolldown'
-import { vptGlobalBindingId } from '../module/module.ts'
+import { vptGlobalBindingId, vptGlobalOutputPath } from '../module/module.ts'
 import { createMiniGlobalPlugin } from './create-mini-global-plugin.ts'
 
 for (const minify of [false, true]) {
@@ -36,11 +36,16 @@ for (const minify of [false, true]) {
                     name: globalPlugin.name,
                     resolveId: globalPlugin.resolveId,
                     load: globalPlugin.load,
-                    renderChunk: globalPlugin.renderChunk,
                     generateBundle: globalPlugin.generateBundle
                 }
             ],
-            output: { format: 'cjs', strict: true, entryFileNames: 'entry.js', minify },
+            output: {
+                format: 'cjs',
+                strict: true,
+                entryFileNames: 'entry.js',
+                minify,
+                paths: { [vptGlobalOutputPath]: './common/vpt-global.js' }
+            },
             write: false
         })
         const files = new Map(

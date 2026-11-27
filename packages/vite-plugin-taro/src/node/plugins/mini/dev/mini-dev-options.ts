@@ -2,9 +2,11 @@ import path from 'node:path'
 import type { OutputOptions, Plugin, RolldownOptions } from 'rolldown'
 import type { DevEngine } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
-import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
+import { createExactModuleIdFilter } from '../../../utils/modules.ts'
 import { build, rolldownRuntimePath, viteReporterPlugin } from '../../../utils/vite-rolldown.ts'
+import { vptGlobalOutputPath } from '../module/module.ts'
+import { disableRolldownLazyLoading } from './disable-rolldown-lazy-loading.ts'
 import type { MiniHmrMode } from './hmr-mode.ts'
 import { replaceViteTransformPlugin } from './replace-vite-transform-plugin.ts'
 
@@ -50,14 +52,9 @@ export function createMiniDevOptionsPlugin({ server, hmrMode }: { server: ViteDe
                 format: 'es',
                 // Bundled development emits complete physical output repeatedly. Minifying bounds disk transfer and native-tool
                 // compile work; source-level HMR diagnostics still come from Vite/Rolldown before this final output pass.
-                minify: {
-                    // Fast Refresh recognizes HOC-returned components by name. Preserve those names in the existing minifier pass.
-                    compress: { target: esTarget, keepNames: { function: true, class: true } },
-                    mangle: { keepNames: true }
-                },
-                // Bundler-level name restoration generates ES2022 class static blocks after source lowering. The minifier
-                // preserves post-bundling names instead; bindings renamed to resolve module collisions retain their unique names.
-                keepNames: false,
+                minify: true,
+                // Fast Refresh recognizes components returned by higher-order functions by their original names.
+                keepNames: true,
                 // Native tools execute physical project files and HMR applies module factories rather than browser source maps. Disabling
                 // maps avoids extra output files and prevents Vite's Oxc sourcemap transform from touching generated host code.
                 sourcemap: false
@@ -70,7 +67,7 @@ export function createMiniDevOptionsPlugin({ server, hmrMode }: { server: ViteDe
             rolldownOptions.experimental ??= {}
             const existingDevMode = rolldownOptions.experimental.devMode
             rolldownOptions.experimental.devMode = {
-                // Retain configured devMode fields while the three explicit Mini invariants below win.
+                // Retain configured devMode fields while the Mini runtime and eager graph settings below win.
                 ...(typeof existingDevMode === 'object' ? existingDevMode : {}),
                 // Bundle the selected adapter and pass the shared provider into its lexical globalThis wrapper at startup.
                 // This needs neither the application's virtual binding nor its HMR registry. Patch adapters initialize delivery
@@ -78,10 +75,7 @@ export function createMiniDevOptionsPlugin({ server, hmrMode }: { server: ViteDe
                 implement: await bundleRuntimeSource(hmrMode.runtimeFile),
                 // Produce a complete output graph on the initial build. Lazy per-request compilation cannot establish the closed
                 // App/Page graph, native companions, style sidecars, and build identity required before any patch is admitted.
-                lazy: false,
-                // The adapter imports and bundles Rolldown's exported DevRuntime, including its module registry and helpers.
-                // Disable the deprecated automatic injection so there is only one base runtime implementation.
-                skipCommonRuntimeInjection: true
+                lazy: false
             }
 
             /*
@@ -144,6 +138,15 @@ const bundleRuntimeSource = memoize(async function bundleRuntimeSource(runtimeFi
     const result = await build({
         input: runtimeFile,
         resolve: { alias: { 'rolldown/experimental/runtime': rolldownRuntimePath } },
+        plugins: [
+            {
+                name: 'vpt:disable-rolldown-lazy-loading',
+                transform: {
+                    filter: { id: createExactModuleIdFilter(rolldownRuntimePath) },
+                    handler: disableRolldownLazyLoading
+                }
+            }
+        ],
         output: {
             format: 'iife',
             // The combined physical runtime owns final minification, so minifying this embedded source would duplicate work.
@@ -156,5 +159,5 @@ const bundleRuntimeSource = memoize(async function bundleRuntimeSource(runtimeFi
 
     // The lexical global prevents self-injection. Assign the completed instance to the chunk-local cell added at render time,
     // before Rolldown's graph prelude and any co-located modules use it. No host-global runtime binding is required.
-    return `__rolldown_runtime__ = (function (globalThis) {\n${result.output[0].code}\nreturn globalThis.__rolldown_runtime__;\n})(__VPT_GLOBAL__);`
+    return `import { vptGlobal } from "${vptGlobalOutputPath}";\n__rolldown_runtime__ = (function (globalThis) {\n${result.output[0].code}\nreturn globalThis.__rolldown_runtime__;\n})(vptGlobal);`
 })

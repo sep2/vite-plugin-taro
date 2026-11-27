@@ -18,7 +18,8 @@ import { type BuildOptions, createServer } from 'vite'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import { createAliMiniContract } from '../../ali/plugins.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
-import { miniAppShellId, miniPageShellId } from '../module/module.ts'
+import { createMiniGlobalPlugin } from '../global/create-mini-global-plugin.ts'
+import { miniAppShellId, miniPageShellId, vptGlobalOutputPath } from '../module/module.ts'
 import { renderNative } from '../render/native.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
 import { createMiniDevOptionsPlugin, requireSingleOutput } from './mini-dev-options.ts'
@@ -30,13 +31,9 @@ const runtimeFile = resolveVptRuntime('wx/dev/devtools-runtime')
 
 const hmrMode = createDevtoolsHmrMode(runtimeFile)
 
-/** Names survive the minifier's existing compression and mangling passes within the Mini syntax target. */
 function assertDevelopmentMinification(output: OutputOptions): void {
-    assert.equal(output.keepNames, false)
-    assert.deepEqual(output.minify, {
-        compress: { target: 'es2018', keepNames: { function: true, class: true } },
-        mangle: { keepNames: true }
-    })
+    assert.equal(output.minify, true)
+    assert.equal(output.keepNames, true)
 }
 
 /** These tests inspect options only: never watch workspace files or populate its shared dependency cache. */
@@ -171,23 +168,38 @@ function createRenderedChunk(name: string, fileName: string, facadeModuleId: str
 /** The wrapper supplies the shared global exactly once, without discovery or virtual imports in the nested build. */
 function assertRuntimeWrapper(source: unknown): void {
     assert.ok(typeof source === 'string')
-    assert.match(source, /^__rolldown_runtime__ = \(function \(globalThis\) \{/)
-    assert.match(source, /return globalThis\.__rolldown_runtime__;\n\}\)\(__VPT_GLOBAL__\);$/)
-    assert.equal(source.match(/__VPT_GLOBAL__/g)?.length, 1)
-    assert.doesNotMatch(source, /vpt\.fake\.global|getGlobalThis|vptGlobal|vpt:global-binding/)
+    assert.ok(source.startsWith(`import { vptGlobal } from "${vptGlobalOutputPath}";\n`))
+    assert.match(source, /\n__rolldown_runtime__ = \(function \(globalThis\) \{/)
+    assert.match(source, /return globalThis\.__rolldown_runtime__;\n\}\)\(vptGlobal\);$/)
+    assert.doesNotMatch(source, /vpt\.fake\.global|getGlobalThis|vpt:global-binding/)
     assert.match(source, /Reflect\.set\(globalThis,\s*['"`]__rolldown_runtime__['"`]/)
     assert.doesNotMatch(source, /Reflect\.(?:get|set)\((?:wx|my),/)
 
     // Installation may mutate only the supplied provider. No ambient DevRuntime is supplied: the bundle must own its base.
     const shared: Record<string, unknown> = {}
-    const context = { __VPT_GLOBAL__: shared }
+    const context = {
+        require(request: string) {
+            assert.equal(request, './vpt-global.js')
+            return { vptGlobal: shared }
+        }
+    }
     Object.defineProperty(context, 'globalThis', {
         get() {
             assert.fail('The HMR wrapper must not read ambient globalThis')
         }
     })
-    // Final rendering declares this local cell; the wrapper initializes it before generated registrations execute.
-    const runtime: unknown = runInNewContext(`let __rolldown_runtime__;\n${source}\n__rolldown_runtime__;`, context, {
+    const chunk = createRenderedChunk('rolldown-runtime', 'common/rolldown-runtime.js', null)
+    const linked = renderNative({
+        code: `let __rolldown_runtime__;\n${source}`,
+        chunk,
+        chunks: {},
+        getPhysicalChunkId(importer) {
+            assert.strictEqual(importer, chunk)
+            return chunk.fileName
+        },
+        sourcemap: false
+    })
+    const runtime: unknown = runInNewContext(`${linked.code}\n__rolldown_runtime__;`, context, {
         contextCodeGeneration: { strings: false, wasm: false }
     })
     assert.strictEqual(runtime, shared.__rolldown_runtime__)
@@ -225,8 +237,7 @@ test('adapts physical wx development output without changing configured filename
                 host: '127.0.0.1',
                 port: 4321,
                 implement: 'previous runtime',
-                lazy: true,
-                skipCommonRuntimeInjection: false
+                lazy: true
             }
         }
     })
@@ -257,7 +268,6 @@ test('adapts physical wx development output without changing configured filename
     assert.equal(devMode.host, '127.0.0.1')
     assert.equal(devMode.port, 4321)
     assert.equal(devMode.lazy, false)
-    assert.equal(devMode.skipCommonRuntimeInjection, true)
     assertRuntimeWrapper(devMode.implement)
     assert.ok(typeof devMode.implement === 'string')
     assert.match(devMode.implement, /groupUpdates/, 'WX must detect the active framework on the native Page instance')
@@ -304,12 +314,20 @@ test('executes generated development code with a bundled runtime and no ambient 
     }
     // The hook must adapt the same output object already passed to DevEngine, before native options are normalized.
     const output: OutputOptions = {}
+    const [globalPlugin, globalDevPlugin] = createMiniGlobalPlugin({
+        getPhysicalChunkId(chunk) {
+            assert.ok(typeof chunk !== 'string')
+            return chunk.fileName
+        }
+    })
     const rolldownOptions: RolldownOptions = {
         input: entryId,
         output,
         plugins: [
             sourcePlugin,
             createMiniDevOptionsPlugin({ server, hmrMode }),
+            { name: globalPlugin.name, resolveId: globalPlugin.resolveId },
+            { name: globalDevPlugin.name, renderChunk: globalDevPlugin.renderChunk },
             {
                 name: 'test:runtime-output',
                 options() {
@@ -355,13 +373,24 @@ test('executes generated development code with a bundled runtime and no ambient 
     const exports: Record<string, unknown> = {}
     const shared: Record<string, unknown> = {}
     runInNewContext(
-        `let __rolldown_runtime__;\n${chunk.code}`,
-        { exports, __VPT_GLOBAL__: shared },
+        chunk.code,
+        {
+            exports,
+            require(request: string) {
+                assert.equal(request, './common/vpt-global.js')
+                return { vptGlobal: shared }
+            }
+        },
         {
             contextCodeGeneration: { strings: false, wasm: false }
         }
     )
     assert.equal(exports.answer, 42)
+    const runtime = shared.__rolldown_runtime__
+    assert.ok(runtime && typeof runtime === 'object' && 'loadLazyChunk' in runtime)
+    const loadLazyChunk = runtime.loadLazyChunk
+    assert.ok(typeof loadLazyChunk === 'function')
+    await assert.rejects(Reflect.apply(loadLazyChunk, runtime, ['probe']), /development uses an eager module graph/)
 })
 
 test('minified development emits ES2018 syntax for colliding class names', async (context) => {
@@ -385,6 +414,7 @@ export const classNames = [new ReadableStream().constructor.name, new Other().co
     ])
     const result = await build({
         input: entry,
+        transform: { target: 'es2018' },
         plugins: [
             {
                 name: 'test:class-names',
@@ -412,11 +442,7 @@ export const classNames = [new ReadableStream().constructor.name, new Other().co
     assert.equal(exports.localValue, 'local stream')
     assert.equal(exports.otherValue, 'other stream')
     assert.ok(Array.isArray(exports.classNames))
-    assert.equal(exports.classNames.length, 2)
-    assert.notEqual(exports.classNames[0], exports.classNames[1])
-    for (const name of exports.classNames) {
-        assert.match(name, /^ReadableStream(?:\$\d+)?$/)
-    }
+    assert.deepEqual([...exports.classNames], ['ReadableStream', 'ReadableStream'])
 })
 
 test('minified development keeps HOC component names compatible with React Refresh', async (context) => {
@@ -548,8 +574,7 @@ test('leaves naming unspecified when Vite has no configured output', async (cont
     assert.deepEqual(adapted.experimental?.devMode, {
         implement:
             typeof adapted.experimental?.devMode === 'object' ? adapted.experimental.devMode.implement : undefined,
-        lazy: false,
-        skipCommonRuntimeInjection: true
+        lazy: false
     })
 })
 

@@ -97,7 +97,7 @@ async function createFixture() {
     const failures: unknown[] = []
     const engine = await dev(options, requireSingleOutput(options), {
         rebuildStrategy: 'never',
-        watch: { skipWrite: true, useDebounce: true },
+        watch: { skipWrite: true },
         onHmrUpdates(result) {
             if (result instanceof Error) {
                 failures.push(result)

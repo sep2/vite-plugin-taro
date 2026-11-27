@@ -45,7 +45,7 @@ for (const polyfills of [
         assert.equal(Object.hasOwn(input, 'vpt-global'), false)
         const inject = config.build.rolldownOptions.transform?.inject
         assert.deepEqual(inject, { ...miniBrowserBindings, globalThis: [vptGlobalBindingId, 'vptGlobal'] })
-        assert.equal(config.build.rolldownOptions.transform?.define?.__VPT_GLOBAL__, undefined)
+        assert.equal(config.build.rolldownOptions.transform?.define, undefined)
         assert.ok(inject)
         assert.equal(Object.hasOwn(inject, 'window'), false)
         assert.equal(Object.hasOwn(inject, 'URL'), false)

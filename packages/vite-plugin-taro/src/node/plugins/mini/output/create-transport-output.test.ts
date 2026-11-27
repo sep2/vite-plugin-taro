@@ -15,7 +15,6 @@ import { createTransportOutput } from './create-transport-output.ts'
 
 function createChunk(fileName: string, kind: MiniChunkKind): Rolldown.OutputChunk {
     return {
-        __rolldown_external_memory_handle__: () => ({ freed: false }),
         type: 'chunk',
         code: '',
         name: fileName,
@@ -67,7 +66,6 @@ test('emits compact deterministic routes with final physical paths and resolved 
     const bundle: Rolldown.OutputBundle = {
         [lazy.fileName]: lazy,
         'app.json': {
-            __rolldown_external_memory_handle__: () => ({ freed: false }),
             type: 'asset',
             fileName: 'app.json',
             name: undefined,

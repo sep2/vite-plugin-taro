@@ -18,7 +18,7 @@ export async function replaceViteTransformPlugin(
         // nonmatching options by identity; Promise.all also retains the positions of asynchronously resolved plugins.
         return Promise.all(plugin.map((option) => replaceViteTransformPlugin(option, config)))
     }
-    if (!plugin || !('name' in plugin) || plugin.name !== 'builtin:vite-transform') {
+    if (plugin === false || plugin?.name !== 'builtin:vite-transform') {
         return plugin
     }
 

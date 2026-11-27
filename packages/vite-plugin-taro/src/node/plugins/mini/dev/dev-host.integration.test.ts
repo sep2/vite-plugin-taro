@@ -535,7 +535,8 @@ test('emits ES2018 chunks and patches for dependencies with colliding class name
     context.after(fixture.close)
     const parser = new Sval({ ecmaVer: 2018, sourceType: 'script' })
     const sources = await fixture.readJavaScript()
-    assert.ok(sources.some((source) => /ReadableStream\$\d+/.test(source)))
+    assert.ok(sources.some((source) => source.includes('initial stream')))
+    assert.ok(sources.some((source) => source.includes('other stream')))
     for (const source of sources) {
         parser.parse(source)
     }

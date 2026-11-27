@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { DevRuntime } from 'rolldown/experimental/runtime'
 import { runtimeReportEvent } from '../../mini/dev/hmr-protocol.ts'
+import { MiniHmrRuntime } from '../../mini/dev/mini-hmr-runtime.ts'
 import { interpreterServerEvent } from '../../mini/dev/modes/interpreter/interpreter-protocol.ts'
 
 type NativeMessageListener = (result: Readonly<{ message: string }>) => void
@@ -117,7 +118,8 @@ test('adapts the Alipay socket while installing both patch modes on the shared r
 
         await importRuntimeEntry('devtools')
         const devtoolsRuntime = Reflect.get(globalThis, '__rolldown_runtime__')
-        assert.ok(devtoolsRuntime instanceof DevRuntime)
+        assert.ok(devtoolsRuntime instanceof MiniHmrRuntime)
+        assert.strictEqual(devtoolsRuntime.vptGlobal, globalThis)
         assert.notStrictEqual(devtoolsRuntime, interpreterRuntime)
         initializeRuntime(devtoolsRuntime, 'devtools')
         assert.equal(Reflect.get(globalThis, 'queueMicrotask'), installedQueueMicrotask)

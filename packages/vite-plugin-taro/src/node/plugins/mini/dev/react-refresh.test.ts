@@ -9,6 +9,7 @@ import vpt from '../../../../index.ts'
 import type { VptOptions } from '../../../../options.ts'
 import { packageRequire } from '../../../utils/packages.ts'
 import { createMiniGlobalPlugin } from '../global/create-mini-global-plugin.ts'
+import { vptGlobalOutputPath } from '../module/module.ts'
 import {
     createMiniReactRefreshTransforms,
     injectReactRefreshRendererDependency,
@@ -111,7 +112,6 @@ export function evaluateBoundary() {
                     name: globalPlugin.name,
                     resolveId: globalPlugin.resolveId,
                     load: globalPlugin.load,
-                    renderChunk: globalPlugin.renderChunk,
                     generateBundle: globalPlugin.generateBundle
                 }
             ],
@@ -119,7 +119,7 @@ export function evaluateBoundary() {
                 ...config.build.rolldownOptions.transform,
                 define: { ...config.define, 'process.env.NODE_ENV': JSON.stringify('development') }
             },
-            output: { format: 'cjs', exports: 'named' },
+            output: { format: 'cjs', exports: 'named', paths: { [vptGlobalOutputPath]: './common/vpt-global.js' } },
             write: false
         })
         const chunk = result.output[0]

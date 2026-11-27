@@ -5,7 +5,8 @@ import { createContext, runInContext } from 'node:vm'
 import { build, type OutputChunk } from 'rolldown'
 import { dev } from 'rolldown/experimental'
 import { resolveVptRuntime } from '../../../utils/packages.ts'
-import { rolldownRuntimeId, vptGlobalBindingId } from '../module/module.ts'
+import { rolldownRuntimeId, vptGlobalBindingId, vptGlobalOutputPath } from '../module/module.ts'
+import { renderNative } from '../render/native.ts'
 import { createMiniGlobalPlugin } from './create-mini-global-plugin.ts'
 
 const [plugin, devPlugin] = createMiniGlobalPlugin({
@@ -15,20 +16,44 @@ const [plugin, devPlugin] = createMiniGlobalPlugin({
     }
 })
 
-test('virtual hooks match only the private binding and leave the real provider untouched', () => {
+test('global hooks match the injected binding and the native output path', () => {
     assert.equal(plugin.name, 'vpt:mini-global')
     assert.equal(plugin.apply, undefined)
     assert.equal(devPlugin.name, 'vpt:mini-global-dev')
     assert.equal(devPlugin.apply, 'serve')
-    for (const hook of [plugin.resolveId, plugin.load]) {
-        assert.ok(hook && typeof hook === 'object')
-        const filter = hook.filter
-        assert.ok(filter && !Array.isArray(filter) && filter.id instanceof RegExp)
-        assert.equal(filter.id.test(vptGlobalBindingId), true)
-        assert.equal(filter.id.test(`${vptGlobalBindingId}?import`), true)
-        assert.equal(filter.id.test(`${vptGlobalBindingId}-other`), false)
-        assert.equal(filter.id.test(resolveVptRuntime('global/vpt-global')), false)
+    const resolve = plugin.resolveId
+    const load = plugin.load
+    assert.ok(resolve && typeof resolve === 'object' && resolve.filter && 'id' in resolve.filter)
+    assert.ok(load && typeof load === 'object' && load.filter && 'id' in load.filter)
+    assert.ok(Array.isArray(resolve.filter.id))
+    const [bindingFilter, providerFilter] = resolve.filter.id
+    assert.ok(providerFilter.test(vptGlobalOutputPath))
+    assert.equal(providerFilter.test(`${vptGlobalOutputPath}.map`), false)
+    for (const filter of [bindingFilter, load.filter.id]) {
+        assert.ok(filter instanceof RegExp)
+        assert.equal(filter.test(vptGlobalBindingId), true)
+        assert.equal(filter.test(`${vptGlobalBindingId}?import`), true)
+        assert.equal(filter.test(`${vptGlobalBindingId}-other`), false)
+        assert.equal(filter.test(resolveVptRuntime('global/vpt-global')), false)
     }
+})
+
+test('an application import with the same name follows normal module resolution', async () => {
+    const result = await build({
+        input: 'app',
+        plugins: [
+            { name: plugin.name, resolveId: plugin.resolveId },
+            {
+                name: 'test:app',
+                resolveId: (id) => id,
+                load: (id) =>
+                    id === 'app' ? `export { marker } from "${vptGlobalOutputPath}";` : 'export const marker = 1;'
+            }
+        ],
+        write: false
+    })
+    assert.deepEqual(result.output[0].imports, [])
+    assert.deepEqual(result.output[0].exports, ['marker'])
 })
 
 test('the virtual binding exports the exact provider object without probing or augmenting it', async () => {
@@ -37,16 +62,23 @@ test('the virtual binding exports the exact provider object without probing or a
         input: vptGlobalBindingId,
         // Isolate virtual loading here; the output tests below exercise rendering and standalone emission too.
         plugins: [{ name: plugin.name, resolveId: plugin.resolveId, load: plugin.load }],
-        transform: { define: { __VPT_GLOBAL__: 'globalThis.provider' } },
-        output: { format: 'cjs' },
+        output: { format: 'cjs', paths: { [vptGlobalOutputPath]: './vpt-global.js' } },
         write: false
     })
     assert.equal(result.output.length, 1)
     const chunk = result.output[0]
     assert.ok(chunk.type === 'chunk')
     assert.deepEqual(chunk.moduleIds, [vptGlobalBindingId])
-    assert.deepEqual(chunk.imports, [])
-    const context = createContext({ provider, exports: {} }, { codeGeneration: { strings: false, wasm: false } })
+    const context = createContext(
+        {
+            exports: {},
+            require(request: string) {
+                assert.equal(request, './vpt-global.js')
+                return { vptGlobal: provider }
+            }
+        },
+        { codeGeneration: { strings: false, wasm: false } }
+    )
     runInContext(chunk.code, context)
     assert.deepEqual(Object.keys(context.exports), ['vptGlobal'])
     assert.strictEqual(context.exports.vptGlobal, provider)
@@ -71,11 +103,11 @@ for (const command of ['serve', 'build'] as const) {
                         load: () => `
                             export const read = () => ({ __rolldown_runtime__, queueMicrotask });
                             export const schedule = (callback) => queueMicrotask(callback);
-                            export function local(__rolldown_runtime__, queueMicrotask, __VPT_GLOBAL__) {
-                                return { __rolldown_runtime__, queueMicrotask, __VPT_GLOBAL__ };
+                            export function local(__rolldown_runtime__, queueMicrotask) {
+                                return { __rolldown_runtime__, queueMicrotask };
                             }
                             export const property = (object) => object.__rolldown_runtime__;
-                            export const text = '__rolldown_runtime__ queueMicrotask __VPT_GLOBAL__';
+                            export const text = '__rolldown_runtime__ queueMicrotask';
                         `,
                         renderChunk: {
                             order: 'pre',
@@ -84,7 +116,6 @@ for (const command of ['serve', 'build'] as const) {
                             }
                         }
                     },
-                    { name: placed.name, renderChunk: placed.renderChunk },
                     command === 'serve' && { name: placedDev.name, renderChunk: placedDev.renderChunk },
                     {
                         name: 'test:capture-bound-runtime',
@@ -126,11 +157,11 @@ for (const command of ['serve', 'build'] as const) {
             assert.equal(runInContext('exports.read().queueMicrotask', context), ambient.queueMicrotask)
             assert.equal(runInContext('exports.schedule(() => { this.scheduled = true }); scheduled', context), true)
             assert.equal(
-                runInContext('JSON.stringify(exports.local(1, 2, 3))', context),
-                JSON.stringify({ __rolldown_runtime__: 1, queueMicrotask: 2, __VPT_GLOBAL__: 3 })
+                runInContext('JSON.stringify(exports.local(1, 2))', context),
+                JSON.stringify({ __rolldown_runtime__: 1, queueMicrotask: 2 })
             )
             assert.equal(runInContext('exports.property({ __rolldown_runtime__: 4 })', context), 4)
-            assert.equal(runInContext('exports.text', context), '__rolldown_runtime__ queueMicrotask __VPT_GLOBAL__')
+            assert.equal(runInContext('exports.text', context), '__rolldown_runtime__ queueMicrotask')
             if (command === 'serve') {
                 // The App-lifetime runtime is captured once, not looked up on every generated call.
                 shared.__rolldown_runtime__ = { marker: 'replacement' }
@@ -164,8 +195,7 @@ for (const { minify, pathStyle } of [false, true].flatMap((minify) =>
                 transform: { inject: { globalThis: [vptGlobalBindingId, 'vptGlobal'] } },
                 experimental: {
                     devMode: {
-                        implement: '__rolldown_runtime__ = __createRuntime(__VPT_GLOBAL__);',
-                        skipCommonRuntimeInjection: true,
+                        implement: `import { vptGlobal } from "${vptGlobalOutputPath}"; __rolldown_runtime__ = __createRuntime(vptGlobal);`,
                         lazy: false
                     }
                 },
@@ -182,10 +212,9 @@ for (const { minify, pathStyle } of [false, true].flatMap((minify) =>
                         name: owner.name,
                         resolveId: owner.resolveId,
                         load: owner.load,
-                        renderChunk: owner.renderChunk,
                         generateBundle: owner.generateBundle
                     },
-                    { name: ownerDev.name, renderChunk: ownerDev.renderChunk },
+                    { name: ownerDev.name, load: ownerDev.load, renderChunk: ownerDev.renderChunk },
                     {
                         name: 'test:capture-runtime-owner',
                         generateBundle: {
@@ -213,7 +242,10 @@ for (const { minify, pathStyle } of [false, true].flatMap((minify) =>
             external: (id) => id !== 'combined',
             plugins: [{ name: 'test:execute-owner', resolveId: (id) => id, load: () => chunk.code }],
             // Exercise both separator styles on every host, including Windows external paths from this second build.
-            output: { format: 'cjs', paths: (id) => id.replaceAll('\\', '/').replaceAll('/', path[pathStyle].sep) },
+            output: {
+                format: 'cjs',
+                paths: { [vptGlobalOutputPath]: `.${path[pathStyle].sep}common${path[pathStyle].sep}vpt-global.js` }
+            },
             write: false
         })
         const executable = native.output[0]
@@ -221,6 +253,9 @@ for (const { minify, pathStyle } of [false, true].flatMap((minify) =>
         // This journal proves initialization precedes generated code, without an ambient binding masking a missing local.
         const events: string[] = []
         const runtime = {
+            get vptGlobal() {
+                return shared
+            },
             registerGraph() {
                 events.push('graph')
             },
@@ -268,23 +303,16 @@ for (const { minify, pathStyle } of [false, true].flatMap((minify) =>
     })
 }
 
-test('provider and development hooks independently filter their own references', () => {
-    for (const [current, reference] of [
-        [plugin, '__VPT_GLOBAL__'],
-        [devPlugin, '__rolldown_runtime__']
-    ] as const) {
-        const hook = current.renderChunk
-        assert.ok(hook && typeof hook === 'object')
-        assert.equal(hook.order, 'pre')
-        assert.ok(hook.filter && !Array.isArray(hook.filter))
-        const filter = hook.filter.code
-        assert.ok(filter instanceof RegExp)
-        for (const name of ['__VPT_GLOBAL__', '__rolldown_runtime__']) {
-            assert.equal(filter.test(name), name === reference)
-        }
-        assert.equal(filter.test('queueMicrotask(callback);'), false)
-        assert.equal(filter.test('export const value = Math.max(3, 4);'), false)
-    }
+test('development output injects a runtime binding only into code that references it', () => {
+    const hook = devPlugin.renderChunk
+    assert.ok(hook && typeof hook === 'object')
+    assert.equal(hook.order, 'pre')
+    assert.ok(hook.filter && !Array.isArray(hook.filter))
+    const filter = hook.filter.code
+    assert.ok(filter instanceof RegExp)
+    assert.equal(filter.test('__rolldown_runtime__'), true)
+    assert.equal(filter.test('queueMicrotask(callback);'), false)
+    assert.equal(filter.test('export const value = Math.max(3, 4);'), false)
 })
 
 for (const minify of [false, true]) {
@@ -297,13 +325,27 @@ for (const minify of [false, true]) {
                         name: plugin.name,
                         resolveId: plugin.resolveId,
                         load: plugin.load,
-                        renderChunk: plugin.renderChunk,
                         generateBundle: plugin.generateBundle
+                    },
+                    {
+                        name: 'test:native-renderer',
+                        renderChunk(code, chunk, options, meta) {
+                            return renderNative({
+                                code,
+                                chunk,
+                                chunks: meta.chunks,
+                                getPhysicalChunkId(importer) {
+                                    assert.strictEqual(importer, chunk)
+                                    return chunk.fileName
+                                },
+                                sourcemap: Boolean(options.sourcemap)
+                            })
+                        }
                     }
                 ],
                 output: {
                     dir: path.resolve('/fixture/output'),
-                    format: 'cjs',
+                    format: 'es',
                     entryFileNames: 'nested/[name]-[hash].js',
                     minify,
                     sourcemap
@@ -319,8 +361,8 @@ for (const minify of [false, true]) {
             assert.deepEqual(provider.imports, [])
             assert.deepEqual(provider.moduleIds, [])
             assert.doesNotMatch(provider.code, /^["']use strict["']/)
-            assert.doesNotMatch(provider.code, /require\(|__rolldown_runtime__|__VPT_GLOBAL__/)
-            assert.doesNotMatch(binding.code, /__VPT_GLOBAL__|vpt\.fake\.global/)
+            assert.doesNotMatch(provider.code, /require\(|__rolldown_runtime__/)
+            assert.doesNotMatch(binding.code, /require\(["']common\/vpt-global\.js|vpt\.fake\.global/)
             assert.match(binding.code, /\.\.\/common\/vpt-global\.js/)
             const context = createContext({}, { codeGeneration: { strings: false, wasm: false } })
             const globalExports: unknown = runInContext(
