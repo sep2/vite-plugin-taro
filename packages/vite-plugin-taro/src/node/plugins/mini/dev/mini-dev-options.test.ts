@@ -18,7 +18,8 @@ import { type BuildOptions, createServer } from 'vite'
 import { packageRequire, resolveVptRuntime } from '../../../utils/packages.ts'
 import { createAliMiniContract } from '../../ali/plugins.ts'
 import { createTtMiniContract } from '../../tt/plugins.ts'
-import { miniAppShellId, miniPageShellId } from '../module/module.ts'
+import { createMiniGlobalPlugin } from '../global/create-mini-global-plugin.ts'
+import { miniAppShellId, miniPageShellId, vptGlobalOutputPath } from '../module/module.ts'
 import { renderNative } from '../render/native.ts'
 import { createMiniHmrMode } from './hmr-mode.ts'
 import { createMiniDevOptionsPlugin, requireSingleOutput } from './mini-dev-options.ts'
@@ -171,23 +172,38 @@ function createRenderedChunk(name: string, fileName: string, facadeModuleId: str
 /** The wrapper supplies the shared global exactly once, without discovery or virtual imports in the nested build. */
 function assertRuntimeWrapper(source: unknown): void {
     assert.ok(typeof source === 'string')
-    assert.match(source, /^__rolldown_runtime__ = \(function \(globalThis\) \{/)
-    assert.match(source, /return globalThis\.__rolldown_runtime__;\n\}\)\(__VPT_GLOBAL__\);$/)
-    assert.equal(source.match(/__VPT_GLOBAL__/g)?.length, 1)
-    assert.doesNotMatch(source, /vpt\.fake\.global|getGlobalThis|vptGlobal|vpt:global-binding/)
+    assert.ok(source.startsWith(`import { vptGlobal } from "${vptGlobalOutputPath}";\n`))
+    assert.match(source, /\n__rolldown_runtime__ = \(function \(globalThis\) \{/)
+    assert.match(source, /return globalThis\.__rolldown_runtime__;\n\}\)\(vptGlobal\);$/)
+    assert.doesNotMatch(source, /vpt\.fake\.global|getGlobalThis|vpt:global-binding/)
     assert.match(source, /Reflect\.set\(globalThis,\s*['"`]__rolldown_runtime__['"`]/)
     assert.doesNotMatch(source, /Reflect\.(?:get|set)\((?:wx|my),/)
 
     // Installation may mutate only the supplied provider. No ambient DevRuntime is supplied: the bundle must own its base.
     const shared: Record<string, unknown> = {}
-    const context = { __VPT_GLOBAL__: shared }
+    const context = {
+        require(request: string) {
+            assert.equal(request, './vpt-global.js')
+            return { vptGlobal: shared }
+        }
+    }
     Object.defineProperty(context, 'globalThis', {
         get() {
             assert.fail('The HMR wrapper must not read ambient globalThis')
         }
     })
-    // Final rendering declares this local cell; the wrapper initializes it before generated registrations execute.
-    const runtime: unknown = runInNewContext(`let __rolldown_runtime__;\n${source}\n__rolldown_runtime__;`, context, {
+    const chunk = createRenderedChunk('rolldown-runtime', 'common/rolldown-runtime.js', null)
+    const linked = renderNative({
+        code: `let __rolldown_runtime__;\n${source}`,
+        chunk,
+        chunks: {},
+        getPhysicalChunkId(importer) {
+            assert.strictEqual(importer, chunk)
+            return chunk.fileName
+        },
+        sourcemap: false
+    })
+    const runtime: unknown = runInNewContext(`${linked.code}\n__rolldown_runtime__;`, context, {
         contextCodeGeneration: { strings: false, wasm: false }
     })
     assert.strictEqual(runtime, shared.__rolldown_runtime__)
@@ -304,12 +320,20 @@ test('executes generated development code with a bundled runtime and no ambient 
     }
     // The hook must adapt the same output object already passed to DevEngine, before native options are normalized.
     const output: OutputOptions = {}
+    const [globalPlugin, globalDevPlugin] = createMiniGlobalPlugin({
+        getPhysicalChunkId(chunk) {
+            assert.ok(typeof chunk !== 'string')
+            return chunk.fileName
+        }
+    })
     const rolldownOptions: RolldownOptions = {
         input: entryId,
         output,
         plugins: [
             sourcePlugin,
             createMiniDevOptionsPlugin({ server, hmrMode }),
+            { name: globalPlugin.name, resolveId: globalPlugin.resolveId },
+            { name: globalDevPlugin.name, renderChunk: globalDevPlugin.renderChunk },
             {
                 name: 'test:runtime-output',
                 options() {
@@ -355,8 +379,14 @@ test('executes generated development code with a bundled runtime and no ambient 
     const exports: Record<string, unknown> = {}
     const shared: Record<string, unknown> = {}
     runInNewContext(
-        `let __rolldown_runtime__;\n${chunk.code}`,
-        { exports, __VPT_GLOBAL__: shared },
+        chunk.code,
+        {
+            exports,
+            require(request: string) {
+                assert.equal(request, './common/vpt-global.js')
+                return { vptGlobal: shared }
+            }
+        },
         {
             contextCodeGeneration: { strings: false, wasm: false }
         }

@@ -5,6 +5,12 @@ export function toLogicalChunkId(physicalChunkId: string): string {
     return path.posix.normalize(physicalChunkId)
 }
 
+/** Generates a native import from the final physical paths, independent of the host OS. */
+export function relativePhysicalChunkReference(importerFileName: string, importedFileName: string): string {
+    const relative = path.posix.relative(path.posix.dirname(importerFileName), importedFileName)
+    return relative.startsWith('../') ? relative : `./${relative}`
+}
+
 /** Resolves one relative Rolldown-generated import to its preliminary physical chunk path. */
 export function resolvePhysicalChunkReference(importerChunkId: string, reference: string): string {
     if (!reference.startsWith('./') && !reference.startsWith('../')) {

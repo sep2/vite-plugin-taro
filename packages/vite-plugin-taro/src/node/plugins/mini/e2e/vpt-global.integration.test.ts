@@ -6,7 +6,7 @@ import { build, type OutputChunk } from 'rolldown'
 import { resolveConfig } from 'vite'
 import vpt from '../../../vpt.ts'
 import { createMiniGlobalPlugin } from '../global/create-mini-global-plugin.ts'
-import { vptGlobalBindingId as bindingId } from '../module/module.ts'
+import { vptGlobalBindingId as bindingId, vptGlobalOutputPath } from '../module/module.ts'
 
 // Exercise production injection, grouping and standalone emission; only application sources and the CJS loader are fixtures.
 const config = await resolveConfig(
@@ -70,7 +70,6 @@ async function bundleFixture(sources: ReadonlyMap<string, string>, input: string
                 name: globalPlugin.name,
                 resolveId: globalPlugin.resolveId,
                 load: globalPlugin.load,
-                renderChunk: globalPlugin.renderChunk,
                 generateBundle: globalPlugin.generateBundle
             }
         ],
@@ -85,7 +84,8 @@ async function bundleFixture(sources: ReadonlyMap<string, string>, input: string
             entryFileNames: '[name].cjs',
             chunkFileNames: '[name]-[hash].cjs',
             minify,
-            codeSplitting: fixtureGrouping
+            codeSplitting: fixtureGrouping,
+            paths: { [vptGlobalOutputPath]: './common/vpt-global.js' }
         },
         write: false
     })
@@ -97,8 +97,8 @@ async function bundleFixture(sources: ReadonlyMap<string, string>, input: string
     assert.deepEqual(runtime.moduleIds, [], 'Discovery must not enter the application graph')
     assert.deepEqual(runtime.imports, [])
     assert.equal(imports.has(runtime.facadeModuleId), false)
-    assert.deepEqual(imports.get(bindingId), [])
-    assert.doesNotMatch(runtime.code, /__VPT_GLOBAL__|require\(|__rolldown_runtime__/)
+    assert.deepEqual(imports.get(bindingId), [vptGlobalOutputPath])
+    assert.doesNotMatch(runtime.code, /require\(|__rolldown_runtime__/)
     return { chunks, imports, entry, runtime }
 }
 
@@ -188,11 +188,9 @@ for (const minify of [false, true]) {
         test(`injection with a standalone provider: ${state} globalThis, minify ${minify}`, async () => {
             const { chunks, imports, entry } = await bundleFixture(applicationSources, [entryId], minify)
             assert.equal(chunks.length, 3)
-            assert.deepEqual(imports.get(bindingId), [])
             assert.deepEqual(imports.get(peerId), [bindingId])
             assert.deepEqual(imports.get(localId), [])
             assert.deepEqual(imports.get(entryId)?.toSorted(), [peerId, localId, bindingId].toSorted())
-            assert.doesNotMatch(chunks[0].code, /__VPT_GLOBAL__/)
 
             const setup = {
                 native: 'Object.freeze(Object.prototype);',
@@ -295,8 +293,7 @@ for (const minify of [false, true]) {
             [peerId, 'export const root = globalThis; export const read = () => globalThis.later;'],
             [lazyId, "globalThis.events.push('lazy'); export const root = globalThis;"]
         ])
-        const { chunks, imports } = await bundleFixture(sources, [entryId, peerId], minify)
-        assert.deepEqual(imports.get(bindingId), [])
+        const { chunks } = await bundleFixture(sources, [entryId, peerId], minify)
         const runtimeChunks = chunks.filter((chunk) => chunk.moduleIds.includes(bindingId))
         assert.equal(runtimeChunks.length, 1)
         assert.equal(runtimeChunks[0].isEntry, true)
@@ -393,7 +390,7 @@ for (const { name, setup } of [
 }
 
 test('local globalThis bindings, property names, text and comments never trigger injection', async () => {
-    const comment = '/*! globalThis and __VPT_GLOBAL__ must remain text. */'
+    const comment = '/*! globalThis must remain text. */'
     const sources = new Map([
         [peerId, "export const value = 'imported local';"],
         [
@@ -402,13 +399,12 @@ test('local globalThis bindings, property names, text and comments never trigger
                 ${comment}
                 import { value as globalThis } from '${peerId}';
                 export { globalThis as imported };
-                export const text = 'globalThis __VPT_GLOBAL__';
+                export const text = 'globalThis';
                 export const property = { globalThis: 'property' };
                 export function parameter(globalThis) { return globalThis; }
                 export function destructured({ globalThis }) { return globalThis; }
                 export function local() { const globalThis = 'local'; return globalThis; }
                 export function caught() { try { throw 'caught'; } catch (globalThis) { return globalThis; } }
-                export function placeholder(__VPT_GLOBAL__) { return __VPT_GLOBAL__; }
             `
         ]
     ])
@@ -420,13 +416,12 @@ test('local globalThis bindings, property names, text and comments never trigger
     execution.context.fixture = execution.load(entry.fileName)
     execution.run(`
         assert.equal(fixture.imported, 'imported local');
-        assert.equal(fixture.text, 'globalThis __VPT_GLOBAL__');
+        assert.equal(fixture.text, 'globalThis');
         assert.deepEqual(fixture.property, { globalThis: 'property' });
         assert.equal(fixture.parameter('parameter'), 'parameter');
         assert.equal(fixture.destructured({ globalThis: 'destructured' }), 'destructured');
         assert.equal(fixture.local(), 'local');
         assert.equal(fixture.caught(), 'caught');
-        assert.equal(fixture.placeholder('placeholder local'), 'placeholder local');
         assert.equal(discoveries, 0);
     `)
 })

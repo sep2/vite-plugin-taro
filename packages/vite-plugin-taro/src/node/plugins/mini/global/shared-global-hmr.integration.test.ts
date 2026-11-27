@@ -10,7 +10,7 @@ import { DevRuntime } from 'rolldown/experimental/runtime'
 import { normalizePath } from 'vite'
 import { projectTempDir } from '../../../tests/project-temp-dir.ts'
 import type { PatchUpdate } from '../dev/hmr-protocol.ts'
-import { vptGlobalBindingId } from '../module/module.ts'
+import { vptGlobalBindingId, vptGlobalOutputPath } from '../module/module.ts'
 import { renderNative } from '../render/native.ts'
 import { createMiniGlobalPlugin } from './create-mini-global-plugin.ts'
 
@@ -28,9 +28,9 @@ function moduleSource(value: number): string {
 /** Execute the complete emitted graph without manually registering the global facade or installing a globalThis alias. */
 function createRuntimeContext(chunks: readonly OutputChunk[], setup: string) {
     const context = createContext(constants.DONT_CONTEXTIFY, { codeGeneration: { strings: false, wasm: false } })
-    const runtime = new RegistrationRuntime('global-test')
+    const runtime = Object.assign(new RegistrationRuntime('global-test'), { vptGlobal: context })
     context.__createRuntime = (global: unknown) => {
-        assert.equal(global, runInContext('this', context))
+        assert.equal(global, context)
         context.__rolldown_runtime__ = runtime
         return runtime
     }
@@ -94,7 +94,7 @@ test('real HMR factories reuse the registered binding without rediscovering the 
                 devMode: {
                     lazy: false,
                     skipCommonRuntimeInjection: true,
-                    implement: '__rolldown_runtime__ = __createRuntime(__VPT_GLOBAL__);'
+                    implement: `import { vptGlobal } from "${vptGlobalOutputPath}"; __rolldown_runtime__ = __createRuntime(vptGlobal);`
                 }
             },
             plugins: [
@@ -102,10 +102,9 @@ test('real HMR factories reuse the registered binding without rediscovering the 
                     name: globalPlugin.name,
                     resolveId: globalPlugin.resolveId,
                     load: globalPlugin.load,
-                    renderChunk: globalPlugin.renderChunk,
                     generateBundle: globalPlugin.generateBundle
                 },
-                { name: globalDevPlugin.name, renderChunk: globalDevPlugin.renderChunk },
+                { name: globalDevPlugin.name, load: globalDevPlugin.load, renderChunk: globalDevPlugin.renderChunk },
                 {
                     name: 'test:capture-global-output',
                     // Match Mini's native execution boundary without requesting unsupported CommonJS dev output.
@@ -188,7 +187,7 @@ test('real HMR factories reuse the registered binding without rediscovering the 
     assert.equal(patches.length, 1)
     const patch = patches[0]
     assert.match(patch.code, /vpt:global-binding/)
-    assert.doesNotMatch(patch.code, /__VPT_GLOBAL__|vpt\.fake\.global|require\(/)
+    assert.doesNotMatch(patch.code, /common\/vpt-global\.js|vpt\.fake\.global|require\(/)
     for (const [index, fixture] of runtimeContexts.entries()) {
         runInContext(patch.code, fixture.context)
         for (const id of patch.changedIds) {

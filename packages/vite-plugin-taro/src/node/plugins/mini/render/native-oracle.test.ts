@@ -110,6 +110,32 @@ test('matches Babel for unbound optional calls and imported tags', () => {
     })
 })
 
+test('matches Babel for named forwarding, default interop, and source-order dependency loading', () => {
+    const code = `
+        import './before.js';
+        const value = 'local';
+        export { value as local };
+        export { value, 'external-name' as 'public-name', default as library } from './library.js';
+        export { default as plain } from './plain.js';
+        import './after.js';
+    `
+    // Both compilers must forward the live properties while preserving the local binding of the same name.
+    const library = { __esModule: true, value: 1, 'external-name': 3, default: { version: 1 } }
+    const dependencies = new Map<string, ModuleNamespace>([
+        ['./before.js', {}],
+        ['./library.js', library],
+        ['./plain.js', {}],
+        ['./after.js', {}]
+    ])
+    compareOracle(code, dependencies, ({ exports, required }) => {
+        library.value = 1
+        const first = exports.value
+        library.value = 2
+        assert.equal(exports.library, library.default)
+        return [first, exports.value, exports.local, exports['public-name'], exports.plain, required]
+    })
+})
+
 test('matches Babel for mutable export writes, aliases, shadowing, and update completion values', () => {
     const code = `
         let value = 1;

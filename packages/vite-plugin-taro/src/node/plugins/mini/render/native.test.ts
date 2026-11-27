@@ -412,6 +412,41 @@ test('renders declaration exports, quoted imports, and unrelated destructuring',
     assert.equal(Reflect.get(Counter, 'value'), 42)
 })
 
+test('forwards live named and default capsule exports through the synchronous loader', () => {
+    const result = renderNative({
+        code: "export { value as count, default } from './page-capsule.js';",
+        chunk: chunk({ fileName: 'page.js', moduleIds: ['/native-page'], isEntry: true }),
+        chunks: {
+            'page-capsule.js': chunk({ fileName: 'page-capsule.js', moduleIds: [appCapsulePath], isEntry: true })
+        },
+        sourcemap: false
+    })
+    // Replacing the exported values after linking distinguishes live getters from snapshots.
+    const capsule = { value: 1, default: 'initial' }
+    const exports: Record<string, unknown> = {}
+    Function(
+        'exports',
+        'require',
+        result.code
+    )(exports, (id: string) => {
+        assert.equal(id, './assets/bootstrap-a.js')
+        assert.deepEqual(Object.keys(exports), ['count', 'default'])
+        return {
+            System: {
+                importSync(id: string) {
+                    assert.equal(id, 'page-capsule.js')
+                    return capsule
+                }
+            }
+        }
+    })
+    assert.equal(exports.count, 1)
+    capsule.value = 2
+    capsule.default = 'updated'
+    assert.equal(exports.count, 2)
+    assert.equal(exports.default, 'updated')
+})
+
 test('preserves live capsule imports and unbound function calls after one activation', () => {
     const result = renderNative({
         code: `
@@ -492,7 +527,10 @@ test('rejects unsupported final native chunk grammar before rewriting', () => {
 
     assert.throws(() => compile('export default 1'), /source-level ExportDefaultDeclaration/)
     assert.throws(() => compile("export * from './dependency.js'"), /source-level ExportAllDeclaration/)
-    assert.throws(() => compile("export { value } from './dependency.js'"), /re-exports/)
+    assert.throws(
+        () => compile("export { default as data } from './dependency.json' with { type: 'json' }"),
+        /export attributes or type-only exports/
+    )
     assert.throws(
         () => compile("import value from './dependency.json' with { type: 'json' }; export { value }"),
         /import phases, attributes, or type-only imports/

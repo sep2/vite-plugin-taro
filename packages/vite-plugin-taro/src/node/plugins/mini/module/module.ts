@@ -37,6 +37,9 @@ export const rolldownRuntimeId = RUNTIME_MODULE_ID
 /** Identifies the virtual binding shared by native files, SystemJS capsules and HMR factories. */
 export const vptGlobalBindingId = '\0vpt:global-binding'
 
+/** App-root-relative path of the standalone native module shared by production and development. */
+export const vptGlobalOutputPath = 'common/vpt-global.js'
+
 /** Generates the selected core-js imports loaded before SystemJS from the native polyfill chunk. */
 export const miniPolyfillsId = '\0vpt:mini-polyfills'
 

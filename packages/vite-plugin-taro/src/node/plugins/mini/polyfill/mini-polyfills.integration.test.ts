@@ -133,7 +133,7 @@ async function compileFixture(
                 const files = [...chunks, { fileName: transport.fileName, code: transport.source }]
                 // Alipay rejects import() at compile time, even inside an unused React Refresh export that Node can parse.
                 for (const chunk of files) {
-                    assert.doesNotMatch(chunk.code, /__VPT_GLOBAL__/, chunk.fileName)
+                    assert.doesNotMatch(chunk.code, /require\(["']common\/vpt-global\.js/, chunk.fileName)
                     const parsed = parseSync(chunk.fileName, chunk.code)
                     assert.deepEqual(parsed.errors, [])
                     walk(parsed.program, {
@@ -668,7 +668,7 @@ for (const target of miniTargets) {
                 )
                 const source = await waitForPatchSource(patchesPath, marker)
                 assert.match(source, /validateRefreshBoundaryAndEnqueueUpdate/)
-                assert.doesNotMatch(source, /vpt\.fake\.global|__VPT_GLOBAL__/)
+                assert.doesNotMatch(source, /vpt\.fake\.global|common\/vpt-global\.js/)
                 for (const runtime of runtimes) {
                     // Keep real factories and IDs; append the observed empty-update shape after the final edit.
                     // That transport patch must not determine which module's exports the test reads.

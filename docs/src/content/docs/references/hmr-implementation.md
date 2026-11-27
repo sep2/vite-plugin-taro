@@ -295,6 +295,8 @@ globalThis.$RefreshReg$ = () => {};
 globalThis.$RefreshSig$ = () => (type) => type;
 ```
 
+小程序入口和开发运行时通过原生 `require()` 加载同一个 `common/vpt-global.js`。小程序文件的目录和分包归属确定后，输出层才计算相对路径。HMR 补丁直接从已经启动的运行时取得同一个全局对象。
+
 映射仅覆盖 `$RefreshReg$`、`$RefreshSig$`、`__registerBeforePerformReactRefresh` 和 `__getReactRefreshIgnoredExports`。VPT 不会创建或整体替换 `window`；普通 `window`、`typeof window`、`window.document` 以及局部声明的 `window` 保持原有语义。生产构建和 H5 不启用这些映射。
 
 边界兼容时，React Refresh 在原有 React 树上更新组件，所以 Hook 状态得以保留。组件类型、Hook 顺序或导出形状不兼容时，Refresh 可以重新挂载局部组件；如果边界主动使本次模块更新失效，运行时会请求完整构建。

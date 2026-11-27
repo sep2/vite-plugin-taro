@@ -22,9 +22,9 @@
  * Babel's CommonJS transform remains beside this implementation only as a differential-test oracle. Those tests compare
  * runtime observations for import interop, receiver semantics, live export writes, declaration timing, and top-level `this`.
  */
-import path from 'node:path'
 import type {
     AssignmentTarget,
+    ExportNamedDeclaration,
     ExportSpecifier,
     ImportDeclaration,
     ImportExpression,
@@ -39,12 +39,15 @@ import type { Rolldown } from 'vite'
 import { parseSync } from 'vite'
 import type { AstTransformResult } from '../../../utils/transform.ts'
 import { RolldownMagicString } from '../../../utils/vite-rolldown.ts'
-import { resolveLogicalChunkReference, resolvePhysicalChunkReference } from '../module/chunk-path.ts'
-import { classifyMiniModule, miniBootstrapId } from '../module/module.ts'
+import {
+    relativePhysicalChunkReference,
+    resolveLogicalChunkReference,
+    resolvePhysicalChunkReference
+} from '../module/chunk-path.ts'
+import { classifyMiniModule, miniBootstrapId, vptGlobalOutputPath } from '../module/module.ts'
 
 type ImportBinding = Readonly<{
     imported: string | null
-    local: string
     namespace: string
 }>
 
@@ -65,6 +68,7 @@ type NativeModuleModel = Readonly<{
     dynamicImports: readonly ImportExpression[]
     exportNamesByLocal: ReadonlyMap<string, readonly string[]>
     imports: readonly ImportModel[]
+    reexportGetters: readonly string[]
     importBindingsByLocal: ReadonlyMap<string, ImportBinding>
     namespaceInterop: string
     postfixTemp: string
@@ -124,13 +128,13 @@ export function renderNative({
     const usesPostfixTemp = rewriteExpressionSemantics(editor, model, chunk.fileName)
     rewriteModuleDeclarations(editor, model)
 
-    const hasExports = model.exportNamesByLocal.size > 0
+    const hasExports = model.exportNamesByLocal.size > 0 || model.reexportGetters.length > 0
     const helpers = renderInteropHelpers(model)
     const postfixTemp = usesPostfixTemp ? `var ${model.postfixTemp};` : ''
     const imports = renderImports(model)
     if (hasExports) {
         editor.prepend(
-            `"use strict";Object.defineProperty(exports,"__esModule",{value:true});${helpers}${postfixTemp}${imports}`
+            `"use strict";Object.defineProperty(exports,"__esModule",{value:true});${helpers}${postfixTemp}${model.reexportGetters.join('')}${imports}`
         )
     } else {
         editor.prepend(`"use strict";${helpers}${postfixTemp}${imports}`)
@@ -160,6 +164,8 @@ function analyzeNativeModule(
     const identifierNames = new Set<string>()
     const exportNamesByLocal = new Map<string, string[]>()
     const imports: ImportModel[] = []
+    // Install forwarding getters before loading dependencies so cyclic consumers see the exported names.
+    const reexportGetters: string[] = []
     const importBindingsByLocal = new Map<string, ImportBinding>()
     const scopes = new ScopeTracker({ preserveExitedScopes: true })
     const dynamicImports: ImportExpression[] = []
@@ -188,7 +194,11 @@ function analyzeNativeModule(
     // This analysis-local cursor checks each import namespace candidate once: O(I + C) probes for imports and collisions.
     let nextImportSuffix = 0
 
-    function analyzeImport(node: ImportDeclaration, reusedNamespace: string | undefined): ImportModel {
+    function analyzeDependency(
+        specifiers: ImportDeclaration['specifiers'] | ExportNamedDeclaration['specifiers'],
+        source: string,
+        reusedNamespace: string | undefined
+    ): ImportModel {
         // Existing dependencies reuse their namespace; new dependencies advance the shared linear naming cursor.
         let namespace = reusedNamespace
         if (namespace === undefined) {
@@ -201,7 +211,12 @@ function analyzeNativeModule(
             nextImportSuffix += 1
         }
         const importNamespace = namespace
-        const bindings = node.specifiers.map((specifier): ImportBinding => {
+        const bindings = specifiers.map((specifier): ImportBinding => {
+            if (specifier.type === 'ExportSpecifier') {
+                const binding = { imported: moduleExportName(specifier.local), namespace: importNamespace }
+                reexportGetters.push(exportGetter(moduleExportName(specifier.exported), binding))
+                return binding
+            }
             const binding = {
                 imported:
                     specifier.type === 'ImportNamespaceSpecifier'
@@ -209,42 +224,39 @@ function analyzeNativeModule(
                         : specifier.type === 'ImportDefaultSpecifier'
                           ? 'default'
                           : moduleExportName(specifier.imported),
-                local: specifier.local.name,
                 namespace: importNamespace
             }
-            importBindingsByLocal.set(binding.local, binding)
+            importBindingsByLocal.set(specifier.local.name, binding)
             return binding
         })
+        const capsule = getImportedCapsule(chunk.fileName, source, chunks)
         return {
             bindings,
-            capsuleBinding: null,
-            interop: importInterop(node),
+            capsuleBinding: capsule ? { logicalId: resolveLogicalChunkReference(chunk.fileName, source) } : null,
+            interop: capsule ? 'none' : importInterop(bindings),
             namespace: importNamespace,
-            reference: node.source.value
+            reference:
+                source === vptGlobalOutputPath
+                    ? relativePhysicalChunkReference(getPhysicalChunkId(chunk), source)
+                    : source
         }
     }
 
     for (const node of program.body) {
         switch (node.type) {
-            case 'ImportDeclaration': {
+            case 'ImportDeclaration':
                 requirePlainImport(node, chunk.fileName)
-                const capsule = getImportedCapsule(chunk.fileName, node.source.value, chunks)
-                if (capsule) {
-                    imports.push({
-                        ...analyzeImport(node, undefined),
-                        capsuleBinding: {
-                            logicalId: resolveLogicalChunkReference(chunk.fileName, node.source.value)
-                        },
-                        interop: 'none'
-                    })
-                    continue
-                }
-
-                imports.push(analyzeImport(node, undefined))
+                imports.push(analyzeDependency(node.specifiers, node.source.value, undefined))
                 break
-            }
             case 'ExportNamedDeclaration':
-                collectFinalExports(node, exportNamesByLocal, chunk.fileName)
+                if (node.attributes.length > 0 || node.exportKind === 'type') {
+                    throw unsupported(chunk.fileName, 'export attributes or type-only exports')
+                }
+                if (node.source) {
+                    imports.push(analyzeDependency(node.specifiers, node.source.value, undefined))
+                } else {
+                    collectFinalExports(node, exportNamesByLocal, chunk.fileName)
+                }
                 break
             case 'ExportDefaultDeclaration':
             case 'ExportAllDeclaration':
@@ -254,11 +266,10 @@ function analyzeNativeModule(
 
     if (dynamicImports.length > 0 || imports.some((entry) => entry.capsuleBinding)) {
         // Placement owns physical paths; capsule identities below stay package-neutral. Resolve only loader users.
-        const relative = path.posix.relative(
-            path.posix.dirname(getPhysicalChunkId(chunk)),
+        const reference = relativePhysicalChunkReference(
+            getPhysicalChunkId(chunk),
             pageLoader ?? getPhysicalChunkId(miniBootstrapId)
         )
-        const reference = relative.startsWith('../') ? relative : `./${relative}`
         const local = takeGeneratedName('__nativeSystem', identifierNames)
         // Parse only this compiler-owned ESM import; the complete chunk is still parsed once. Its ordinary binding is
         // first in the import plan so generated loader calls use the same lowering as authored named imports.
@@ -266,7 +277,7 @@ function analyzeNativeModule(
             .program.body[0] as ImportDeclaration
         const existingIndex = imports.findIndex((entry) => entry.reference === reference)
         const existing = existingIndex < 0 ? undefined : imports.splice(existingIndex, 1)[0]
-        const injected = analyzeImport(declaration, existing?.namespace)
+        const injected = analyzeDependency(declaration.specifiers, reference, existing?.namespace)
         imports.unshift(existing ? { ...existing, bindings: [...injected.bindings, ...existing.bindings] } : injected)
     }
 
@@ -279,6 +290,7 @@ function analyzeNativeModule(
         exportNamesByLocal,
         imports,
         importBindingsByLocal,
+        reexportGetters,
         namespaceInterop,
         postfixTemp,
         program,
@@ -300,7 +312,9 @@ function rewriteModuleDeclarations(editor: RolldownMagicString, model: NativeMod
                 editor.remove(node.start, node.end)
                 break
             case 'ExportNamedDeclaration':
-                if (node.declaration) {
+                if (node.source) {
+                    editor.remove(node.start, node.end)
+                } else if (node.declaration) {
                     // Strip only the export keyword; declaration publication is handled at its initializer or end boundary.
                     editor.remove(node.start, node.declaration.start)
                     rewriteExportedDeclaration(editor, node.declaration, model.exportNamesByLocal)
@@ -476,9 +490,6 @@ function collectFinalExports(
     exportNamesByLocal: Map<string, string[]>,
     filename: string
 ): void {
-    if (declaration.source || declaration.attributes.length > 0 || declaration.exportKind === 'type') {
-        throw unsupported(filename, 're-exports, export attributes, or type-only exports')
-    }
     if (declaration.declaration) {
         for (const local of declarationBindingNames(declaration.declaration, filename)) {
             const names = exportNamesByLocal.get(local) ?? []
@@ -519,9 +530,7 @@ function renderExportList(specifiers: readonly ExportSpecifier[], model: NativeM
             const local = moduleExportName(specifier.local)
             const exported = moduleExportName(specifier.exported)
             const imported = model.importBindingsByLocal.get(local)
-            return imported
-                ? `Object.defineProperty(exports,${JSON.stringify(exported)},{enumerable:true,get:function(){return ${importedExpression(imported)}}});`
-                : ''
+            return imported ? exportGetter(exported, imported) : ''
         })
         .join('')
 }
@@ -591,6 +600,10 @@ function importedReferenceContext(
     return 'plain'
 }
 
+function exportGetter(exported: string, binding: ImportBinding): string {
+    return `Object.defineProperty(exports,${JSON.stringify(exported)},{enumerable:true,get:function(){return ${importedExpression(binding)}}});`
+}
+
 function importedExpression(binding: ImportBinding): string {
     return binding.imported === null ? binding.namespace : memberExpression(binding.namespace, binding.imported)
 }
@@ -639,9 +652,13 @@ function renderImports(model: NativeModuleModel): string {
 }
 
 /** Selects Babel-compatible wrapping for default and namespace imports from CommonJS values. */
-function importInterop(declaration: ImportDeclaration): ImportInterop {
-    if (declaration.specifiers.some((specifier) => specifier.type === 'ImportNamespaceSpecifier')) return 'namespace'
-    if (declaration.specifiers.some((specifier) => specifier.type === 'ImportDefaultSpecifier')) return 'default'
+function importInterop(bindings: readonly ImportBinding[]): ImportInterop {
+    if (bindings.some(({ imported }) => imported === null)) {
+        return 'namespace'
+    }
+    if (bindings.some(({ imported }) => imported === 'default')) {
+        return bindings.every(({ imported }) => imported === 'default') ? 'default' : 'namespace'
+    }
     return 'none'
 }
 

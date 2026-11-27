@@ -131,6 +131,9 @@ export type ConnectMiniSocket = (endpoint: string) => MiniSocketTask
 
 /** Shared Mini Program host mechanics extending the Rolldown contract instead of reimplementing it. */
 export class MiniHmrRuntime extends DevRuntime {
+    /** Shared host object supplied to the runtime bundle and exposed to HMR factories. */
+    readonly vptGlobal = globalThis
+
     /**
      * One session for the running App. Undefined only before the mode-selected entry initializes the runtime; its identity then
      * stays fixed while appliedSeq records the committed frontier.
@@ -164,7 +167,7 @@ export class MiniHmrRuntime extends DevRuntime {
 
         // Generated React Refresh boundaries need this host primitive before any application factory runs.
         // Installing it in the shared development runtime covers every Mini target and mode without production overhead.
-        polyfillQueueMicrotask(globalThis)
+        polyfillQueueMicrotask(this.vptGlobal)
 
         this.connectSocket = connectSocket
     }

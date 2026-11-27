@@ -5,6 +5,7 @@ import type { ViteDevServer } from 'vite'
 import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { build, rolldownRuntimePath, viteReporterPlugin } from '../../../utils/vite-rolldown.ts'
+import { vptGlobalOutputPath } from '../module/module.ts'
 import type { MiniHmrMode } from './hmr-mode.ts'
 import { replaceViteTransformPlugin } from './replace-vite-transform-plugin.ts'
 
@@ -156,5 +157,5 @@ const bundleRuntimeSource = memoize(async function bundleRuntimeSource(runtimeFi
 
     // The lexical global prevents self-injection. Assign the completed instance to the chunk-local cell added at render time,
     // before Rolldown's graph prelude and any co-located modules use it. No host-global runtime binding is required.
-    return `__rolldown_runtime__ = (function (globalThis) {\n${result.output[0].code}\nreturn globalThis.__rolldown_runtime__;\n})(__VPT_GLOBAL__);`
+    return `import { vptGlobal } from "${vptGlobalOutputPath}";\n__rolldown_runtime__ = (function (globalThis) {\n${result.output[0].code}\nreturn globalThis.__rolldown_runtime__;\n})(vptGlobal);`
 })
