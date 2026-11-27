@@ -135,6 +135,7 @@ export function createMiniPlacementPlugin(automaticSubpackages: boolean): MiniPl
                     phase: 'planned',
                     placement: createPlacement({
                         automaticSubpackages,
+                        namedSubpackages: [],
                         chunks: meta.chunks,
                         planningBudgetBytes: miniSubpackagePlanningBudget,
                         getAdditionalModuleBytes: (moduleId) =>

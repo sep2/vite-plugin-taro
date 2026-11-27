@@ -56,6 +56,7 @@ async function buildFixture({ modules, input, additionalBytes }: BuildFixture): 
         renderChunk(_code, _chunk, _outputOptions, meta) {
             placement ??= createPlacement({
                 automaticSubpackages: true,
+                namedSubpackages: [],
                 chunks: meta.chunks,
                 planningBudgetBytes: planningBudgetBytes,
                 getAdditionalModuleBytes: (moduleId) => additionalBytes?.[moduleId] ?? 0

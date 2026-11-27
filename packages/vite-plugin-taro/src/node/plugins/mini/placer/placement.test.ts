@@ -18,7 +18,10 @@ type TestPlacement = {
     placement: Placement
 }
 
-function createTestPlacement(chunks: Readonly<Record<string, TestChunk>>): TestPlacement {
+function createTestPlacement(
+    chunks: Readonly<Record<string, TestChunk>>,
+    options?: Pick<Parameters<typeof createPlacement>[0], 'namedSubpackages' | 'automaticSubpackages'>
+): TestPlacement {
     const renderedChunks = Object.fromEntries(
         Object.entries(chunks).map(([chunkId, chunk]) => [chunkId, renderedChunk(chunkId, chunk)])
     )
@@ -28,7 +31,8 @@ function createTestPlacement(chunks: Readonly<Record<string, TestChunk>>): TestP
     return {
         chunks: renderedChunks,
         placement: createPlacement({
-            automaticSubpackages: true,
+            automaticSubpackages: options?.automaticSubpackages ?? true,
+            namedSubpackages: options?.namedSubpackages ?? [],
             chunks: renderedChunks,
             planningBudgetBytes: packageBudgetBytes,
             getAdditionalModuleBytes: (moduleId) => bytesByModuleId.get(moduleId) ?? 0
@@ -100,8 +104,14 @@ test('keeps nested lazy chunks and shared dependencies in main when automatic su
         'nested.js': renderedChunk('nested.js', { imports: ['shared.js'] }),
         'shared.js': renderedChunk('shared.js', {})
     }
+    for (const chunk of Object.values(chunks)) {
+        Object.defineProperty(chunk, 'dynamicImports', {
+            get: () => assert.fail('Main-only placement must skip dynamic-import analysis')
+        })
+    }
     const placement = createPlacement({
         automaticSubpackages: false,
+        namedSubpackages: [],
         chunks,
         planningBudgetBytes: packageBudgetBytes,
         getAdditionalModuleBytes: () => assert.fail('Main-package chunks do not need package-size estimates')
@@ -127,6 +137,46 @@ test('keeps the union of entry static closures in main, including cycles but not
     }
     assert.equal(getLocation(output, 'invoice.js').kind, 'subpackage')
 })
+
+for (const automaticSubpackages of [false, true]) {
+    test(`assigns eager code by entry package (automatic subpackages: ${automaticSubpackages})`, () => {
+        const output = createTestPlacement(
+            {
+                'home.js': { isEntry: true, imports: ['shared.js'] },
+                'detail.js': { isEntry: true, imports: ['popup.js', 'shared.js', 'format.js'] },
+                'list.js': { isEntry: true, imports: ['popup.js'] },
+                'profile.js': { isEntry: true, imports: ['format.js'] },
+                'popup.js': { dynamicImports: ['invoice.js'] },
+                'format.js': { imports: ['locale.js'] },
+                'locale.js': { imports: ['format.js'] },
+                'shared.js': {},
+                'invoice.js': {}
+            },
+            {
+                automaticSubpackages,
+                namedSubpackages: [
+                    { root: 'orders', entries: ['detail.js', 'list.js'] },
+                    { root: 'account', entries: ['profile.js'] }
+                ]
+            }
+        )
+
+        for (const id of ['detail.js', 'list.js', 'popup.js']) {
+            assert.deepEqual(getLocation(output, id), { kind: 'subpackage', root: 'orders' })
+        }
+        assert.deepEqual(getLocation(output, 'profile.js'), { kind: 'subpackage', root: 'account' })
+        for (const id of ['home.js', 'shared.js', 'format.js', 'locale.js']) {
+            assert.deepEqual(getLocation(output, id), { kind: 'main' })
+        }
+        assert.equal(output.placement.getPhysicalChunkId(output.chunks['detail.js']!), 'orders/detail.js')
+        const invoice = getLocation(output, 'invoice.js')
+        if (automaticSubpackages) {
+            assert.ok(invoice.kind === 'subpackage' && invoice.root.startsWith('sub/p_'))
+        } else {
+            assert.deepEqual(invoice, { kind: 'main' })
+        }
+    })
+}
 
 test('resolves exact entry module IDs and chunk objects through the same physical placement', () => {
     const bootstrapId = '/runtime/bootstrap.ts?target=wx'

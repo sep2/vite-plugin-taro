@@ -4,9 +4,9 @@ import type { MiniGeneratedSubpackage } from '../mini-contract.ts'
 
 const generatedSubpackageRootPrefix = 'sub/p_'
 
-/** Identifies one generated code-only subpackage by its physical output root. */
+/** Identifies a subpackage by its physical output root. */
 export type SubpackageLocation = {
-    /** Discriminates generated subpackages from main. */
+    /** Discriminates subpackages from main. */
     kind: 'subpackage'
     /** Native subpackage root relative to the Mini Program output directory. */
     root: string
@@ -26,8 +26,11 @@ export type Placement = Readonly<{
     finalize(bundle: Rolldown.OutputBundle): readonly GeneratedSubpackage[]
 }>
 
-/** Shared main-package value used for every synchronously reachable chunk. */
+/** Shared location for chunks owned by the main package. */
 const mainPackage = { kind: 'main' } as const
+
+/** One named package and its preliminary entry chunk IDs. */
+type NamedSubpackage = Readonly<{ root: string; entries: readonly string[] }>
 
 type PlaceableChunk = {
     chunkId: string
@@ -55,7 +58,7 @@ type PackedSubpackage = SubpackageLocation & {
  * Applies Load-Transition Hypergraph Partitioning to Rolldown's final preliminary chunk graph:
  *
  * 1. Sort preliminary filenames to remove callback and object-enumeration order from every later decision.
- * 2. Reserve every explicit entry and its complete static closure in main because native startup must load it synchronously.
+ * 2. Pin entry closures to their package; dependencies reached from multiple packages must be readable from main.
  * 3. Treat each dynamic-import edge as one load transition; the target's static closure is that transition's hyperedge.
  *    Nested dynamic edges remain separate transitions rather than being folded into the parent closure.
  * 4. Index every lazy chunk by all transitions requiring it. Shared chunks therefore carry global demand rather than being
@@ -69,11 +72,14 @@ type PackedSubpackage = SubpackageLocation & {
  */
 export function createPlacement({
     automaticSubpackages,
+    namedSubpackages,
     chunks,
     planningBudgetBytes,
     getAdditionalModuleBytes
 }: {
     automaticSubpackages: boolean
+    /** Unlisted entries belong to the main package. */
+    namedSubpackages: readonly NamedSubpackage[]
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
     planningBudgetBytes: number
     getAdditionalModuleBytes(moduleId: string): number
@@ -88,40 +94,30 @@ export function createPlacement({
         )
     )
 
-    const mainChunkIds = automaticSubpackages
-        ? collectStaticClosure(
-              chunkById,
-              chunkById
-                  .entries()
-                  .filter(([, chunk]) => chunk.isEntry)
-                  .map(([id]) => id),
-              new Set<string>()
-          )
-        : new Set(chunkById.keys())
-
-    const transitionsByChunk = collectTransitionsByChunk({ chunks: chunkById, mainChunkIds: mainChunkIds })
-    const placeableChunks = [...chunkById]
-        .filter(([chunkId]) => !mainChunkIds.has(chunkId))
-        .map(([chunkId, chunk]) => ({
-            chunkId: chunkId,
-            estimatedBytes:
-                estimateChunkBytes(chunk) +
-                chunk.moduleIds.reduce((bytes, moduleId) => bytes + getAdditionalModuleBytes(moduleId), 0),
-            transitions: transitionsByChunk.get(chunkId) ?? new Set<number>()
-        }))
-    const subpackages = packChunks({
-        chunks: placeableChunks,
-        planningBudgetBytes: planningBudgetBytes
-    }).map(createPackedSubpackage)
-
-    // This local map accumulates the immutable plan returned to output materialization.
-    const locationByChunk = new Map<string, PackageLocation>()
-    for (const chunkId of mainChunkIds) {
-        locationByChunk.set(chunkId, mainPackage)
-    }
-    for (const subpackage of subpackages) {
-        for (const chunkId of subpackage.chunkIds) {
-            locationByChunk.set(chunkId, subpackage)
+    // Eager assignments are fixed before lazy packing; only unassigned chunks can enter generated packages.
+    const locationByChunk =
+        automaticSubpackages || namedSubpackages.length
+            ? placeEntryClosures(chunkById, namedSubpackages)
+            : new Map<string, PackageLocation>()
+    // Only roots allocated by the packer need generated declarations.
+    const generatedPackages = new Set<PackageLocation>()
+    if (automaticSubpackages) {
+        for (const subpackage of packLazyChunks(
+            chunkById,
+            locationByChunk,
+            planningBudgetBytes,
+            getAdditionalModuleBytes
+        )) {
+            generatedPackages.add(subpackage)
+            for (const chunkId of subpackage.chunkIds) {
+                locationByChunk.set(chunkId, subpackage)
+            }
+        }
+    } else {
+        for (const id of chunkById.keys()) {
+            if (!locationByChunk.has(id)) {
+                locationByChunk.set(id, mainPackage)
+            }
         }
     }
     function getLocation(chunkId: string): PackageLocation {
@@ -167,7 +163,9 @@ export function createPlacement({
                 // OutputChunk is mutable in generateBundle. Assigning fileName makes Rolldown retain all chunk metadata and
                 // write that same chunk at its physical package path; deleting bundle keys or re-emitting would lose identity.
                 chunk.fileName = `${location.root}/${chunk.fileName}`
-                roots.add(location.root)
+                if (generatedPackages.has(location)) {
+                    roots.add(location.root)
+                }
             }
 
             return [...roots].sort().map((root) => ({ root: root }))
@@ -175,22 +173,69 @@ export function createPlacement({
     }
 }
 
+/** Entries in one package share one traversal. Once two packages reach a chunk, its entire closure is in main. */
+function placeEntryClosures(
+    chunks: ReadonlyMap<string, Rolldown.RenderedChunk>,
+    namedSubpackages: readonly NamedSubpackage[]
+): Map<string, PackageLocation> {
+    const namedEntries = new Set(namedSubpackages.values().flatMap(({ entries }) => entries))
+    const mainEntries = chunks
+        .entries()
+        .filter(([id, chunk]) => chunk.isEntry && !namedEntries.has(id))
+        .map(([id]) => id)
+    // Main ownership is final, so later traversals can stop at an already shared chunk.
+    const mainIds = collectStaticClosure(chunks, mainEntries, new Set<string>())
+    const owners = new Map<string, PackageLocation>(mainIds.values().map((id) => [id, mainPackage]))
+    for (const { root, entries } of namedSubpackages) {
+        const location = { kind: 'subpackage', root } as const
+        for (const id of collectStaticClosure(chunks, entries, mainIds)) {
+            if (owners.has(id)) {
+                mainIds.add(id)
+                owners.set(id, mainPackage)
+            } else {
+                owners.set(id, location)
+            }
+        }
+    }
+    return owners
+}
+
+/** Pack chunks outside the pinned entry closures according to dynamic-import demand. */
+function packLazyChunks(
+    chunkById: ReadonlyMap<string, Rolldown.RenderedChunk>,
+    locationByChunk: ReadonlyMap<string, PackageLocation>,
+    planningBudgetBytes: number,
+    getAdditionalModuleBytes: (moduleId: string) => number
+): PackedSubpackage[] {
+    const transitionsByChunk = collectTransitionsByChunk(chunkById, locationByChunk)
+    const placeableChunks = [...chunkById]
+        .filter(([chunkId]) => !locationByChunk.has(chunkId))
+        .map(([chunkId, chunk]) => ({
+            chunkId: chunkId,
+            estimatedBytes:
+                estimateChunkBytes(chunk) +
+                chunk.moduleIds.reduce((bytes, moduleId) => bytes + getAdditionalModuleBytes(moduleId), 0),
+            transitions: transitionsByChunk.get(chunkId) ?? new Set<number>()
+        }))
+    return packChunks({
+        chunks: placeableChunks,
+        planningBudgetBytes: planningBudgetBytes
+    }).map(createPackedSubpackage)
+}
+
 /** Creates every load-transition hyperedge and indexes its static closure by chunk. */
-function collectTransitionsByChunk({
-    chunks,
-    mainChunkIds
-}: {
-    chunks: ReadonlyMap<string, Rolldown.RenderedChunk>
-    mainChunkIds: ReadonlySet<string>
-}): Map<string, ReadonlySet<number>> {
+function collectTransitionsByChunk(
+    chunks: ReadonlyMap<string, Rolldown.RenderedChunk>,
+    assigned: ReadonlyMap<string, PackageLocation>
+): Map<string, ReadonlySet<number>> {
     const transitionsByChunk = new Map<string, Set<number>>()
     let transitionId = 0
     for (const chunk of chunks.values()) {
         for (const targetId of [...chunk.dynamicImports].sort()) {
-            if (!chunks.has(targetId) || mainChunkIds.has(targetId)) {
+            if (!chunks.has(targetId) || assigned.has(targetId)) {
                 continue
             }
-            for (const chunkId of collectStaticClosure(chunks, [targetId], mainChunkIds)) {
+            for (const chunkId of collectStaticClosure(chunks, [targetId], assigned)) {
                 const transitions = transitionsByChunk.get(chunkId) ?? new Set<number>()
                 transitions.add(transitionId)
                 transitionsByChunk.set(chunkId, transitions)
@@ -205,7 +250,7 @@ function collectTransitionsByChunk({
 function collectStaticClosure(
     chunks: ReadonlyMap<string, Rolldown.RenderedChunk>,
     roots: Iterable<string>,
-    stopAt: ReadonlySet<string>
+    stopAt: Pick<ReadonlySet<string>, 'has'>
 ): Set<string> {
     // The local stack and visited set expand each reachable chunk once, including in cyclic graphs.
     const pending = [...roots]
