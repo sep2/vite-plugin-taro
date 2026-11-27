@@ -36,7 +36,7 @@ import { createMiniWatchPlugin } from './watch/create-mini-watch-plugin.ts'
 /** Creates the complete Mini Program plugin set. */
 export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] {
     const resolver = createMiniResolver(contract)
-    const placer = createMiniPlacementPlugin(contract.automaticSubpackages, resolver.pageEntries)
+    const placer = createMiniPlacementPlugin(contract.automaticSubpackages, resolver.pages)
     const styles = createMiniStylePlugin(contract)
 
     return [
@@ -114,7 +114,7 @@ function createMiniPlugin(
 
         /** Binds stylesheet roots to the current graph before each complete output, including cached App loads. */
         renderStart() {
-            return styles.bindEntries(this, { appEntry: resolver.appEntry, pageEntries: resolver.pageEntries })
+            return styles.bindEntries(this, { appEntry: resolver.appEntry, pageEntries: resolver.pages })
         },
 
         /** The App shell owns all other entries, including replay from the bundler's module cache. */
@@ -132,7 +132,7 @@ function createMiniPlugin(
                 this.emitFile({ type: 'chunk', id: miniComponentCapsuleId, fileName: componentCapsuleFileName })
                 this.emitFile({ type: 'chunk', id: miniCustomWrapperShellId, fileName: customWrapperShellFileName })
 
-                for (const entry of resolver.pageEntries) {
+                for (const entry of resolver.pages) {
                     this.emitFile({ type: 'chunk', id: entry.shellId, fileName: entry.shellName })
                     this.emitFile({ type: 'chunk', id: entry.capsuleId, fileName: `${entry.capsuleName}.js` })
                 }
@@ -200,7 +200,7 @@ function createMiniPlugin(
                 const outputFiles = await createOutputFiles({
                     bundle,
                     contract,
-                    pages: resolver.pageEntries.map((entry) => entry.page),
+                    pages: resolver.pages,
                     subpackages,
                     isProduction: this.environment.config.isProduction,
                     getModuleInfo: (moduleId) => this.getModuleInfo(moduleId),

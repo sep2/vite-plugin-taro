@@ -4,7 +4,7 @@ import type { createMiniResolver } from '../resolve/create-mini-resolver.ts'
 type MiniResolver = ReturnType<typeof createMiniResolver>
 type MiniEntries = {
     appEntry: MiniResolver['appEntry']
-    pageEntries: MiniResolver['pageEntries']
+    pageEntries: MiniResolver['pages']
 }
 
 /** Projection needs captured CSS and candidates, not the retained compiler or its invalidation state. */

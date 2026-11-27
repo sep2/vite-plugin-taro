@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
-import { resolvePage } from '../../page/resolve-page.ts'
-import { createMiniPageEntry } from '../resolve/create-mini-page-entry.ts'
+import { resolveMiniPage } from '../resolve/resolve-mini-page.ts'
 import { createPlacement, type PackageLocation, type Placement } from './placement.ts'
 
 const packageBudgetBytes = 1_900_000
@@ -21,7 +20,7 @@ type TestPlacement = {
 }
 
 function pageEntry(subpackage: string, path: string) {
-    return createMiniPageEntry(resolvePage({ subpackage, path }))
+    return resolveMiniPage({ subpackage, path })
 }
 
 function createTestPlacement(

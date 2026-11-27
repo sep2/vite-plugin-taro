@@ -2,7 +2,7 @@ import type { Plugin, Rolldown } from 'vite'
 import type { MiniSubpackage } from '../mini-contract.ts'
 import { classifyMiniModule, isMiniFrameworkVendorModule, isMiniPolyfillModule } from '../module/module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
-import type { MiniPageEntry } from '../resolve/create-mini-page-entry.ts'
+import type { MiniResolvedPage } from '../resolve/resolve-mini-page.ts'
 import { createPlacement, type PackageLocation, type Placement } from './placement.ts'
 
 export type { Placement } from './placement.ts'
@@ -100,7 +100,7 @@ export function createPlacementRolldownOptions() {
  */
 export function createMiniPlacementPlugin(
     automaticSubpackages: boolean,
-    pageEntries: readonly MiniPageEntry[]
+    pageEntries: readonly MiniResolvedPage[]
 ): MiniPlacementPlugin {
     // This one mutable cell is the output-generation state machine described above; hooks replace it atomically by phase.
     let state: PlacementState = { phase: 'idle' }

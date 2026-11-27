@@ -217,8 +217,8 @@ test('resolves App/Page capsules in cascade order without mutating their entry m
         pageEntries: entries.pageEntries.map((entry) => ({ ...entry, capsuleId: `resolved:${entry.capsuleId}` }))
     })
     for (const [index, entry] of entries.pageEntries.entries()) {
-        assert.strictEqual(observed.entries.pageEntries[index]!.page, entry.page)
-        assert.strictEqual(observed.projection.pageEntries[index]!.page, entry.page)
+        assert.strictEqual(observed.entries.pageEntries[index]!.option, entry.option)
+        assert.strictEqual(observed.projection.pageEntries[index]!.option, entry.option)
     }
     assert.equal(observed.projection.appEntry.css, sources[0][1])
     assert.deepEqual(

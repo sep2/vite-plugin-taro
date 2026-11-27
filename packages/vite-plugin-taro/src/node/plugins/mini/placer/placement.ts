@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { Rolldown } from 'vite'
 import type { MiniSubpackage } from '../mini-contract.ts'
-import type { MiniPageEntry } from '../resolve/create-mini-page-entry.ts'
+import type { MiniResolvedPage } from '../resolve/resolve-mini-page.ts'
 
 const generatedSubpackageRootPrefix = 'sub/p_'
 
@@ -70,7 +70,7 @@ export function createPlacement({
 }: {
     automaticSubpackages: boolean
     /** Unlisted entries belong to the main package. */
-    pageEntries: readonly MiniPageEntry[]
+    pageEntries: readonly MiniResolvedPage[]
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
     planningBudgetBytes: number
     getAdditionalModuleBytes(moduleId: string): number
@@ -86,9 +86,9 @@ export function createPlacement({
     )
 
     // Group only declared package pages, preserving their manifest order and their original JS entry metadata.
-    const packagePages = new Map<string, MiniPageEntry[]>()
+    const packagePages = new Map<string, MiniResolvedPage[]>()
     for (const entry of pageEntries) {
-        const root = entry.page.option.subpackage
+        const root = entry.option.subpackage
         if (root !== undefined) {
             const members = packagePages.get(root)
             if (members) {
@@ -180,7 +180,7 @@ export function createPlacement({
             return [
                 ...packagePages
                     .entries()
-                    .map(([root, members]) => ({ root, pages: members.map((entry) => entry.page.option.path) })),
+                    .map(([root, members]) => ({ root, pages: members.map((entry) => entry.option.path) })),
                 ...[...roots].sort().map((root) => ({ root, pages: [] }))
             ]
         }
@@ -190,9 +190,9 @@ export function createPlacement({
 /** Entries in one package share one traversal. Once two packages reach a chunk, its entire closure is in main. */
 function placeEntryClosures(
     chunks: ReadonlyMap<string, Rolldown.RenderedChunk>,
-    packagePages: ReadonlyMap<string, readonly MiniPageEntry[]>
+    packagePages: ReadonlyMap<string, readonly MiniResolvedPage[]>
 ): Map<string, PackageLocation> {
-    const entryFiles = (page: MiniPageEntry) => [page.shellName, `${page.capsuleName}.js`]
+    const entryFiles = (page: MiniResolvedPage) => [page.shellName, `${page.capsuleName}.js`]
     const namedEntries = new Set(packagePages.values().flatMap((pages) => pages.values().flatMap(entryFiles)))
     const mainEntries = chunks
         .entries()
