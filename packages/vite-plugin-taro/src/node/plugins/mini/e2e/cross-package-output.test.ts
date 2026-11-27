@@ -185,7 +185,7 @@ function createMiniOutputPlugin(): Plugin {
         },
         async renderChunk(code, chunk, outputOptions, meta) {
             placement ??= createPlacement({
-                automaticSubpackages: true,
+                automaticSubpackages: 'any',
                 pageEntries: [],
                 chunks: meta.chunks,
                 planningBudgetBytes: planningBudgetBytes,

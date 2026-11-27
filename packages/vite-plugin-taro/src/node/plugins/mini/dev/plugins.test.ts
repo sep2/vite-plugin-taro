@@ -25,7 +25,7 @@ const contract = {
         projectConfigJson: {}
     },
     supportsPagePrerender: true,
-    automaticSubpackages: true,
+    automaticSubpackages: 'any',
     define: {},
     taro: {
         hostPath: '/runtime/host.ts',

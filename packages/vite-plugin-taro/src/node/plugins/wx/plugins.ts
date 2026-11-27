@@ -19,7 +19,7 @@ export function createWxMiniContract(options: Readonly<VptOptions>): MiniContrac
     return {
         options,
         supportsPagePrerender: true,
-        automaticSubpackages: true,
+        automaticSubpackages: 'any',
         define: {},
         taro: {
             env: 'weapp',

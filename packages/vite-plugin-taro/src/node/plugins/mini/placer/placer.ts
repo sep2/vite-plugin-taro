@@ -1,5 +1,5 @@
 import type { Plugin, Rolldown } from 'vite'
-import type { MiniSubpackage } from '../mini-contract.ts'
+import type { MiniContract, MiniSubpackage } from '../mini-contract.ts'
 import { classifyMiniModule, isMiniFrameworkVendorModule, isMiniPolyfillModule } from '../module/module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
 import type { MiniResolvedPage } from '../resolve/resolve-mini-page.ts'
@@ -100,7 +100,7 @@ export function createPlacementRolldownOptions() {
  * unrepresentable.
  */
 export function createMiniPlacementPlugin(
-    automaticSubpackages: boolean,
+    automaticSubpackages: MiniContract['automaticSubpackages'],
     pageEntries: readonly MiniResolvedPage[]
 ): MiniPlacementPlugin {
     // This one mutable cell is the output-generation state machine described above; hooks replace it atomically by phase.

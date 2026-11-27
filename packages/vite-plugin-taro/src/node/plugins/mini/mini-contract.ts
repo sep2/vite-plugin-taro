@@ -65,8 +65,8 @@ export type MiniContract = Readonly<{
     options: Readonly<VptOptions>
     /** Whether native Page initialization supports the caller's prerender request. */
     supportsPagePrerender: boolean
-    /** Places lazy chunks in native subpackages; false keeps code in main with deferred SystemJS execution. */
-    automaticSubpackages: boolean
+    /** Eligible destinations for lazy chunks: all subpackages, only code-only common packages, or main. */
+    automaticSubpackages: 'any' | 'common' | 'off'
     /** Build-time expressions supplied by the target, overriding shared defaults. */
     define: Record<string, string>
     taro: TaroContract

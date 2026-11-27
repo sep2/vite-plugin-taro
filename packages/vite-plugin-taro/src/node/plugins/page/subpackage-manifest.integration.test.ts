@@ -10,8 +10,9 @@ for (const target of ['wx', 'zfb', 'tb', 'tt', 'xhs'] as const) {
             'src/app.tsx': 'export default function App({ children }) { return children }',
             'src/home.tsx':
                 'import {shared} from "./shared"; export default function Home() { return <button onClick={() => import("./lazy").then(m => m.open())}>{shared}</button> }',
-            'src/lazy.ts': 'export function open() { console.log("lazy") }',
-            'src/popup.ts': 'export const popup = Math.random()',
+            'src/lazy.ts': 'import {format} from "./format"; export function open() { console.log(format) }',
+            'src/format.ts': 'export const format = Math.random()',
+            'src/popup.ts': 'import {format} from "./format"; export const popup = format + Math.random()',
             'src/shared.ts': 'export const shared = Math.random()',
             'src/detail.tsx':
                 'import {popup} from "./popup"; import {shared} from "./shared"; export default function Detail() { return popup + shared }',
@@ -52,7 +53,13 @@ for (const target of ['wx', 'zfb', 'tb', 'tt', 'xhs'] as const) {
         }
         assert.match(moduleFile('popup'), /^orders\/common\//)
         assert.match(moduleFile('shared'), /^common\//)
-        assert.match(moduleFile('lazy'), target === 'xhs' ? /^common\// : /^(orders|account)\/common\//)
+        const lazy = moduleFile('lazy')
+        if (target === 'tt') {
+            assert.match(moduleFile('format'), /^common\//)
+            assert.match(lazy, /^sub\/p_\w+\/common\//)
+        } else {
+            assert.match(lazy, target === 'xhs' ? /^common\// : /^(orders|account)\/common\//)
+        }
         const files = new Set(chunks.map((chunk) => chunk.fileName))
         for (const route of ['home', 'orders/detail', 'orders/history/list', 'account/profile']) {
             assert.ok(files.has(`${route}.js`), route)
@@ -63,7 +70,8 @@ for (const target of ['wx', 'zfb', 'tb', 'tt', 'xhs'] as const) {
         assert.ok(String(transport.source).includes('case "orders/detail-capsule.js":'))
         assert.deepEqual(manifest.subPackages, [
             { root: 'orders', pages: ['detail', 'history/list'] },
-            { root: 'account', pages: ['profile'] }
+            { root: 'account', pages: ['profile'] },
+            ...(target === 'tt' ? [{ root: lazy.split('/common/')[0], pages: [], common: true }] : [])
         ])
     })
 }

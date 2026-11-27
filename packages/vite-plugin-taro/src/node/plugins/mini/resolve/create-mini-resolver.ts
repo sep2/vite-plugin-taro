@@ -35,9 +35,7 @@ export function createMiniResolver(
     const normalizedAppCapsulePath = normalizePath(miniAppCapsuleId)
     const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
 
-    const pages: readonly MiniResolvedPage[] = orderPages(contract.options.pages).map((option) =>
-        resolveMiniPage(option, contract.styles.ext)
-    )
+    const pages = resolveMiniPages(contract.options.pages, contract.styles.ext)
     const pageByRoute = new Map(pages.map((page) => [page.route, page]))
 
     const privateIdResolvers = new Map<string, PrivateIdResolver>([
@@ -123,6 +121,23 @@ export function createMiniResolver(
             }
         }
     }
+}
+
+/** A Mini Program starts on its first main-package page, including when a subpackage is declared first. */
+function resolveMiniPages(options: MiniContract['options']['pages'], styleExtension: string): MiniResolvedPage[] {
+    const pages = orderPages(options).map((option) => resolveMiniPage(option, styleExtension))
+    const first = pages[0]
+    if (first?.option.subpackage === undefined) {
+        return pages
+    }
+    if (first.option.entry) {
+        throw new Error(`Mini Program entry "${first.route}" must be a main-package page.`)
+    }
+    const entry = pages.find((page) => page.option.subpackage === undefined)
+    if (!entry) {
+        throw new Error('Declare a main-package page for the Mini Program entry.')
+    }
+    return [entry, ...pages.filter((page) => page !== entry)]
 }
 
 /** Shell and capsule facades identify the same declared Page through their route query. */

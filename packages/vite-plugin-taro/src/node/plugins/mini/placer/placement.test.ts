@@ -36,7 +36,7 @@ function createTestPlacement(
     return {
         chunks: renderedChunks,
         placement: createPlacement({
-            automaticSubpackages: options?.automaticSubpackages ?? true,
+            automaticSubpackages: options?.automaticSubpackages ?? 'any',
             pageEntries: options?.pageEntries ?? [],
             chunks: renderedChunks,
             planningBudgetBytes: packageBudgetBytes,
@@ -115,7 +115,7 @@ test('keeps nested lazy chunks and shared dependencies in main when automatic su
         })
     }
     const placement = createPlacement({
-        automaticSubpackages: false,
+        automaticSubpackages: 'off',
         pageEntries: [],
         chunks,
         planningBudgetBytes: packageBudgetBytes,
@@ -143,7 +143,7 @@ test('keeps the union of entry static closures in main, including cycles but not
     assert.equal(getLocation(output, 'invoice.js').kind, 'subpackage')
 })
 
-for (const automaticSubpackages of [false, true]) {
+for (const automaticSubpackages of ['off', 'any'] as const) {
     test(`assigns eager code by entry package (automatic subpackages: ${automaticSubpackages})`, () => {
         const output = createTestPlacement(
             {
@@ -176,7 +176,10 @@ for (const automaticSubpackages of [false, true]) {
         }
         assert.equal(output.placement.getPhysicalChunkId(output.chunks['orders/detail.js']!), 'orders/detail.js')
         const invoice = getLocation(output, 'invoice.js')
-        assert.deepEqual(invoice, automaticSubpackages ? { kind: 'subpackage', root: 'orders' } : { kind: 'main' })
+        assert.deepEqual(
+            invoice,
+            automaticSubpackages === 'any' ? { kind: 'subpackage', root: 'orders' } : { kind: 'main' }
+        )
     })
 }
 
@@ -187,7 +190,7 @@ test('charges both the named entry and its eager dependencies before packing laz
         'invoice.js': { bytes: 500_000 }
     }
     const options = {
-        automaticSubpackages: true,
+        automaticSubpackages: 'any' as const,
         pageEntries: [pageEntry('orders', 'detail')]
     }
     const fits = createTestPlacement(chunks, options)
@@ -202,7 +205,7 @@ test('charges both the named entry and its eager dependencies before packing laz
     const fallback = createTestPlacement(
         { ...full, 'account/profile.js': { isEntry: true } },
         {
-            automaticSubpackages: true,
+            automaticSubpackages: 'any',
             pageEntries: [...options.pageEntries, pageEntry('account', 'profile')]
         }
     )

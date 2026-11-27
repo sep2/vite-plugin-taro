@@ -37,13 +37,13 @@ export type VptPageOption = {
      */
     path: string
 
-    /** Package root prefixed to the public route. For example, detail in orders is served at /orders/detail. */
+    /** Subpackage root. The public route is /<subpackage>/<path>; the source remains src/<path>.tsx. */
     subpackage?: string
 
     /**
      * Selects this page as the application entry. At most one page may set `entry: true`.
-     * The entry is placed first across all targets; other pages retain their declared order.
-     * When no page opts in, the first declared page remains the entry.
+     * Mini Programs require a main-package entry and default to the first declared main-package page.
+     * H5 defaults to the first declared page. Other pages retain their declared order.
      */
     entry?: boolean
 
@@ -104,7 +104,7 @@ export interface VptOptions {
      * Ordered page list.
      *
      * The page marked `entry: true` is placed first, preserving the declared order of all other pages.
-     * This resolved order becomes the `pages` order in the generated `app.json`, the H5 route order, and the Page order
+     * Mini manifests list each package’s pages in resolved order. This order also determines H5 routes and Page order
      * in the application style cascade. Each Page source is resolved according to its `path`.
      */
     pages: VptPageOption[]

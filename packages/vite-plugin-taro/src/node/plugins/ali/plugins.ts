@@ -28,7 +28,7 @@ export function createAliMiniContract(vptOptions: Readonly<VptOptions>): MiniCon
     return {
         options: vptOptions,
         supportsPagePrerender: true,
-        automaticSubpackages: true,
+        automaticSubpackages: 'any',
         define: {},
         taro: {
             env: 'alipay',

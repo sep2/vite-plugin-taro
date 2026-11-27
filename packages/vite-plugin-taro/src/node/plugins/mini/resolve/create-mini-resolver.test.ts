@@ -179,12 +179,23 @@ test('preserves resolved Page order in the App-owned entries', () => {
     assert.deepEqual(appEntry, createMiniResolver(input).appEntry)
 })
 
+test('requires a main-package application entry when Mini pages are declared', () => {
+    const detail = { path: 'detail', subpackage: 'orders' }
+    for (const pages of [[detail], [{ path: 'home' }, { ...detail, entry: true }]]) {
+        assert.throws(
+            () => createMiniResolver({ ...contract, options: { ...contract.options, pages } }),
+            /main.package/
+        )
+    }
+})
+
 test('resolves a named package entry by public route and loads its declared component', () => {
     const resolver = createMiniResolver({
         ...contract,
-        options: { ...contract.options, pages: [{ path: 'detail', subpackage: 'orders' }] }
+        options: { ...contract.options, pages: [{ path: 'detail', subpackage: 'orders' }, { path: 'home' }] }
     })
-    const [entry] = resolver.pages
+    const [home, entry] = resolver.pages
+    assert.equal(home?.route, 'home')
     assert.ok(entry)
     assert.equal(entry.route, 'orders/detail')
     assert.equal(entry.option.subpackage, 'orders')
@@ -209,6 +220,7 @@ test('selects the package loader by declared Page shell identity', () => {
     assert.equal(resolver.getPageLoader(detail.shellId), 'orders/common/vpt-page-loader.js')
     for (const facade of [
         home.shellId,
+        miniPageShellId,
         detail.capsuleId,
         miniAppShellId,
         miniBootstrapId,

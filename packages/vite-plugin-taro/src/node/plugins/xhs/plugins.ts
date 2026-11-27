@@ -20,7 +20,7 @@ export function createXhsMiniContract(options: Readonly<VptOptions>): MiniContra
         options,
         // XHS Page data is a native JSON object; React mounts through the shared onLoad barrier.
         supportsPagePrerender: false,
-        automaticSubpackages: false,
+        automaticSubpackages: 'off',
         define: {},
         taro: {
             env: 'xhs',

@@ -33,6 +33,14 @@ for (const entryIndex of [0, 1, 2]) {
     })
 }
 
+test('subpackage declarations do not affect shared page ordering', () => {
+    const detail = { path: 'detail', subpackage: 'orders' }
+    assert.deepEqual(orderPages([detail]), [detail])
+    const entry = { ...detail, entry: true }
+    const home = { path: 'home' }
+    assert.deepEqual(orderPages([home, entry]), [entry, home])
+})
+
 test('rejects multiple entry pages with their route paths', () => {
     const pages: VptPageOption[] = [
         { path: 'pages/a', entry: true },

@@ -20,7 +20,7 @@ export function createTtMiniContract(options: Readonly<VptOptions>): MiniContrac
         options,
         // TT requires object-form initial Page data.
         supportsPagePrerender: false,
-        automaticSubpackages: true,
+        automaticSubpackages: 'common',
         define: {
             // We don't use taro's tt dom impl, vpt has it own dom host.
             'tt.__$enableTTDom$__': 'false'

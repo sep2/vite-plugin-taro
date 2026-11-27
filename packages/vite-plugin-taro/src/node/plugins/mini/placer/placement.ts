@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Rolldown } from 'vite'
-import type { MiniSubpackage } from '../mini-contract.ts'
+import type { MiniContract, MiniSubpackage } from '../mini-contract.ts'
 import type { MiniResolvedPage } from '../resolve/resolve-mini-page.ts'
 
 const generatedSubpackageRootPrefix = 'sub/p_'
@@ -69,7 +69,7 @@ export function createPlacement({
     getAdditionalModuleBytes,
     warn
 }: {
-    automaticSubpackages: boolean
+    automaticSubpackages: MiniContract['automaticSubpackages']
     /** Unlisted entries belong to the main package. */
     pageEntries: readonly MiniResolvedPage[]
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
@@ -103,14 +103,27 @@ export function createPlacement({
 
     // Pin entry closures before packing lazy chunks into the remaining package capacity.
     const locationByChunk =
-        automaticSubpackages || packagePages.size
+        automaticSubpackages !== 'off' || packagePages.size > 0
             ? placeEntryClosures(chunkById, packagePages)
             : new Map<string, PackageLocation>()
 
-    if (automaticSubpackages) {
+    const commonOnly = automaticSubpackages === 'common'
+    if (commonOnly && packagePages.size > 0) {
+        // The main transport cannot read ordinary TT page packages. Eager dependencies also needed by a
+        // lazy import must therefore be synchronous main modules, independent of which page starts first.
+        const targets = chunkById.values().flatMap((chunk) => chunk.dynamicImports)
+        for (const id of collectStaticClosure(chunkById, targets, new Set<string>())) {
+            if (locationByChunk.has(id)) {
+                locationByChunk.set(id, mainPackage)
+            }
+        }
+    }
+
+    if (automaticSubpackages !== 'off') {
         for (const subpackage of packLazyChunks(
             chunkById,
             locationByChunk,
+            commonOnly,
             planningBudgetBytes,
             getAdditionalModuleBytes,
             warn
@@ -222,6 +235,7 @@ function placeEntryClosures(
 function packLazyChunks(
     chunkById: ReadonlyMap<string, Rolldown.RenderedChunk>,
     locationByChunk: ReadonlyMap<string, PackageLocation>,
+    commonOnly: boolean,
     planningBudgetBytes: number,
     getAdditionalModuleBytes: (moduleId: string) => number,
     warn: ((message: string) => void) | undefined
@@ -249,14 +263,14 @@ function packLazyChunks(
             lazy.push(item)
         }
     }
-    const bins = [...namedBins.values()]
-    for (const bin of bins) {
+    for (const bin of namedBins.values()) {
         if (bin.estimatedBytes > planningBudgetBytes) {
             warn?.(
                 `Page subpackage "${bin.name}" already needs an estimated ${bin.estimatedBytes} bytes for its pages, static dependencies and native assets (planning budget: ${planningBudgetBytes} bytes). Move a page or reduce its dependencies or styles.`
             )
         }
     }
+    const bins = commonOnly ? [] : [...namedBins.values()]
     // Each placement consumes capacity before the next candidate is scored.
     for (const chunk of lazy.sort(compareChunks)) {
         let bin =
