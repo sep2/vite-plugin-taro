@@ -88,7 +88,17 @@ export function createPlacement({
         )
     )
 
-    const mainChunkIds = automaticSubpackages ? findMainChunkIds(chunkById) : new Set(chunkById.keys())
+    const mainChunkIds = automaticSubpackages
+        ? collectStaticClosure(
+              chunkById,
+              chunkById
+                  .entries()
+                  .filter(([, chunk]) => chunk.isEntry)
+                  .map(([id]) => id),
+              new Set<string>()
+          )
+        : new Set(chunkById.keys())
+
     const transitionsByChunk = collectTransitionsByChunk({ chunks: chunkById, mainChunkIds: mainChunkIds })
     const placeableChunks = [...chunkById]
         .filter(([chunkId]) => !mainChunkIds.has(chunkId))
@@ -165,26 +175,6 @@ export function createPlacement({
     }
 }
 
-/** Keeps every explicit output entry and its complete static chunk closure in main. */
-function findMainChunkIds(chunks: ReadonlyMap<string, Rolldown.RenderedChunk>): Set<string> {
-    const mainChunkIds = new Set<string>()
-    // The worklist avoids recursion and visits every eager static edge once.
-    const pending = [...chunks].filter(([, chunk]) => chunk.isEntry).map(([chunkId]) => chunkId)
-    while (pending.length > 0) {
-        const chunkId = pending.pop()
-        if (!chunkId || mainChunkIds.has(chunkId)) {
-            continue
-        }
-        const chunk = chunks.get(chunkId)
-        if (!chunk) {
-            continue
-        }
-        mainChunkIds.add(chunkId)
-        pending.push(...chunk.imports)
-    }
-    return mainChunkIds
-}
-
 /** Creates every load-transition hyperedge and indexes its static closure by chunk. */
 function collectTransitionsByChunk({
     chunks,
@@ -200,11 +190,7 @@ function collectTransitionsByChunk({
             if (!chunks.has(targetId) || mainChunkIds.has(targetId)) {
                 continue
             }
-            for (const chunkId of collectStaticClosure({
-                rootId: targetId,
-                chunks: chunks,
-                mainChunkIds: mainChunkIds
-            })) {
+            for (const chunkId of collectStaticClosure(chunks, [targetId], mainChunkIds)) {
                 const transitions = transitionsByChunk.get(chunkId) ?? new Set<number>()
                 transitions.add(transitionId)
                 transitionsByChunk.set(chunkId, transitions)
@@ -215,32 +201,27 @@ function collectTransitionsByChunk({
     return transitionsByChunk
 }
 
-/** Collects one transition's static closure; nested dynamic imports remain independent transitions. */
-function collectStaticClosure({
-    rootId,
-    chunks,
-    mainChunkIds
-}: {
-    rootId: string
-    chunks: ReadonlyMap<string, Rolldown.RenderedChunk>
-    mainChunkIds: ReadonlySet<string>
-}): string[] {
+/** Follows static imports from the roots without entering chunks in stopAt. */
+function collectStaticClosure(
+    chunks: ReadonlyMap<string, Rolldown.RenderedChunk>,
+    roots: Iterable<string>,
+    stopAt: ReadonlySet<string>
+): Set<string> {
+    // The local stack and visited set expand each reachable chunk once, including in cyclic graphs.
+    const pending = [...roots]
     const closure = new Set<string>()
-    // The worklist follows static edges only; the visited set terminates cycles.
-    const pending = [rootId]
     while (pending.length > 0) {
-        const chunkId = pending.pop()
-        if (!chunkId || closure.has(chunkId) || mainChunkIds.has(chunkId)) {
+        const id = pending.pop()!
+        if (closure.has(id) || stopAt.has(id)) {
             continue
         }
-        const chunk = chunks.get(chunkId)
-        if (!chunk) {
-            continue
+        const chunk = chunks.get(id)
+        if (chunk) {
+            closure.add(id)
+            pending.push(...chunk.imports)
         }
-        closure.add(chunkId)
-        pending.push(...chunk.imports)
     }
-    return [...closure].sort()
+    return closure
 }
 
 /** Partitions final chunks by transition overlap before best-fit capacity. */

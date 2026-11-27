@@ -113,18 +113,19 @@ test('keeps nested lazy chunks and shared dependencies in main when automatic su
     assert.deepEqual(packageMembers({ chunks, placement }), [])
 })
 
-test('keeps every entry static chunk closure in main', () => {
+test('keeps the union of entry static closures in main, including cycles but not dynamic imports', () => {
     const output = createTestPlacement({
-        '/entry.js': { isEntry: true, imports: ['/eager.js'], dynamicImports: ['/feature.js'] },
-        '/eager.js': { imports: ['/shared.js'] },
-        '/shared.js': {},
-        '/feature.js': { imports: ['/shared.js'] }
+        'home.js': { isEntry: true, imports: ['shared.js'] },
+        'detail.js': { isEntry: true, imports: ['popup.js'] },
+        'popup.js': { imports: ['detail.js', 'shared.js'], dynamicImports: ['invoice.js'] },
+        'shared.js': {},
+        'invoice.js': { imports: ['shared.js'] }
     })
 
-    for (const chunkId of ['/entry.js', '/eager.js', '/shared.js']) {
-        assert.equal(getLocation(output, chunkId).kind, 'main')
+    for (const id of ['home.js', 'detail.js', 'popup.js', 'shared.js']) {
+        assert.equal(getLocation(output, id).kind, 'main')
     }
-    assert.equal(getLocation(output, '/feature.js').kind, 'subpackage')
+    assert.equal(getLocation(output, 'invoice.js').kind, 'subpackage')
 })
 
 test('resolves exact entry module IDs and chunk objects through the same physical placement', () => {
