@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { resolvePage } from '../../page/resolve-page.ts'
 import { specializePageCapsule } from './specialize-page-capsule.ts'
 
 const source = `import './app.js'
@@ -13,12 +14,13 @@ test('specializes the Page capsule with one options object', () => {
         code: source,
         id,
         sourcemap: true,
-        page: {
+        supportsPagePrerender: true,
+        page: resolvePage({
             path: 'pages/home/index',
             config: {
                 navigationBarTitleText: 'Home'
             }
-        }
+        })
     })
 
     assert.match(result.code, /vpt:page-component/)
@@ -35,7 +37,8 @@ test('preserves omitted native config and defaults prerender to false', () => {
     const result = specializePageCapsule({
         code: 'const options = __VPT_PAGE_OPTIONS__',
         id: '/plugin/runtime/mini/capsule/page.js?route=pages%2Fplain%2Findex',
-        page: { path: 'pages/plain/index' }
+        supportsPagePrerender: true,
+        page: resolvePage({ path: 'pages/plain/index' })
     })
 
     const options: unknown = Function(`${result.code}; return options`)()
@@ -53,7 +56,8 @@ for (const prerender of [undefined, false, true]) {
         const result = specializePageCapsule({
             code: 'const options = __VPT_PAGE_OPTIONS__',
             id: '/runtime/page.ts',
-            page
+            supportsPagePrerender: true,
+            page: resolvePage(page)
         })
         const options: unknown = Function(`${result.code}; return options`)()
         assert.deepEqual(options, { ...page, prerender: prerender === true })
@@ -68,7 +72,8 @@ test('preserves quotes and the reserved slot name inside Page options', () => {
     const result = specializePageCapsule({
         code: 'const options = __VPT_PAGE_OPTIONS__',
         id: '/runtime/page.ts',
-        page,
+        supportsPagePrerender: true,
+        page: resolvePage(page),
         sourcemap: false
     })
     const options: unknown = Function(`${result.code}; return options`)()
@@ -82,7 +87,8 @@ test('rejects a Page capsule missing its specialization placeholder', () => {
             specializePageCapsule({
                 code: 'export default {}',
                 id: '/plugin/runtime/mini/capsule/page.js?route=pages%2Fhome%2Findex',
-                page: { path: 'pages/home/index' }
+                supportsPagePrerender: true,
+                page: resolvePage({ path: 'pages/home/index' })
             }),
         /Expected one placeholder __VPT_PAGE_OPTIONS__, found 0/
     )

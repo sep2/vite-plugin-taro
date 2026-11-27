@@ -122,7 +122,7 @@ export function createMiniDevelopmentPlugin(
                         contract.output.projectPrivateConfigFilename,
                         contract.styles.appFileName,
                         contract.styles.globalFileName,
-                        ...pages.map((page) => `${page.path}${styleExtension}`),
+                        ...pages.map((page) => `${page.route}${styleExtension}`),
                         ...(hmrMode.rebuildStrategy === 'on-failure' ? [hmrInfoFileName] : []),
                         ...(reset?.kind === 'write' ? [reset.fileName] : [])
                     ]

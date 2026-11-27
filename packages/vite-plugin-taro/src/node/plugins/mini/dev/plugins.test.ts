@@ -5,6 +5,7 @@ import test from 'node:test'
 import { type Rolldown, resolveConfig } from 'vite'
 import { createMemoryTestProject } from '../../../tests/create-memory-test-project.ts'
 import { pageMetadataKey } from '../../page/page-metadata-key.ts'
+import { resolvePage } from '../../page/resolve-page.ts'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
 import { miniAppCapsuleId, pageComponentId } from '../module/module.ts'
 import { createMiniStylePlugin } from '../styles/plugins.ts'
@@ -155,7 +156,7 @@ test('cleans the first written output using resolved App metadata and preserves 
     const plugin = config.plugins.find((candidate) => candidate.name === 'vpt:mini-dev')
     const writeBundle = plugin?.writeBundle
     assert.ok(writeBundle && typeof writeBundle === 'object')
-    const pages = Object.freeze([Object.freeze({ path: 'pages/resolved/index' })])
+    const pages = Object.freeze([resolvePage({ path: 'index', subpackage: 'pages/resolved' })])
     const appId = path.join(root, 'compiler', 'app.ts')
     // The test controls asynchronous resolution so cleanup must wait for the exact compiler graph identity.
     const ready = Promise.withResolvers<void>()

@@ -1,5 +1,5 @@
-import type { VptPageOption } from '../../../../options.ts'
 import { type AstTransformResult, replaceTemplate } from '../../../utils/transform.ts'
+import type { ResolvedPage } from '../../page/resolve-page.ts'
 
 const pageOptionsPlaceholder = '__VPT_PAGE_OPTIONS__'
 
@@ -8,11 +8,13 @@ export function specializePageCapsule({
     code,
     id,
     page,
+    supportsPagePrerender,
     sourcemap
 }: {
     code: string
     id: string
-    page: VptPageOption
+    page: ResolvedPage
+    supportsPagePrerender: boolean
     sourcemap?: boolean
 }): AstTransformResult {
     return replaceTemplate(
@@ -20,9 +22,9 @@ export function specializePageCapsule({
         id,
         {
             [pageOptionsPlaceholder]: JSON.stringify({
-                path: page.path,
-                config: page.config,
-                prerender: page.prerender === true
+                path: page.route,
+                config: page.option.config,
+                prerender: supportsPagePrerender && page.option.prerender === true
             })
         },
         sourcemap ?? false

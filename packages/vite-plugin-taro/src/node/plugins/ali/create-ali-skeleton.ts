@@ -94,16 +94,16 @@ export function createAliSkeleton(
         createTextAsset('custom-wrapper.axml', customWrapperTemplateSource),
         jsonAsset('custom-wrapper.json', recursiveComponentJson),
         ...pages.flatMap((page) => {
-            const baseTemplatePath = toRootRelativePath(page.path, 'base.axml')
+            const baseTemplatePath = toRootRelativePath(page.route, 'base.axml')
             const pageTemplateSource = template.buildPageTemplate(baseTemplatePath, {
-                content: getPageConfig(page),
-                path: page.path
+                content: getPageConfig(page.option),
+                path: page.route
             })
 
             return [
-                jsonAsset(`${page.path}.json`, createSkeletonPageJson(page, nativeComponentConfig)),
+                jsonAsset(`${page.route}.json`, createSkeletonPageJson(page, nativeComponentConfig)),
                 createTextAsset(
-                    `${page.path}.axml`,
+                    `${page.route}.axml`,
                     buildAliPageTemplate({
                         source: pageTemplateSource,
                         baseTemplatePath: baseTemplatePath

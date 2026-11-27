@@ -1,12 +1,8 @@
 import type { VptPageOption } from '../../../options.ts'
 
-/** A compiler page uses its public route as path and keeps the component lookup independent. */
-export type ResolvedPage = VptPageOption & { sourcePath: string }
+/** Public route paired with the original page declaration. */
+export type ResolvedPage = Readonly<{ route: string; option: VptPageOption }>
 
-export function resolvePage(page: VptPageOption): ResolvedPage {
-    return {
-        ...page,
-        path: page.subpackage ? `${page.subpackage}/${page.path}` : page.path,
-        sourcePath: page.path
-    }
+export function resolvePage(option: VptPageOption): ResolvedPage {
+    return { route: option.subpackage ? `${option.subpackage}/${option.path}` : option.path, option }
 }

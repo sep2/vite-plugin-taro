@@ -24,7 +24,7 @@ export async function createOutputFiles({
 }): Promise<Rolldown.EmittedFile[]> {
     const nativeOutput = await createNativeComponentOutput({ bundle, getModuleInfo, getPackageLocation })
 
-    const pagesByRoot = Map.groupBy(pages, (page) => page.subpackage)
+    const pagesByRoot = Map.groupBy(pages, (page) => page.option.subpackage)
     return [
         {
             type: 'asset',
@@ -39,7 +39,7 @@ export async function createOutputFiles({
                     ...pagesByRoot
                         .entries()
                         .flatMap(([root, members]) =>
-                            root === undefined ? [] : [{ root, pages: members.map((page) => page.sourcePath) }]
+                            root === undefined ? [] : [{ root, pages: members.map((page) => page.option.path) }]
                         ),
                     ...subpackages
                 ],

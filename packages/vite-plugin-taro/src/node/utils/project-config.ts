@@ -1,4 +1,5 @@
 import type { VptJsonObject, VptOptions, VptPageConfig, VptPageOption } from '../../options.ts'
+import type { ResolvedPage } from '../plugins/page/resolve-page.ts'
 
 /** Resolves an omitted Page configuration to its empty native representation. */
 export function getPageConfig(page: VptPageOption): VptPageConfig {
@@ -8,11 +9,11 @@ export function getPageConfig(page: VptPageOption): VptPageConfig {
 /** Creates shared App configuration with the resolved page order as the authoritative value. */
 export function createAppConfig(
     options: Pick<Readonly<VptOptions>, 'appJson'>,
-    pages: readonly VptPageOption[]
+    pages: readonly ResolvedPage[]
 ): VptJsonObject {
     const { subPackages: _subPackages, subpackages: _subpackages, ...appJson } = options.appJson
     return {
         ...appJson,
-        pages: pages.map((page) => page.path)
+        pages: pages.map((page) => page.route)
     }
 }

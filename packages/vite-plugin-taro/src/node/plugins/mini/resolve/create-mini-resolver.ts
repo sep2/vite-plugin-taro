@@ -36,7 +36,7 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
     // setPages replaces the ordered page snapshot and rebuilds its constant-time route index together.
     let pages: readonly ResolvedPage[] = []
 
-    const pageByPath = new Map<string, ResolvedPage>()
+    const pageByRoute = new Map<string, ResolvedPage>()
 
     const privateIdResolvers = new Map<string, PrivateIdResolver>([
         // Preload needs only the initialized loader.
@@ -51,18 +51,18 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
         [
             pageComponentId,
             (importer, projectRoot) => {
-                const page = requireConfiguredPage({ moduleId: importer, pageByPath })
+                const page = requireConfiguredPage({ moduleId: importer, pageByRoute })
 
-                return resolvePageComponentPath({ pagePath: page.sourcePath, projectRoot })
+                return resolvePageComponentPath({ pagePath: page.option.path, projectRoot })
             }
         ],
         [
             pageCapsuleId,
             (importer) => {
                 // Query-qualify the capsule source so every Page retains a distinct graph identity.
-                const page = requireConfiguredPage({ moduleId: importer, pageByPath })
+                const page = requireConfiguredPage({ moduleId: importer, pageByRoute })
 
-                return createRouteModuleId({ moduleId: miniPageCapsuleId, pagePath: page.path })
+                return createRouteModuleId({ moduleId: miniPageCapsuleId, route: page.route })
             }
         ]
     ])
@@ -78,18 +78,18 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
         pageEntries() {
             return pages.map((page) => ({
                 page,
-                capsuleId: createRouteModuleId({ moduleId: miniPageCapsuleId, pagePath: page.path }),
-                capsuleName: `${page.path}-capsule`,
-                shellId: createRouteModuleId({ moduleId: miniPageShellId, pagePath: page.path }),
-                shellName: `${page.path}.js`
+                capsuleId: createRouteModuleId({ moduleId: miniPageCapsuleId, route: page.route }),
+                capsuleName: `${page.route}-capsule`,
+                shellId: createRouteModuleId({ moduleId: miniPageShellId, route: page.route }),
+                shellName: `${page.route}.js`
             }))
         },
 
         setPages(declarations: readonly VptPageOption[]) {
             pages = declarations.map(resolvePage)
-            pageByPath.clear()
+            pageByRoute.clear()
             for (const page of pages) {
-                pageByPath.set(page.path, page)
+                pageByRoute.set(page.route, page)
             }
         },
 
@@ -124,12 +124,13 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
             }
 
             if (normalizedId === normalizedPageCapsulePath) {
-                const page = requireConfiguredPage({ moduleId: id, pageByPath })
+                const page = requireConfiguredPage({ moduleId: id, pageByRoute })
 
                 return specializePageCapsule({
                     code,
                     id,
-                    page: { ...page, prerender: contract.supportsPagePrerender && page.prerender === true },
+                    page,
+                    supportsPagePrerender: contract.supportsPagePrerender,
                     sourcemap
                 })
             }
@@ -138,24 +139,24 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
 }
 
 /** Creates one route-qualified module ID. */
-function createRouteModuleId({ moduleId, pagePath }: { moduleId: string; pagePath: string }): string {
-    return `${moduleId}?route=${encodeURIComponent(pagePath)}`
+function createRouteModuleId({ moduleId, route }: { moduleId: string; route: string }): string {
+    return `${moduleId}?route=${encodeURIComponent(route)}`
 }
 
 /** Returns the configured Page identified by a route-qualified capsule ID. */
 function requireConfiguredPage({
     moduleId,
-    pageByPath
+    pageByRoute
 }: {
     moduleId: string | undefined
-    pageByPath: ReadonlyMap<string, ResolvedPage>
+    pageByRoute: ReadonlyMap<string, ResolvedPage>
 }): ResolvedPage {
     const queryIndex = moduleId?.indexOf('?') ?? -1
-    const pagePath = queryIndex === -1 ? undefined : new URLSearchParams(moduleId?.slice(queryIndex + 1)).get('route')
-    const page = pagePath ? pageByPath.get(pagePath) : undefined
+    const route = queryIndex === -1 ? undefined : new URLSearchParams(moduleId?.slice(queryIndex + 1)).get('route')
+    const page = route ? pageByRoute.get(route) : undefined
     if (!page) {
         throw new Error(
-            pagePath ? `Unknown Page capsule: ${pagePath}` : 'Page capsule import must originate from a route module'
+            route ? `Unknown Page capsule: ${route}` : 'Page capsule import must originate from a route module'
         )
     }
     return page

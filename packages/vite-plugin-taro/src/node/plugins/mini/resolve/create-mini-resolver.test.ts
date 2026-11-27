@@ -88,7 +88,7 @@ test('resolves fixed IDs immediately and Page IDs after setPages', () => {
     resolver.setPages(contract.options.pages)
     assert.deepEqual(resolver.pageEntries(), [
         {
-            page: { ...contract.options.pages[0], sourcePath: 'pages/home/index' },
+            page: { option: contract.options.pages[0], route: 'pages/home/index' },
             capsuleId: `${modules.pageCapsule}?route=pages%2Fhome%2Findex`,
             capsuleName: 'pages/home/index-capsule',
             shellId: `${modules.pageShell}?route=pages%2Fhome%2Findex`,
@@ -157,14 +157,14 @@ test('preserves resolved Page order in the App-owned entries', () => {
     const pageEntries = resolver.pageEntries()
     assert.deepEqual(pageEntries, [
         {
-            page: { ...pages[0], sourcePath: 'pages/z-last/index' },
+            page: { option: pages[0], route: 'pages/z-last/index' },
             capsuleId: `${modules.pageCapsule}?route=pages%2Fz-last%2Findex`,
             capsuleName: 'pages/z-last/index-capsule',
             shellId: `${modules.pageShell}?route=pages%2Fz-last%2Findex`,
             shellName: 'pages/z-last/index.js'
         },
         {
-            page: { ...pages[1], sourcePath: 'features/account/pages/a-first/index' },
+            page: { option: pages[1], route: 'features/account/pages/a-first/index' },
             capsuleId: `${modules.pageCapsule}?route=features%2Faccount%2Fpages%2Fa-first%2Findex`,
             capsuleName: 'features/account/pages/a-first/index-capsule',
             shellId: `${modules.pageShell}?route=features%2Faccount%2Fpages%2Fa-first%2Findex`,
@@ -179,8 +179,8 @@ test('resolves a named package entry by public route and loads its declared comp
     resolver.setPages([{ path: 'detail', subpackage: 'orders' }])
     const [entry] = resolver.pageEntries()
     assert.ok(entry)
-    assert.equal(entry.page.path, 'orders/detail')
-    assert.equal(entry.page.subpackage, 'orders')
+    assert.equal(entry.page.route, 'orders/detail')
+    assert.equal(entry.page.option.subpackage, 'orders')
     assert.equal(entry.shellName, 'orders/detail.js')
     const root = path.resolve('/project')
     assert.equal(resolver.resolveId(pageCapsuleId, entry.shellId, root), entry.capsuleId)
@@ -221,21 +221,21 @@ test('setPages updates entries, route resolution and capsule metadata together',
         assert.equal(resolver.specialize, specialize)
         assert.deepEqual(
             resolver.pageEntries().map((entry) => entry.page),
-            pages.map((page) => ({ ...page, sourcePath: page.path }))
+            pages.map((page) => ({ option: page, route: page.path }))
         )
         for (const [index, entry] of resolver.pageEntries().entries()) {
             const declaration = pages[index]!
-            assert.equal(entry.page.sourcePath, declaration.path)
+            assert.strictEqual(entry.page.option, declaration)
             assert.equal(resolveId(pageCapsuleId, entry.shellId, projectRoot), entry.capsuleId)
             assert.equal(
                 resolveId(pageComponentId, entry.capsuleId, projectRoot),
-                normalizePath(path.resolve(projectRoot, `src/${entry.page.path}.tsx`))
+                normalizePath(path.resolve(projectRoot, `src/${entry.page.option.path}.tsx`))
             )
             const result = specialize('const options = __VPT_PAGE_OPTIONS__', entry.capsuleId, false)
             assert.ok(result)
             assert.deepEqual(Function(`${result.code}; return options`)(), {
                 ...declaration,
-                prerender: entry.page.prerender === true
+                prerender: entry.page.option.prerender === true
             })
         }
         const app = specialize('const config = __VPT_APP_CONFIG__', appEntry.capsuleId, false)
@@ -249,7 +249,7 @@ test('setPages updates entries, route resolution and capsule metadata together',
             pages.map((page) => page.path)
         )
         for (const entry of previousEntries) {
-            if (!pages.some((page) => page.path === entry.page.path)) {
+            if (!pages.some((page) => page.path === entry.page.route)) {
                 assert.throws(() => resolveId(pageCapsuleId, entry.shellId, projectRoot), /Unknown Page capsule/)
                 assert.throws(() => resolveId(pageComponentId, entry.capsuleId, projectRoot), /Unknown Page capsule/)
                 assert.throws(

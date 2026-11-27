@@ -34,6 +34,6 @@ export function transformH5App({
 
 /** Every application-controlled value is JSON-encoded; the route loader itself is fixed compiler-owned syntax. */
 function createRoute(page: ResolvedPage, projectRoot: string): string {
-    const component = JSON.stringify(createPageComponentImportPath({ pagePath: page.sourcePath, projectRoot }))
-    return `{path:${JSON.stringify(page.path)},load:async function(context,params){const page=await import(${component});return [page,context,params]},...${JSON.stringify(getPageConfig(page))}}`
+    const component = JSON.stringify(createPageComponentImportPath({ pagePath: page.option.path, projectRoot }))
+    return `{path:${JSON.stringify(page.route)},load:async function(context,params){const page=await import(${component});return [page,context,params]},...${JSON.stringify(getPageConfig(page.option))}}`
 }

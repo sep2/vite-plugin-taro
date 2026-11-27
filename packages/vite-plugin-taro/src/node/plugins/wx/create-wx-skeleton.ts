@@ -102,13 +102,13 @@ export function createWxSkeleton(
         jsonAsset('custom-wrapper.json', recursiveComponentJson),
 
         ...pages.flatMap((page) => [
-            jsonAsset(`${page.path}.json`, createSkeletonPageJson(page, nativeComponentConfig)),
+            jsonAsset(`${page.route}.json`, createSkeletonPageJson(page, nativeComponentConfig)),
             createTextAsset(
-                `${page.path}.wxml`,
+                `${page.route}.wxml`,
                 buildWxPageTemplate(
-                    template.buildPageTemplate(toRootRelativePath(page.path, 'base.wxml'), {
-                        content: getPageConfig(page),
-                        path: page.path
+                    template.buildPageTemplate(toRootRelativePath(page.route, 'base.wxml'), {
+                        content: getPageConfig(page.option),
+                        path: page.route
                     })
                 )
             )

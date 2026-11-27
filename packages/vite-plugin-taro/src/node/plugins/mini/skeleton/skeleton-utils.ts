@@ -1,6 +1,6 @@
 import path from 'node:path'
 import type { Rolldown } from 'vite'
-import type { VptOptions, VptPageOption } from '../../../../options.ts'
+import type { VptOptions } from '../../../../options.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { createAppConfig, getPageConfig } from '../../../utils/project-config.ts'
 import type { ResolvedPage } from '../../page/resolve-page.ts'
@@ -54,7 +54,7 @@ export function createSkeletonAppJson(
     return {
         ...createAppConfig(
             options,
-            pages.filter((page) => page.subpackage === undefined)
+            pages.filter((page) => page.option.subpackage === undefined)
         ),
         ...(subpackages.length > 0 ? { subPackages: subpackages } : {})
     }
@@ -62,10 +62,10 @@ export function createSkeletonAppJson(
 
 /** Creates a Page config while preserving caller fields and registering every generated rendering boundary. */
 export function createSkeletonPageJson(
-    page: VptPageOption,
+    page: ResolvedPage,
     nativeComponents: SkeletonNativeComponentConfig
 ): MiniJsonObject {
-    const config = getPageConfig(page)
+    const config = getPageConfig(page.option)
     const usingComponents = isJsonObject(config.usingComponents) ? config.usingComponents : {}
     const componentPlaceholder = isJsonObject(config.componentPlaceholder) ? config.componentPlaceholder : {}
     const hasNativeComponentPlaceholder = Object.keys(nativeComponents.componentPlaceholder).length > 0
@@ -75,8 +75,8 @@ export function createSkeletonPageJson(
         usingComponents: {
             ...usingComponents,
             ...nativeComponents.usingComponents,
-            comp: toRootRelativePath(page.path, 'comp'),
-            [customWrapperName]: toRootRelativePath(page.path, customWrapperName)
+            comp: toRootRelativePath(page.route, 'comp'),
+            [customWrapperName]: toRootRelativePath(page.route, customWrapperName)
         },
         ...(hasNativeComponentPlaceholder
             ? {

@@ -1,10 +1,10 @@
-import type { VptPageOption } from '../../../options.ts'
+import type { ResolvedPage } from './resolve-page.ts'
 
 /** Ordered page metadata attached to the compiled application module. */
 export const pageMetadataKey = 'vpt:pages'
 
 declare module 'rolldown' {
     interface CustomPluginOptions {
-        [pageMetadataKey]?: readonly VptPageOption[]
+        [pageMetadataKey]?: readonly ResolvedPage[]
     }
 }
