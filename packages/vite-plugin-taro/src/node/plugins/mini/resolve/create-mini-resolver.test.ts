@@ -34,6 +34,7 @@ const modules = {
 }
 
 const contract = {
+    styles: { ext: '.wxss' },
     supportsPagePrerender: true,
     options: {
         target: 'wx',
@@ -60,7 +61,7 @@ const contract = {
         componentsReactPath: '/runtime/components-react.ts',
         targetRuntimePath: '/runtime/target.ts'
     }
-} satisfies Pick<MiniContract, 'options' | 'taro' | 'supportsPagePrerender'>
+} satisfies Pick<MiniContract, 'options' | 'taro' | 'styles' | 'supportsPagePrerender'>
 
 test('resolves fixed IDs and configured Page IDs', () => {
     const resolver = createMiniResolver(contract)
@@ -92,6 +93,7 @@ test('resolves fixed IDs and configured Page IDs', () => {
             capsuleName: 'pages/home/index-capsule',
             shellId: `${modules.pageShell}?route=pages%2Fhome%2Findex`,
             shellName: 'pages/home/index.js',
+            styleName: 'pages/home/index.wxss',
             pageLoader: undefined
         }
     ])
@@ -160,6 +162,7 @@ test('preserves resolved Page order in the App-owned entries', () => {
             capsuleName: 'pages/z-last/index-capsule',
             shellId: `${modules.pageShell}?route=pages%2Fz-last%2Findex`,
             shellName: 'pages/z-last/index.js',
+            styleName: 'pages/z-last/index.wxss',
             pageLoader: undefined
         },
         {
@@ -169,6 +172,7 @@ test('preserves resolved Page order in the App-owned entries', () => {
             capsuleName: 'features/account/pages/a-first/index-capsule',
             shellId: `${modules.pageShell}?route=features%2Faccount%2Fpages%2Fa-first%2Findex`,
             shellName: 'features/account/pages/a-first/index.js',
+            styleName: 'features/account/pages/a-first/index.wxss',
             pageLoader: undefined
         }
     ])
@@ -185,6 +189,7 @@ test('resolves a named package entry by public route and loads its declared comp
     assert.equal(entry.route, 'orders/detail')
     assert.equal(entry.option.subpackage, 'orders')
     assert.equal(entry.shellName, 'orders/detail.js')
+    assert.equal(entry.styleName, 'orders/detail.wxss')
     assert.equal(entry.pageLoader, 'orders/common/vpt-page-loader.js')
     const root = path.resolve('/project')
     assert.equal(resolver.resolveId(pageCapsuleId, entry.shellId, root), entry.capsuleId)

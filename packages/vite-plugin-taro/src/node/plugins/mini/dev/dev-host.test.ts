@@ -35,10 +35,7 @@ const contract = {
         appJson: {},
         projectConfigJson: {}
     },
-    styles: {
-        appFileName: 'app.wxss',
-        globalFileName: 'assets/global.wxss'
-    }
+    styles: { ext: '.wxss' }
 } satisfies Pick<MiniContract, 'options' | 'styles'>
 
 async function importDevHost(dev: SyntheticDev): Promise<CreateMiniDevHost> {
@@ -170,7 +167,7 @@ test('reduces synthetic engine update variants and unknown host failures without
                 styleFailure = undefined
                 throw failure
             }
-            await writeWxss(contract.styles.globalFileName, '.synthetic {}\n')
+            await writeWxss('assets/global.wxss', '.synthetic {}\n')
             await writeWxss('pages/home/index.wxss', '.synthetic-page {}\n')
             return artifacts
         }

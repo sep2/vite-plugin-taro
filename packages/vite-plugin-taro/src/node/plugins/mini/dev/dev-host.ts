@@ -12,6 +12,7 @@ import {
 import { dev } from '../../../utils/vite-rolldown.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import type { MiniStyleService } from '../styles/create-mini-style-service.ts'
+import { appStyleName, globalStyleName } from '../styles/mini-style-names.ts'
 import { createHmrResultsStream } from './create-hmr-results-stream.ts'
 import { hmrInfoFileName, renderDevelopmentAppStyle, renderHmrInfo, writeDevelopmentFile } from './hmr-files.ts'
 import type { MiniHmrAction, MiniHmrMode } from './hmr-mode.ts'
@@ -169,8 +170,8 @@ export async function createMiniDevHost({
             // A fresh marker makes every complete output an App-level native-tool reload even when its stylesheet is unchanged.
             const { buildId } = journal.startBuild()
             await writeFile(
-                contract.styles.appFileName,
-                renderDevelopmentAppStyle(contract.styles.globalFileName, buildId)
+                appStyleName(contract.styles.ext),
+                renderDevelopmentAppStyle(globalStyleName(contract.styles.ext), buildId)
             )
             return
         }
@@ -219,7 +220,10 @@ export async function createMiniDevHost({
         // write intentionally causes the one full refresh allowed at a complete-build boundary; the refreshed App reads the new
         // info above. Incremental updates must never write this file because an App refresh could replace the runtime while its
         // JavaScript patch is being acknowledged. They publish only the imported App CSS and Page stylesheets instead.
-        await writeFile(contract.styles.appFileName, renderDevelopmentAppStyle(contract.styles.globalFileName, buildId))
+        await writeFile(
+            appStyleName(contract.styles.ext),
+            renderDevelopmentAppStyle(globalStyleName(contract.styles.ext), buildId)
+        )
     }
 
     /** Reduces one merged source action through the existing authoritative host state. */

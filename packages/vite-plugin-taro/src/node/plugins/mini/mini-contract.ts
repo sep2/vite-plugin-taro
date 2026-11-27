@@ -18,11 +18,10 @@ export type RuntimeContract = {
     interpreterHmrRuntime: string
 }
 
-/** Style output names selected by one Mini Program target. */
-export type StyleContract = {
-    appFileName: string
-    globalFileName: string
-}
+/** Native stylesheet extension selected by the target, including the leading dot. */
+export type StyleContract = Readonly<{
+    ext: string
+}>
 
 /** Native component registration discovered from the final Mini Program graph. */
 export type MiniNativeComponentRegistration = Readonly<{

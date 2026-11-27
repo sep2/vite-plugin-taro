@@ -20,7 +20,7 @@ type TestPlacement = {
 }
 
 function pageEntry(subpackage: string, path: string) {
-    return resolveMiniPage({ subpackage, path })
+    return resolveMiniPage({ subpackage, path }, '.wxss')
 }
 
 function createTestPlacement(

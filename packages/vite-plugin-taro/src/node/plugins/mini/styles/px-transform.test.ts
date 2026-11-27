@@ -49,10 +49,7 @@ for (const target of ['wx', 'h5'] as const) {
             plugins: [
                 project.plugin,
                 target === 'wx' &&
-                    createMiniStylePlugin(
-                        { styles: { appFileName: 'app.wxss', globalFileName: 'assets/global.wxss' } },
-                        createMiniStyleEntries(entry, [])
-                    )
+                    createMiniStylePlugin({ styles: { ext: '.wxss' } }, createMiniStyleEntries(entry, [], '.wxss'))
             ],
             build: {
                 write: false,

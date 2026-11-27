@@ -11,6 +11,7 @@ import { pageMetadataKey } from '../../page/page-metadata-key.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { miniAppCapsuleId, miniPageCapsuleId, pageComponentId, rolldownRuntimeId } from '../module/module.ts'
 import type { MiniStyleService } from '../styles/create-mini-style-service.ts'
+import { appStyleName, globalStyleName } from '../styles/mini-style-names.ts'
 import { createMiniViteClientPlugin } from './create-mini-vite-client-plugin.ts'
 import { createMiniDevHost, type MiniDevHost } from './dev-host.ts'
 import { hmrInfoFileName } from './hmr-files.ts'
@@ -98,7 +99,7 @@ export function createMiniDevelopmentPlugin(
                     // The shared output plugin emits the production App wrapper during every complete build: startup and each
                     // recovery build, not just once when this plugin instance is created. Development transfers that file
                     // to the host so its only physical write happens after the complete output and matching mode state are durable.
-                    removeDevelopmentAppStyle(bundle, contract.styles.appFileName)
+                    removeDevelopmentAppStyle(bundle, appStyleName(contract.styles.ext))
 
                     await emitMiniPublicAssets(this)
                 }
@@ -114,15 +115,14 @@ export function createMiniDevelopmentPlugin(
                     // exact graph identity through the compiler so filesystem casing and separators agree on every platform.
                     const app = await this.resolve(miniAppCapsuleId)
                     const pages = this.getModuleInfo(app!.id)!.meta[pageMetadataKey]!
-                    const styleExtension = path.extname(contract.styles.appFileName)
 
                     // These files are owned by DevTools or the host, not necessarily emitted in Rolldown's bundle.
                     const hostFiles = [
                         contract.output.projectConfigFilename,
                         contract.output.projectPrivateConfigFilename,
-                        contract.styles.appFileName,
-                        contract.styles.globalFileName,
-                        ...pages.map((page) => `${page.route}${styleExtension}`),
+                        appStyleName(contract.styles.ext),
+                        globalStyleName(contract.styles.ext),
+                        ...pages.map((page) => page.styleName),
                         ...(hmrMode.rebuildStrategy === 'on-failure' ? [hmrInfoFileName] : []),
                         ...(reset?.kind === 'write' ? [reset.fileName] : [])
                     ]

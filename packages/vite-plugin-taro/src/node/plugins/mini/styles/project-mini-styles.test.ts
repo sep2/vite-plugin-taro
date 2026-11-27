@@ -37,7 +37,7 @@ function createFixture(entries: Parameters<typeof projectMiniStyles>[0]) {
 }
 
 test('keeps App styles global and Page-shared component styles in each consumer', () => {
-    const entries = createMiniStyleEntries('/app.js', ['/page.js?route=first', '/page.js?route=second'])
+    const entries = createMiniStyleEntries('/app.js', ['/page.js?route=first', '/page.js?route=second'], '.wxss')
     const originalEntries = structuredClone(entries)
     const fixture = createFixture(entries)
     fixture.style('/global.css', '.global {}', ['global'])
@@ -77,7 +77,7 @@ test('keeps App styles global and Page-shared component styles in each consumer'
 })
 
 test('preserves independent Page cascades through shared cyclic and dynamic dependencies', () => {
-    const fixture = createFixture(createMiniStyleEntries('/app.js', ['/first.js', '/second.js']))
+    const fixture = createFixture(createMiniStyleEntries('/app.js', ['/first.js', '/second.js'], '.wxss'))
     fixture.style('/app.css', '.app {}', undefined)
     fixture.style('/dependency.css', '.dependency {}', undefined)
     fixture.style('/shared.css', '.shared {}', ['shared'])
@@ -109,7 +109,7 @@ test('deduplicates physical query variants without pruning dependencies of App-o
     const appCss = path.join(root, 'app.css')
     const pageCss = path.join(root, 'page.css')
     const extraCss = path.join(root, 'extra.css')
-    const fixture = createFixture(createMiniStyleEntries(appId, [pageId]))
+    const fixture = createFixture(createMiniStyleEntries(appId, [pageId], '.wxss'))
     fixture.style(`${appCss}?v=app`, '.app {}', ['app'])
     fixture.style(`${pageCss}?v=one`, '.page {}', ['page'])
     fixture.style(`${pageCss}?v=two`, '.page {}', ['page'])
@@ -128,7 +128,7 @@ test('deduplicates physical query variants without pruning dependencies of App-o
 })
 
 test('recomputes ownership and prunes removed imports without retaining stale CSS or candidates', () => {
-    const fixture = createFixture(createMiniStyleEntries('/app.js', ['/first.js', '/second.js']))
+    const fixture = createFixture(createMiniStyleEntries('/app.js', ['/first.js', '/second.js'], '.wxss'))
     fixture.style('/shared.css', '.shared {}', ['shared'])
     fixture.style('/first.css', '.first {}', ['first'])
     fixture.module('/app.js', ['/shared.css'], [])
@@ -175,7 +175,7 @@ test('recomputes ownership and prunes removed imports without retaining stale CS
 })
 
 test('ignores missing and uncaptured styles while retaining an empty captured stylesheet', () => {
-    const fixture = createFixture(createMiniStyleEntries('/app.js', ['/missing-page.js']))
+    const fixture = createFixture(createMiniStyleEntries('/app.js', ['/missing-page.js'], '.wxss'))
     fixture.style('/pending.css', undefined, ['pending'])
     fixture.style('/empty.css', '', [])
     fixture.style('/missing.css', '.missing {}', ['missing'])
@@ -191,7 +191,7 @@ test('ignores missing and uncaptured styles while retaining an empty captured st
 })
 
 test('combines App and ordered Page roots once, including cyclic lazy styles and shared physical variants', () => {
-    const entries = createMiniStyleEntries('/app.js', ['/first.js', '/second.js', '/missing.js'])
+    const entries = createMiniStyleEntries('/app.js', ['/first.js', '/second.js', '/missing.js'], '.wxss')
     const fixture = createFixture(entries)
     fixture.style('/app.css', '.app {}', ['app'])
     fixture.style('/shared.css?one', '.shared {}', ['shared'])
@@ -232,7 +232,7 @@ test('combines App and ordered Page roots once, including cyclic lazy styles and
 })
 
 test('preserves an empty App projection with no configured Pages', () => {
-    const entries = createMiniStyleEntries('/app.js', [])
+    const entries = createMiniStyleEntries('/app.js', [], '.wxss')
     const projection = createFixture(entries).project(true)
 
     assert.deepEqual(projection.appEntry, { ...entries.appEntry, styles: new Map(), css: '', classSet: new Set() })

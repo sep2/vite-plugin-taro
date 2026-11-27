@@ -37,10 +37,7 @@ export function createTtMiniContract(options: Readonly<VptOptions>): MiniContrac
             devtoolsHmrRuntime: resolveVptRuntime('tt/dev/devtools-runtime'),
             interpreterHmrRuntime: resolveVptRuntime('tt/dev/interpreter-runtime')
         },
-        styles: {
-            appFileName: 'app.ttss',
-            globalFileName: 'assets/global.ttss'
-        },
+        styles: { ext: '.ttss' },
         output: {
             projectConfigFilename,
             projectPrivateConfigFilename,

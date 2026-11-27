@@ -11,10 +11,7 @@ import { miniHtmlBase } from './mini-html-base.ts'
 import { createMiniStyleFixturePlugin as createMiniStylePlugin } from './test/create-mini-style-fixture-plugin.ts'
 
 const contract = {
-    styles: {
-        appFileName: 'app.wxss',
-        globalFileName: 'assets/global.wxss'
-    }
+    styles: { ext: '.wxss' }
 } satisfies Pick<MiniContract, 'styles'>
 
 function createSourceFixture(files: Readonly<Record<string, string>>, entryName: string) {
@@ -23,7 +20,7 @@ function createSourceFixture(files: Readonly<Record<string, string>>, entryName:
 }
 
 test('handles physical and ignored query fragments before watcher cleanup', async () => {
-    const styles = createMiniStylePlugin(contract, createMiniStyleEntries('/src/app.js', []))
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries('/src/app.js', [], '.wxss'))
     await resolveConfig({ configFile: false, plugins: [styles], logLevel: 'silent' }, 'build')
     const transformHook = styles.transform
     assert.ok(transformHook)
@@ -49,7 +46,7 @@ test('invalidates Tailwind compiler dependencies through the HMR hook', async ()
     const themeId = path.join(root, 'theme.css')
     const source = ['@import "tailwindcss";', '@import "./theme.css";', '@source inline("bg-brand");'].join('\n')
     await writeFile(themeId, '@theme { --color-brand: #123456; }')
-    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(path.join(root, 'app.ts'), []))
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(path.join(root, 'app.ts'), [], '.wxss'))
     await resolveConfig({ root, configFile: false, plugins: [styles], logLevel: 'silent' }, 'build')
     const transformHook = styles.transform
     const hotUpdateHook = styles.hotUpdate
@@ -110,7 +107,7 @@ test('minifies the complete compiler stylesheet before later WX output hooks', a
         'src/app.ts'
     )
     const { root, entry: applicationEntry, plugin } = project
-    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(applicationEntry, []))
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(applicationEntry, [], '.wxss'))
     const verifyAssetOwnership: Plugin = {
         name: 'test:verify-wx-style-ownership',
         generateBundle: {
@@ -197,8 +194,8 @@ for (const extension of ['wxss', 'acss', 'ttss']) {
                 plugins: [
                     plugin,
                     createMiniStylePlugin(
-                        { styles: { appFileName: `app.${extension}`, globalFileName } },
-                        createMiniStyleEntries(appId, [firstId, secondId])
+                        { styles: { ext: `.${extension}` } },
+                        createMiniStyleEntries(appId, [firstId, secondId], `.${extension}`)
                     )
                 ],
                 build: {
@@ -274,8 +271,8 @@ for (const extension of ['wxss', 'acss']) {
             const nativeStyle = '.native-counter { padding: 1px; }\n'
 
             const styles = createMiniStylePlugin(
-                { styles: { appFileName: `app.${extension}`, globalFileName } },
-                createMiniStyleEntries(appPath, [])
+                { styles: { ext: `.${extension}` } },
+                createMiniStyleEntries(appPath, [], `.${extension}`)
             )
             const result = await build({
                 root,
@@ -352,7 +349,7 @@ test('captures CSS minification and splitting configured by a later ordinary plu
         logLevel: 'silent',
         plugins: [
             plugin,
-            createMiniStylePlugin(contract, createMiniStyleEntries(appPath, [pagePath])),
+            createMiniStylePlugin(contract, createMiniStyleEntries(appPath, [pagePath], '.wxss')),
             {
                 name: 'test:configure-css-output',
                 config() {
@@ -368,7 +365,7 @@ test('captures CSS minification and splitting configured by a later ordinary plu
         }
     })
     assert.ok(!Array.isArray(result) && 'output' in result)
-    const globalStyle = result.output.find((asset) => asset.fileName === contract.styles.globalFileName)
+    const globalStyle = result.output.find((asset) => asset.fileName === 'assets/global.wxss')
     const pageStyle = result.output.find((asset) => asset.fileName === 'pages/page-0/index.wxss')
     assert.equal(globalStyle?.type, 'asset')
     assert.equal(pageStyle?.type, 'asset')
@@ -382,7 +379,7 @@ test('emits the HTML base once even when the application has no styles', async (
     using project = createSourceFixture({ 'app.ts': 'export {}\n' }, 'app.ts')
     const { root, entry: appPath, plugin } = project
 
-    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(appPath, []))
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(appPath, [], '.wxss'))
     const result = await build({
         root,
         configFile: false,

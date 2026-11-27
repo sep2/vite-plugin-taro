@@ -6,10 +6,10 @@ import { createMiniStyleService } from './create-mini-style-service.ts'
 
 for (const cssCodeSplit of [true, false]) {
     test(`style service projects ${cssCodeSplit ? 'split' : 'combined'} output and publishes live graph changes`, async () => {
-        const entries = createMiniStyleEntries('app-entry', ['page-entry'])
+        const entries = createMiniStyleEntries('app-entry', ['page-entry'], '.wxss')
         const originalEntries = structuredClone(entries)
         const service = createMiniStyleService(
-            { styles: { appFileName: 'app.wxss', globalFileName: 'assets/global.wxss' } },
+            { styles: { ext: '.wxss' } },
             { root: '/fixture', cssCodeSplit, cssMinify: false, logger: createLogger('silent') }
         )
         // This test-owned graph models changing import edges independently of the retained successful CSS captures.

@@ -3,6 +3,7 @@ import type { ResolvedPage } from '../../page/resolve-page.ts'
 import type { MiniContract, MiniSubpackage } from '../mini-contract.ts'
 import { createNativeComponentOutput } from '../native/create-native-component-output.ts'
 import type { PackageLocation } from '../placer/placement.ts'
+import { appStyleName, globalStyleName } from '../styles/mini-style-names.ts'
 
 /** Creates every compiler-owned Mini Program file derived from the final Rolldown bundle. */
 export async function createOutputFiles({
@@ -27,8 +28,8 @@ export async function createOutputFiles({
     return [
         {
             type: 'asset',
-            fileName: contract.styles.appFileName,
-            source: `@import "./${contract.styles.globalFileName}";\n`
+            fileName: appStyleName(contract.styles.ext),
+            source: `@import "./${globalStyleName(contract.styles.ext)}";\n`
         },
         ...contract.output.generateProjectSkeleton(
             {

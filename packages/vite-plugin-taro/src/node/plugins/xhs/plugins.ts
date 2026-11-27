@@ -32,10 +32,7 @@ export function createXhsMiniContract(options: Readonly<VptOptions>): MiniContra
             devtoolsHmrRuntime: resolveVptRuntime('xhs/dev/devtools-runtime'),
             interpreterHmrRuntime: resolveVptRuntime('xhs/dev/interpreter-runtime')
         },
-        styles: {
-            appFileName: 'app.css',
-            globalFileName: 'assets/global.css'
-        },
+        styles: { ext: '.css' },
         output: {
             projectConfigFilename,
             projectPrivateConfigFilename,

@@ -40,10 +40,7 @@ export function createAliMiniContract(vptOptions: Readonly<VptOptions>): MiniCon
             devtoolsHmrRuntime: resolveVptRuntime(`${target}/dev/devtools-runtime`),
             interpreterHmrRuntime: resolveVptRuntime(`${target}/dev/interpreter-runtime`)
         },
-        styles: {
-            appFileName: 'app.acss',
-            globalFileName: 'assets/global.acss'
-        },
+        styles: { ext: '.acss' },
         output: {
             projectConfigFilename,
             projectPrivateConfigFilename: '.mini-ide/project-ide.json',

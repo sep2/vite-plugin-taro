@@ -5,9 +5,9 @@ import test from 'node:test'
 import { type Rolldown, resolveConfig } from 'vite'
 import { createMemoryTestProject } from '../../../tests/create-memory-test-project.ts'
 import { pageMetadataKey } from '../../page/page-metadata-key.ts'
-import { resolvePage } from '../../page/resolve-page.ts'
 import type { MiniContract, RuntimeContract } from '../mini-contract.ts'
 import { miniAppCapsuleId, pageComponentId } from '../module/module.ts'
+import { resolveMiniPage } from '../resolve/resolve-mini-page.ts'
 import { createMiniStylePlugin } from '../styles/plugins.ts'
 import { createMiniDevelopmentPlugin, removeDevelopmentAppStyle } from './plugins.ts'
 
@@ -34,10 +34,7 @@ const contract = {
         targetRuntimePath: '/runtime/target.ts'
     },
     runtime: runtimeModules,
-    styles: {
-        appFileName: 'app.native.css',
-        globalFileName: 'assets/global.native.css'
-    },
+    styles: { ext: '.native.css' },
     output: {
         projectConfigFilename: 'project.fixture.json',
         projectPrivateConfigFilename: 'project.private.fixture.json',
@@ -131,9 +128,9 @@ test('cleans the first written output using resolved App metadata and preserves 
         'emitted.txt',
         contract.output.projectConfigFilename,
         contract.output.projectPrivateConfigFilename,
-        contract.styles.appFileName,
-        contract.styles.globalFileName,
-        'pages/resolved/index.css',
+        'app.native.css',
+        'assets/global.native.css',
+        'pages/resolved/index.native.css',
         'hmr/info.js',
         'hmr/patches.js'
     ]
@@ -156,7 +153,7 @@ test('cleans the first written output using resolved App metadata and preserves 
     const plugin = config.plugins.find((candidate) => candidate.name === 'vpt:mini-dev')
     const writeBundle = plugin?.writeBundle
     assert.ok(writeBundle && typeof writeBundle === 'object')
-    const pages = Object.freeze([resolvePage({ path: 'index', subpackage: 'pages/resolved' })])
+    const pages = Object.freeze([resolveMiniPage({ path: 'index', subpackage: 'pages/resolved' }, contract.styles.ext)])
     const appId = path.join(root, 'compiler', 'app.ts')
     // The test controls asynchronous resolution so cleanup must wait for the exact compiler graph identity.
     const ready = Promise.withResolvers<void>()
@@ -210,7 +207,7 @@ test('transfers the App style entry from complete output to the development host
         'assets/global.native.css': globalStyle
     }
 
-    removeDevelopmentAppStyle(bundle, contract.styles.appFileName)
+    removeDevelopmentAppStyle(bundle, 'app.native.css')
 
     assert.deepEqual(bundle, { 'assets/global.native.css': globalStyle })
 })

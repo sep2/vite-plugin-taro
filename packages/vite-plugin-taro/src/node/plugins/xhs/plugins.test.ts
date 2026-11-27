@@ -26,7 +26,7 @@ test('binds XHS native APIs, template rendering, CSS, and both HMR transports', 
     assert.match(contract.taro.targetRuntimePath, /xhs[/\\]taro-runtime\.(?:ts|js)$/)
     assert.match(contract.runtime.devtoolsHmrRuntime, /xhs[/\\]dev[/\\]devtools-runtime\.(?:ts|js)$/)
     assert.match(contract.runtime.interpreterHmrRuntime, /xhs[/\\]dev[/\\]interpreter-runtime\.(?:ts|js)$/)
-    assert.deepEqual(contract.styles, { appFileName: 'app.css', globalFileName: 'assets/global.css' })
+    assert.deepEqual(contract.styles, { ext: '.css' })
     assert.deepEqual(contract.define, {})
     assert.equal(contract.output.projectConfigFilename, 'project.config.json')
     assert.equal(contract.output.projectPrivateConfigFilename, 'project.private.config.json')

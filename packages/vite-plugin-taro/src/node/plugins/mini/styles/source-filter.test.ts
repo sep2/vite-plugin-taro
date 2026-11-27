@@ -7,7 +7,7 @@ import { createMiniStyleEntries } from '../../../tests/create-mini-style-entries
 import { wrapPluginTransform } from '../../../utils/vite.ts'
 import { createMiniStyleFixturePlugin as createMiniStylePlugin } from './test/create-mini-style-fixture-plugin.ts'
 
-const contract = { styles: { appFileName: 'app.wxss', globalFileName: 'assets/global.wxss' } }
+const contract = { styles: { ext: '.wxss' } }
 
 test('native stylesheet dispatch matches Vite for extensions, virtual styles, and query modes', async () => {
     const extensions = ['css', 'less', 'sass', 'scss', 'styl', 'stylus', 'pcss', 'postcss', 'sss']
@@ -37,7 +37,7 @@ test('native stylesheet dispatch matches Vite for extensions, virtual styles, an
         '/fixture/app.css#fragment'
     ]
     const sourceIds = new Set(ids)
-    const styles = createMiniStylePlugin(contract, createMiniStyleEntries('/fixture/app.js', []))
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries('/fixture/app.js', [], '.wxss'))
     await resolveConfig({ configFile: false, plugins: [styles], logLevel: 'silent' }, 'build')
     assert.ok(styles.transform && typeof styles.transform === 'object')
     assert.equal(styles.transform.order, 'pre')
@@ -79,7 +79,7 @@ test('ordinary CSS clears retained Tailwind candidates while raw requests leave 
     const root = normalizePath(fileURLToPath(new URL('.', import.meta.url)))
     const entryId = `${root}source-filter-entry.js`
     const styleId = `${root}source-filter-fixture.css`
-    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(entryId, []))
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(entryId, [], '.wxss'))
     // Model Vite's successful post-CSS boundary without materializing source files or browser output.
     const cssPost: Plugin = { name: 'vite:css-post', transform: (code) => ({ code, map: null }) }
     const config = styles.config
@@ -115,7 +115,7 @@ test('ordinary CSS clears retained Tailwind candidates while raw requests leave 
     // Publication is captured in memory; no stylesheet writer or watcher is started by this test.
     const published: string[] = []
     const publish = async (fileName: string, css: string) => {
-        assert.equal(fileName, contract.styles.globalFileName)
+        assert.equal(fileName, 'assets/global.wxss')
         published.push(css)
     }
     const initial = await styles.finalizeUpdate([artifact], publish)

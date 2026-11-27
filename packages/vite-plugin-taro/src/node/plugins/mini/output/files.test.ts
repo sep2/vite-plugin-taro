@@ -24,11 +24,11 @@ test('creates the stable app stylesheet wrapper', async () => {
     })
 
     assert.deepEqual(
-        outputFiles.find((file) => file.type === 'asset' && file.fileName === contract.styles.appFileName),
+        outputFiles.find((file) => file.type === 'asset' && file.fileName === 'app.wxss'),
         {
             type: 'asset',
-            fileName: contract.styles.appFileName,
-            source: `@import "./${contract.styles.globalFileName}";\n`
+            fileName: 'app.wxss',
+            source: '@import "./assets/global.wxss";\n'
         }
     )
 })

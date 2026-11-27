@@ -47,7 +47,7 @@ for (const target of ['zfb', 'tb'] as const) {
             devtoolsHmrRuntime: resolveVptRuntime(`${target}/dev/devtools-runtime`),
             interpreterHmrRuntime: resolveVptRuntime(`${target}/dev/interpreter-runtime`)
         })
-        assert.deepEqual(contract.styles, { appFileName: 'app.acss', globalFileName: 'assets/global.acss' })
+        assert.deepEqual(contract.styles, { ext: '.acss' })
         assert.equal(contract.output.projectConfigFilename, 'mini.project.json')
         assert.equal(contract.output.projectPrivateConfigFilename, '.mini-ide/project-ide.json')
         assert.equal(contract.output.generateProjectSkeleton, createAliSkeleton)

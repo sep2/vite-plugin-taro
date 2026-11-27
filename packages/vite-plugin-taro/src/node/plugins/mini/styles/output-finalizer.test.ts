@@ -8,7 +8,7 @@ import type { createMiniTransformer } from './create-mini-transformer.ts'
 import { miniHtmlBase } from './mini-html-base.ts'
 import type { projectMiniStyles } from './project-mini-styles.ts'
 
-const contract = { styles: { appFileName: 'app.wxss', globalFileName: 'assets/global.wxss' } }
+const contract = { styles: { ext: '.wxss' } }
 const root = normalizePath(fileURLToPath(new URL('.', import.meta.url)))
 const { createMiniStylePlugin, transformers, projections } = await importObservedPlugin()
 
@@ -150,7 +150,7 @@ function tailwind(candidates: readonly string[]): string {
 }
 
 test('empties imported CSS helper payloads while preserving factories and patch identities', async (context) => {
-    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', []))
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', [], '.wxss'))
     const css = '.page::after { content: "line\\\\quote"; }\n.page { padding: 1px; }'
     const declarations = [
         ['const', '__vite__css', '__vite__id'],
@@ -179,7 +179,7 @@ test('empties imported CSS helper payloads while preserving factories and patch 
 })
 
 test('resolves App/Page capsules in cascade order without mutating their entry metadata', async (context) => {
-    const entries = createMiniStyleEntries('/app.js', ['/z-page.js', '/a-page.js'])
+    const entries = createMiniStyleEntries('/app.js', ['/z-page.js', '/a-page.js'], '.wxss')
     const originalEntries = structuredClone(entries)
     const fixture = await createStyleFixture(context, false, entries)
     const resolve = context.mock.method(fixture.context, 'resolve', async (id: string) => ({ id: `resolved:${id}` }))
@@ -229,7 +229,7 @@ test('resolves App/Page capsules in cascade order without mutating their entry m
 })
 
 test('keeps the previous resolved ownership snapshot when a Page resolution fails', async (context) => {
-    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js'], '.wxss'))
     fixture.graph.set('/page.js', { importedIds: ['/app.css'], dynamicallyImportedIds: [] })
     await fixture.capture('/app.css', '.app { color: red; }')
     await fixture.update('export {}')
@@ -250,7 +250,7 @@ test('keeps the previous resolved ownership snapshot when a Page resolution fail
 })
 
 test('moves styles from App to Page during HMR without changing JavaScript candidate identities', async (context) => {
-    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js'], '.wxss'))
     fixture.graph.set('/page.js', { importedIds: ['/app.css'], dynamicallyImportedIds: [] })
     await fixture.transform('/app.css', tailwind(['py-5.5']))
     const code = "const name = 'py-5.5'"
@@ -281,7 +281,7 @@ test('moves styles from App to Page during HMR without changing JavaScript candi
 })
 
 test('emits HTML display defaults only in App CSS and leaves empty Page styles empty', async (context) => {
-    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js'], '.wxss'))
     await fixture.update('export {}')
     assert.deepEqual(fixture.published, [
         { fileName: 'assets/global.wxss', source: `${miniHtmlBase}\n` },
@@ -304,7 +304,7 @@ test('caches each Page independently, rewrites the shared candidate union, and c
     const fixture = await createStyleFixture(
         context,
         true,
-        createMiniStyleEntries('/app.js', ['/first.js', '/second.js'])
+        createMiniStyleEntries('/app.js', ['/first.js', '/second.js'], '.wxss')
     )
     fixture.graph.set('/first.js', { importedIds: ['/first.css'], dynamicallyImportedIds: [] })
     fixture.graph.set('/second.js', { importedIds: ['/second.css'], dynamicallyImportedIds: [] })
@@ -337,7 +337,7 @@ test('caches each Page independently, rewrites the shared candidate union, and c
 })
 
 test('cssCodeSplit:false publishes Page Tailwind updates globally and prunes removed imports without rewriting Page companions', async (context) => {
-    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']), {
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js'], '.wxss'), {
         cssCodeSplit: false
     })
     fixture.graph.set('/page.js', { importedIds: ['/page.css'], dynamicallyImportedIds: [] })
@@ -371,9 +371,14 @@ test('cssCodeSplit:false publishes Page Tailwind updates globally and prunes rem
 
 for (const cssCodeSplit of [undefined, true, false]) {
     test(`defaults to split native styles and respects cssCodeSplit=${cssCodeSplit ?? 'default'}`, async (context) => {
-        const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']), {
-            cssCodeSplit
-        })
+        const fixture = await createStyleFixture(
+            context,
+            false,
+            createMiniStyleEntries('/app.js', ['/page.js'], '.wxss'),
+            {
+                cssCodeSplit
+            }
+        )
         fixture.graph.set('/page.js', { importedIds: ['/page.css'], dynamicallyImportedIds: [] })
         fixture.graph.set('/page.css', { importedIds: [], dynamicallyImportedIds: [] })
         await fixture.capture('/page.css', '.page { color: red; }')
@@ -384,7 +389,7 @@ for (const cssCodeSplit of [undefined, true, false]) {
 }
 
 test('retries a failed Page write without rewriting durable App CSS or delivering partial JavaScript', async (context) => {
-    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js'], '.wxss'))
     fixture.graph.set('/page.js', { importedIds: ['/page.css'], dynamicallyImportedIds: [] })
     fixture.graph.set('/page.css', { importedIds: [], dynamicallyImportedIds: [] })
     await fixture.capture('/app.css', '.app { color: red; }')
@@ -411,7 +416,7 @@ test('retries a failed Page write without rewriting durable App CSS or deliverin
 })
 
 test('a Page conversion failure keeps its last valid CSS while publishing healthy App CSS and JavaScript', async (context) => {
-    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js'], '.wxss'))
     fixture.graph.set('/page.js', { importedIds: ['/page.css'], dynamicallyImportedIds: [] })
     fixture.graph.set('/page.css', { importedIds: [], dynamicallyImportedIds: [] })
     await fixture.capture('/app.css', '.app { color: red; }')
@@ -435,7 +440,7 @@ test('a Page conversion failure keeps its last valid CSS while publishing health
 })
 
 test('reuses unchanged CSS and candidate tables while rewriting each current patch', async (context) => {
-    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', []))
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', [], '.wxss'))
     await fixture.transform('/app.css', tailwind(['py-5.5']))
     const first = await fixture.update("const first = 'py-5.5'")
     const unchanged = await fixture.update("const next = 'py-5.5'")
@@ -478,7 +483,7 @@ test('reuses unchanged CSS and candidate tables while rewriting each current pat
 })
 
 test('retains only the latest conversion and keeps each plugin minification policy independent', async (context) => {
-    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', []))
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', [], '.wxss'))
     const firstCss = '.first { padding: 1px; }'
     const secondCss = '.second { padding: 2px; }'
     for (const source of [firstCss, firstCss, secondCss, firstCss]) {
@@ -491,7 +496,7 @@ test('retains only the latest conversion and keeps each plugin minification poli
     )
     assert.match(fixture.published.at(-1)!.source, /\.first \{ padding: 1rpx; \}/)
 
-    const minified = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', []))
+    const minified = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', [], '.wxss'))
     await minified.capture('/app.css', firstCss)
     await minified.update('export {}')
     await minified.update('export {}')
@@ -504,7 +509,7 @@ test('reprojects cyclic multi-entry graphs, deduplicates styles, and prunes remo
     const fixture = await createStyleFixture(
         context,
         false,
-        createMiniStyleEntries('/app.js', ['/page.js', '/missing.js'])
+        createMiniStyleEntries('/app.js', ['/page.js', '/missing.js'], '.wxss')
     )
     fixture.graph.clear()
     fixture.graph.set('/app.js', { importedIds: ['/a.css?one'], dynamicallyImportedIds: ['/lazy.js'] })
@@ -558,7 +563,7 @@ test('reprojects cyclic multi-entry graphs, deduplicates styles, and prunes remo
 
 for (const failureStage of ['conversion', 'minification'] as const) {
     test(`HMR logs CSS ${failureStage} failure and retains valid styles without rejecting JavaScript`, async (context) => {
-        const fixture = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', []))
+        const fixture = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', [], '.wxss'))
         const code = "const classes = 'py-5.5 mr-4.5'"
         await fixture.transform('/app.css', tailwind(['py-5.5']))
         await fixture.update(code)
@@ -597,7 +602,7 @@ for (const failureStage of ['conversion', 'minification'] as const) {
 }
 
 test('HMR retains the last valid stylesheet when Lightning CSS rejects a native media query', async (context) => {
-    const fixture = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', []))
+    const fixture = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', [], '.wxss'))
     await fixture.capture('/app.css', '.units { padding: 4px; }')
     await fixture.update('export {}')
     await fixture.capture('/app.css', '@media (min-width: 375rpx) { .units { padding: 16px; } }')
@@ -610,7 +615,7 @@ test('HMR retains the last valid stylesheet when Lightning CSS rejects a native 
 })
 
 test('HMR skips an invalid stylesheet without a previous conversion and recovers after import removal', async (context) => {
-    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js']))
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', ['/page.js'], '.wxss'))
     fixture.graph.set('/page.js', { importedIds: ['/page.css'], dynamicallyImportedIds: [] })
     fixture.graph.set('/page.css', { importedIds: [], dynamicallyImportedIds: [] })
     await fixture.capture('/page.css', '.broken {')
@@ -626,7 +631,7 @@ test('HMR skips an invalid stylesheet without a previous conversion and recovers
 })
 
 test('reverting failed CSS to the previous source reuses the last valid conversion without rewriting it', async (context) => {
-    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', []))
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', [], '.wxss'))
     const previousCss = '.app { padding: 4px; }'
     await fixture.capture('/app.css', previousCss)
     await fixture.update('export {}')
@@ -641,7 +646,7 @@ test('reverting failed CSS to the previous source reuses the last valid conversi
 })
 
 test('a complete build rejects invalid CSS that HMR logged and kept out of publication', async (context) => {
-    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', []))
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', [], '.wxss'))
     await fixture.capture('/app.css', '.app { padding: 4px; }')
     await fixture.update('export {}')
     await fixture.capture('/app.css', '.app {')
@@ -659,7 +664,7 @@ test('a complete build rejects invalid CSS that HMR logged and kept out of publi
 
 for (const failureStage of ['conversion', 'minification', 'JavaScript'] as const) {
     test(`failed ${failureStage === 'JavaScript' ? 'HMR JavaScript' : `build CSS ${failureStage}`} stays strict and retryable`, async (context) => {
-        const fixture = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', []))
+        const fixture = await createStyleFixture(context, true, createMiniStyleEntries('/app.js', [], '.wxss'))
         const previousCss = '.previous { color: red; }'
         const nextCss = '.next { color: blue; }'
         const code = "const classes = 'py-5.5 mr-4.5'"
@@ -717,7 +722,7 @@ for (const failureStage of ['conversion', 'minification', 'JavaScript'] as const
 }
 
 test('retries a failed stylesheet publication without repeating successful conversion', async (context) => {
-    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', []))
+    const fixture = await createStyleFixture(context, false, createMiniStyleEntries('/app.js', [], '.wxss'))
     await fixture.transform('/app.css', tailwind(['py-5.5']))
     const artifact = { code: "const name = 'py-5.5'", filename: 'app.js', seq: 1 }
     await assert.rejects(

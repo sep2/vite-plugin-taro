@@ -14,12 +14,9 @@ import type { MiniContract } from '../mini-contract.ts'
 import { createMiniStyleFixturePlugin as createMiniStylePlugin } from './test/create-mini-style-fixture-plugin.ts'
 
 const contract = {
-    styles: {
-        appFileName: 'app.wxss',
-        globalFileName: 'assets/global.wxss'
-    }
+    styles: { ext: '.wxss' }
 } satisfies Pick<MiniContract, 'styles'>
-const globalWxssFileName = contract.styles.globalFileName
+const globalWxssFileName = 'assets/global.wxss'
 
 function assertGlobalStylesheet(css: string, applicationCss: string): void {
     assert.equal((css.match(/\.h5-span/g) ?? []).length, 1)
@@ -53,7 +50,7 @@ test('minifies App/Page CSS, clears removed Page styles, and suppresses identica
     let publicationWork = Promise.resolve()
     // DevEngine callbacks run only after assignment and advance the same published frontier as the production host.
     let engine: DevEngine
-    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(appId, [pageId]))
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(appId, [pageId], '.wxss'))
     // This one-shot mutable fault proves a failed atomic writer does not advance the plugin's published stylesheet frontier.
     let writeFailure: Error | undefined
     const writeStyle = async (fileName: string, wxss: string): Promise<void> => {
@@ -290,7 +287,7 @@ test('respects cssMinify:false while rendering Tailwind CSS and matching patch f
     let hmrWork = Promise.resolve()
     // DevEngine callbacks run only after assignment and commit every finalized payload before the next source edit.
     let engine: DevEngine
-    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(appId, []))
+    const styles = createMiniStylePlugin(contract, createMiniStyleEntries(appId, [], '.wxss'))
     const writeStyle = async (fileName: string, wxss: string): Promise<void> => {
         await writeDevelopmentFile(outDir, fileName, wxss)
         publishedStyles.push(wxss)

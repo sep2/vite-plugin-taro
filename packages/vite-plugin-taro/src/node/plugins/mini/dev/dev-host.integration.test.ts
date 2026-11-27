@@ -449,10 +449,7 @@ function waitForInterpreterMessage(socket: WebSocket): Promise<InterpreterServer
 test('rejects a server without Vite bundled development ownership', async (context) => {
     const contract = {
         options: createOptions(),
-        styles: {
-            appFileName: 'app.wxss',
-            globalFileName: 'assets/global.wxss'
-        }
+        styles: { ext: '.wxss' }
     } satisfies Pick<MiniContract, 'options' | 'styles'>
     const server = await createServer({
         configFile: false,

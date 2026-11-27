@@ -7,6 +7,7 @@ import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { miniHtmlBase } from './mini-html-base.ts'
+import { globalStyleName } from './mini-style-names.ts'
 import { minifyMiniStylesheet } from './minify-mini-stylesheet.ts'
 import { pageStyleBytesKey } from './page-style-bytes.ts'
 import { projectMiniStyles } from './project-mini-styles.ts'
@@ -245,7 +246,7 @@ export function createMiniStyleService(contract: Pick<MiniContract, 'styles'>, p
                     const shell = (await context.resolve(page.shellId))!
                     // Refresh even cached shells: a CSS-only edit can change the emitted companion without touching JS.
                     context.getModuleInfo(shell.id)!.meta[pageStyleBytesKey] = budgetedStyles.getPageStyleBytes(
-                        page.shellName
+                        page.styleName
                     )
                 }
             }
@@ -345,8 +346,6 @@ export function createMiniStyleService(contract: Pick<MiniContract, 'styles'>, p
 /** Caches one successful conversion per native output file and one shared JavaScript candidate identity. */
 function createFinalizeOutput(styles: MiniContract['styles'], minify: BuildOptions['cssMinify'], logger: Logger) {
     const miniTransformer = createMiniTransformer()
-    const extension = path.posix.extname(styles.appFileName)
-    const pageStyleName = (shellName: string) => shellName.replace(/\.js$/, extension)
     // Commit after JS conversion succeeds; tolerated HMR CSS failures retain the affected file's last valid conversion.
     let previousOutput:
         | Readonly<{
@@ -386,9 +385,9 @@ function createFinalizeOutput(styles: MiniContract['styles'], minify: BuildOptio
                     ? previousOutput.classSet
                     : projection.classSet
             const inputs = [
-                { fileName: styles.globalFileName, css: projection.appEntry.css, app: true },
+                { fileName: globalStyleName(styles.ext), css: projection.appEntry.css, app: true },
                 ...projection.pageEntries.map((entry) => ({
-                    fileName: pageStyleName(entry.shellName),
+                    fileName: entry.styleName,
                     css: entry.css,
                     app: false
                 }))
@@ -406,8 +405,8 @@ function createFinalizeOutput(styles: MiniContract['styles'], minify: BuildOptio
             }
 
             return {
-                getPageStyleBytes(shellName: string): number {
-                    return Buffer.byteLength(nextStylesheets.get(pageStyleName(shellName))!.source)
+                getPageStyleBytes(styleName: string): number {
+                    return Buffer.byteLength(nextStylesheets.get(styleName)!.source)
                 },
                 finish(artifacts: readonly JavaScriptArtifact[]) {
                     const javaScript = artifacts.map((artifact) =>

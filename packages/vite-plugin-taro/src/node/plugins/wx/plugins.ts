@@ -33,10 +33,7 @@ export function createWxMiniContract(options: Readonly<VptOptions>): MiniContrac
             devtoolsHmrRuntime: resolveVptRuntime('wx/dev/devtools-runtime'),
             interpreterHmrRuntime: resolveVptRuntime('wx/dev/interpreter-runtime')
         },
-        styles: {
-            appFileName: 'app.wxss',
-            globalFileName: 'assets/global.wxss'
-        },
+        styles: { ext: '.wxss' },
         output: {
             projectConfigFilename,
             projectPrivateConfigFilename,

@@ -27,7 +27,7 @@ test('binds TT runtime and style paths without translating native configuration'
     assert.deepEqual(Object.keys(contract.runtime).sort(), ['devtoolsHmrRuntime', 'interpreterHmrRuntime'])
     assert.match(contract.runtime.devtoolsHmrRuntime, /tt[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
     assert.match(contract.runtime.interpreterHmrRuntime, /tt[/\\]dev[/\\]interpreter-runtime\.(?:js|ts)$/)
-    assert.deepEqual(contract.styles, { appFileName: 'app.ttss', globalFileName: 'assets/global.ttss' })
+    assert.deepEqual(contract.styles, { ext: '.ttss' })
     assert.equal(contract.output.projectConfigFilename, 'project.config.json')
     assert.equal(contract.output.projectPrivateConfigFilename, 'project.private.config.json')
     assert.equal(contract.output.generateProjectSkeleton, createTtSkeleton)

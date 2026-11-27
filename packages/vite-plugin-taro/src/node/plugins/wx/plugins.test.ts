@@ -27,10 +27,7 @@ test('creates the WX Mini Program contract without translating public options', 
     assert.deepEqual(Object.keys(contract.runtime).sort(), ['devtoolsHmrRuntime', 'interpreterHmrRuntime'])
     assert.match(contract.runtime.devtoolsHmrRuntime, /runtime[/\\]wx[/\\]dev[/\\]devtools-runtime\.(?:js|ts)$/)
     assert.match(contract.runtime.interpreterHmrRuntime, /runtime[/\\]wx[/\\]dev[/\\]interpreter-runtime\.(?:js|ts)$/)
-    assert.deepEqual(contract.styles, {
-        appFileName: 'app.wxss',
-        globalFileName: 'assets/global.wxss'
-    })
+    assert.deepEqual(contract.styles, { ext: '.wxss' })
     assert.equal(contract.output.projectConfigFilename, 'project.config.json')
     assert.equal(contract.output.projectPrivateConfigFilename, 'project.private.config.json')
     assert.equal(contract.output.generateProjectSkeleton, createWxSkeleton)
