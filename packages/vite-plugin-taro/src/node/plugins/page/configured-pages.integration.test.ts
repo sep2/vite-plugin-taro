@@ -1,16 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { build, resolveConfig } from 'vite'
+import { build } from 'vite'
 import type { VptOptions, VptPageOption } from '../../../options.ts'
 import { createMemoryBuildProject } from '../../tests/create-memory-build-project.ts'
 import vpt from '../../vpt.ts'
 
 for (const target of ['wx', 'h5'] as const) {
-    test(`${target}: rejects configuration without pages`, async () => {
-        // @ts-expect-error Verify the runtime diagnostic for untyped Vite configs.
-        const plugins = vpt({ target, app: 'src/app.tsx', appJson: {}, projectConfigJson: {} })
-        await assert.rejects(
-            resolveConfig({ configFile: false, plugins }, 'build'),
+    test(`${target}: rejects configuration without pages`, () => {
+        assert.throws(
+            // @ts-expect-error Verify the runtime diagnostic for untyped Vite configs.
+            () => vpt({ target, app: 'src/app.tsx', appJson: {}, projectConfigJson: {} }),
             /VPT pages option must be an array/
         )
     })

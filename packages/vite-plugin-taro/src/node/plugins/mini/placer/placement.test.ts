@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
+import { resolvePage } from '../../page/resolve-page.ts'
+import { createMiniPageEntry } from '../resolve/create-mini-page-entry.ts'
 import { createPlacement, type PackageLocation, type Placement } from './placement.ts'
 
 const packageBudgetBytes = 1_900_000
@@ -18,9 +20,13 @@ type TestPlacement = {
     placement: Placement
 }
 
+function pageEntry(subpackage: string, path: string) {
+    return createMiniPageEntry(resolvePage({ subpackage, path }))
+}
+
 function createTestPlacement(
     chunks: Readonly<Record<string, TestChunk>>,
-    options?: Pick<Parameters<typeof createPlacement>[0], 'namedSubpackages' | 'automaticSubpackages'>
+    options?: Pick<Parameters<typeof createPlacement>[0], 'pageEntries' | 'automaticSubpackages'>
 ): TestPlacement {
     const renderedChunks = Object.fromEntries(
         Object.entries(chunks).map(([chunkId, chunk]) => [chunkId, renderedChunk(chunkId, chunk)])
@@ -32,7 +38,7 @@ function createTestPlacement(
         chunks: renderedChunks,
         placement: createPlacement({
             automaticSubpackages: options?.automaticSubpackages ?? true,
-            namedSubpackages: options?.namedSubpackages ?? [],
+            pageEntries: options?.pageEntries ?? [],
             chunks: renderedChunks,
             planningBudgetBytes: packageBudgetBytes,
             getAdditionalModuleBytes: (moduleId) => bytesByModuleId.get(moduleId) ?? 0
@@ -111,7 +117,7 @@ test('keeps nested lazy chunks and shared dependencies in main when automatic su
     }
     const placement = createPlacement({
         automaticSubpackages: false,
-        namedSubpackages: [],
+        pageEntries: [],
         chunks,
         planningBudgetBytes: packageBudgetBytes,
         getAdditionalModuleBytes: () => assert.fail('Main-package chunks do not need package-size estimates')
@@ -143,9 +149,9 @@ for (const automaticSubpackages of [false, true]) {
         const output = createTestPlacement(
             {
                 'home.js': { isEntry: true, imports: ['shared.js'] },
-                'detail.js': { isEntry: true, imports: ['popup.js', 'shared.js', 'format.js'] },
-                'list.js': { isEntry: true, imports: ['popup.js'] },
-                'profile.js': { isEntry: true, imports: ['format.js'], bytes: 500_000 },
+                'orders/detail.js': { isEntry: true, imports: ['popup.js', 'shared.js', 'format.js'] },
+                'orders/list.js': { isEntry: true, imports: ['popup.js'] },
+                'account/profile.js': { isEntry: true, imports: ['format.js'], bytes: 500_000 },
                 'popup.js': { dynamicImports: ['invoice.js'] },
                 'format.js': { imports: ['locale.js'] },
                 'locale.js': { imports: ['format.js'] },
@@ -154,21 +160,22 @@ for (const automaticSubpackages of [false, true]) {
             },
             {
                 automaticSubpackages,
-                namedSubpackages: [
-                    { root: 'orders', entries: ['detail.js', 'list.js'] },
-                    { root: 'account', entries: ['profile.js'] }
+                pageEntries: [
+                    pageEntry('orders', 'detail'),
+                    pageEntry('orders', 'list'),
+                    pageEntry('account', 'profile')
                 ]
             }
         )
 
-        for (const id of ['detail.js', 'list.js', 'popup.js']) {
+        for (const id of ['orders/detail.js', 'orders/list.js', 'popup.js']) {
             assert.deepEqual(getLocation(output, id), { kind: 'subpackage', root: 'orders' })
         }
-        assert.deepEqual(getLocation(output, 'profile.js'), { kind: 'subpackage', root: 'account' })
+        assert.deepEqual(getLocation(output, 'account/profile.js'), { kind: 'subpackage', root: 'account' })
         for (const id of ['home.js', 'shared.js', 'format.js', 'locale.js']) {
             assert.deepEqual(getLocation(output, id), { kind: 'main' })
         }
-        assert.equal(output.placement.getPhysicalChunkId(output.chunks['detail.js']!), 'orders/detail.js')
+        assert.equal(output.placement.getPhysicalChunkId(output.chunks['orders/detail.js']!), 'orders/detail.js')
         const invoice = getLocation(output, 'invoice.js')
         assert.deepEqual(invoice, automaticSubpackages ? { kind: 'subpackage', root: 'orders' } : { kind: 'main' })
     })
@@ -176,11 +183,14 @@ for (const automaticSubpackages of [false, true]) {
 
 test('charges both the named entry and its eager dependencies before packing lazy chunks', () => {
     const chunks = {
-        'detail.js': { isEntry: true, imports: ['popup.js'], bytes: 600_000 },
+        'orders/detail.js': { isEntry: true, imports: ['popup.js'], bytes: 600_000 },
         'popup.js': { dynamicImports: ['invoice.js'], bytes: 700_000 },
         'invoice.js': { bytes: 500_000 }
     }
-    const options = { automaticSubpackages: true, namedSubpackages: [{ root: 'orders', entries: ['detail.js'] }] }
+    const options = {
+        automaticSubpackages: true,
+        pageEntries: [pageEntry('orders', 'detail')]
+    }
     const fits = createTestPlacement(chunks, options)
     assert.deepEqual(getLocation(fits, 'invoice.js'), { kind: 'subpackage', root: 'orders' })
 
@@ -191,10 +201,10 @@ test('charges both the named entry and its eager dependencies before packing laz
     assert.deepEqual(getLocation(spill, 'popup.js'), { kind: 'subpackage', root: 'orders' })
 
     const fallback = createTestPlacement(
-        { ...full, 'profile.js': { isEntry: true } },
+        { ...full, 'account/profile.js': { isEntry: true } },
         {
             automaticSubpackages: true,
-            namedSubpackages: [...options.namedSubpackages, { root: 'account', entries: ['profile.js'] }]
+            pageEntries: [...options.pageEntries, pageEntry('account', 'profile')]
         }
     )
     assert.deepEqual(getLocation(fallback, 'invoice.js'), { kind: 'subpackage', root: 'account' })

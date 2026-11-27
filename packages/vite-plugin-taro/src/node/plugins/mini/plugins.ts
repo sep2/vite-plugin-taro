@@ -3,7 +3,6 @@ import { esTarget } from '../../utils/constant.ts'
 import { createExactModuleIdFilter } from '../../utils/modules.ts'
 import { packageRequire, resolveTaroRuntime } from '../../utils/packages.ts'
 import type { AstTransformResult } from '../../utils/transform.ts'
-import { orderPages } from '../page/order-pages.ts'
 import { createMiniDevelopmentPlugin } from './dev/plugins.ts'
 import { createMiniGlobalPlugin } from './global/create-mini-global-plugin.ts'
 import type { MiniContract } from './mini-contract.ts'
@@ -36,17 +35,17 @@ import { createMiniWatchPlugin } from './watch/create-mini-watch-plugin.ts'
 
 /** Creates the complete Mini Program plugin set. */
 export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] {
-    const placement = createMiniPlacementPlugin(contract.automaticSubpackages)
-
+    const resolver = createMiniResolver(contract)
+    const placer = createMiniPlacementPlugin(contract.automaticSubpackages, resolver.pageEntries)
     const styles = createMiniStylePlugin(contract)
 
     return [
-        placement,
+        placer,
         styles,
-        createMiniPlugin(contract, placement, styles),
+        createMiniPlugin(contract, placer, styles, resolver),
         createMiniNativeComponentPlugin(),
         createMiniPolyfillPlugin(contract),
-        createMiniGlobalPlugin(placement),
+        createMiniGlobalPlugin(placer),
         createMiniDevelopmentPlugin(contract, styles),
         createMiniWatchPlugin(contract),
         createMiniOverridePlugin(contract)
@@ -56,16 +55,12 @@ export function createMiniTargetPlugins(contract: MiniContract): PluginOption[] 
 /** Configures the complete Mini Program target build pipeline. */
 function createMiniPlugin(
     contract: MiniContract,
-    placement: MiniPlacementPlugin,
-    styles: Pick<MiniStylePlugin, 'bindEntries'>
+    placer: MiniPlacementPlugin,
+    styles: Pick<MiniStylePlugin, 'bindEntries'>,
+    resolver: ReturnType<typeof createMiniResolver>
 ): Plugin {
-    const resolver = createMiniResolver(contract)
-
     return {
         name: 'vpt:mini',
-        configResolved() {
-            resolver.setPages(orderPages(contract.options.pages))
-        },
 
         config() {
             return {
@@ -119,7 +114,7 @@ function createMiniPlugin(
 
         /** Binds stylesheet roots to the current graph before each complete output, including cached App loads. */
         renderStart() {
-            return styles.bindEntries(this, { appEntry: resolver.appEntry, pageEntries: resolver.pageEntries() })
+            return styles.bindEntries(this, { appEntry: resolver.appEntry, pageEntries: resolver.pageEntries })
         },
 
         /** The App shell owns all other entries, including replay from the bundler's module cache. */
@@ -137,7 +132,7 @@ function createMiniPlugin(
                 this.emitFile({ type: 'chunk', id: miniComponentCapsuleId, fileName: componentCapsuleFileName })
                 this.emitFile({ type: 'chunk', id: miniCustomWrapperShellId, fileName: customWrapperShellFileName })
 
-                for (const entry of resolver.pageEntries()) {
+                for (const entry of resolver.pageEntries) {
                     this.emitFile({ type: 'chunk', id: entry.shellId, fileName: entry.shellName })
                     this.emitFile({ type: 'chunk', id: entry.capsuleId, fileName: `${entry.capsuleName}.js` })
                 }
@@ -178,7 +173,7 @@ function createMiniPlugin(
                             code,
                             chunk,
                             chunks: meta.chunks,
-                            getPhysicalChunkId: placement.getPhysicalChunkId,
+                            getPhysicalChunkId: placer.getPhysicalChunkId,
                             sourcemap
                         })
                     }
@@ -197,19 +192,19 @@ function createMiniPlugin(
                 // createOutputFiles then observes those paths to relocate native component folders, emit placeholders, and
                 // declare only surviving package roots in app.json. The standalone global provider is emitted separately
                 // after this hook; it has no graph edges, native components, or subpackage ownership to plan.
-                const subpackages = placement.getSubpackages()
+                const subpackages = placer.getSubpackages()
 
                 // Emit after minification so native loaders always receive quoted literal paths, without a repair pass.
-                this.emitFile(createTransportOutput({ bundle, getPackageLocation: placement.getPackageLocation }))
+                this.emitFile(createTransportOutput({ bundle, getPackageLocation: placer.getPackageLocation }))
 
                 const outputFiles = await createOutputFiles({
                     bundle,
                     contract,
-                    pages: resolver.pageEntries().map((entry) => entry.page),
+                    pages: resolver.pageEntries.map((entry) => entry.page),
                     subpackages,
                     isProduction: this.environment.config.isProduction,
                     getModuleInfo: (moduleId) => this.getModuleInfo(moduleId),
-                    getPackageLocation: placement.getPackageLocation
+                    getPackageLocation: placer.getPackageLocation
                 })
 
                 outputFiles.forEach((file) => {

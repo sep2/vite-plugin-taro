@@ -91,38 +91,20 @@ test('configures H5 runtime resolution and optimization', async () => {
 })
 
 test('shares configured page metadata between client and SSR', async () => {
-    // These fixture-owned values distinguish input readiness from the captured application snapshot.
+    // Count reads and replace the input to verify both environments use the captured pages.
     let pageReads = 0
-    let pagesReady = false
     const pages = [{ path: 'pages/about' }, { path: 'pages/home', entry: true }]
     let currentPages = pages
     Object.freeze(pages)
     const plugins = createH5TargetPlugins({
         ...options,
         get pages() {
-            assert.equal(pagesReady, true)
             pageReads += 1
             return currentPages
         }
     })
-    assert.equal(pageReads, 0)
-    const config = await resolveConfig(
-        {
-            configFile: false,
-            plugins: [
-                {
-                    name: 'test:async-page-configuration',
-                    async config() {
-                        await Promise.resolve()
-                        pagesReady = true
-                    }
-                },
-                plugins
-            ]
-        },
-        'serve'
-    )
     assert.equal(pageReads, 1)
+    const config = await resolveConfig({ configFile: false, plugins }, 'serve')
     currentPages = [{ path: 'pages/updated' }]
     const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:h5')
     assert.ok(compiler)

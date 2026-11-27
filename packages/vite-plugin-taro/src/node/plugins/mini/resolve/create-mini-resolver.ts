@@ -1,11 +1,11 @@
 import path from 'node:path'
 import { normalizePath, type Rolldown } from 'vite'
-import type { VptPageOption } from '../../../../options.ts'
 import { normalizeModuleId, resolveAppComponentPath, resolvePageComponentPath } from '../../../utils/modules.ts'
 import { createAppConfig } from '../../../utils/project-config.ts'
 import { appComponentId } from '../../client/constant.ts'
+import { orderPages } from '../../page/order-pages.ts'
 import { pageMetadataKey } from '../../page/page-metadata-key.ts'
-import { type ResolvedPage, resolvePage } from '../../page/resolve-page.ts'
+import { resolvePage } from '../../page/resolve-page.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import {
     appShellFileName,
@@ -13,7 +13,6 @@ import {
     miniAppShellId,
     miniBootstrapId,
     miniPageCapsuleId,
-    miniPageShellId,
     miniTransportId,
     miniTransportOutputPath,
     pageCapsuleId,
@@ -22,6 +21,7 @@ import {
     taroTargetRuntimeId,
     vitePreloadId
 } from '../module/module.ts'
+import { createMiniPageEntry, type MiniPageEntry } from './create-mini-page-entry.ts'
 import { specializeAppCapsule } from './specialize-app-capsule.ts'
 import { specializePageCapsule } from './specialize-page-capsule.ts'
 
@@ -33,10 +33,9 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
     const normalizedAppCapsulePath = normalizePath(miniAppCapsuleId)
     const normalizedPageCapsulePath = normalizePath(miniPageCapsuleId)
 
-    // setPages replaces the ordered page snapshot and rebuilds its constant-time route index together.
-    let pages: readonly ResolvedPage[] = []
-
-    const pageByRoute = new Map<string, ResolvedPage>()
+    const pages = orderPages(contract.options.pages).map(resolvePage)
+    const pageEntries: readonly MiniPageEntry[] = pages.map(createMiniPageEntry)
+    const entryByRoute = new Map(pageEntries.map((entry) => [entry.page.route, entry]))
 
     const privateIdResolvers = new Map<string, PrivateIdResolver>([
         // Preload needs only the initialized loader.
@@ -51,20 +50,12 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
         [
             pageComponentId,
             (importer, projectRoot) => {
-                const page = requireConfiguredPage({ moduleId: importer, pageByRoute })
+                const { page } = requirePageEntry(importer, entryByRoute)
 
                 return resolvePageComponentPath({ pagePath: page.option.path, projectRoot })
             }
         ],
-        [
-            pageCapsuleId,
-            (importer) => {
-                // Query-qualify the capsule source so every Page retains a distinct graph identity.
-                const page = requireConfiguredPage({ moduleId: importer, pageByRoute })
-
-                return createRouteModuleId({ moduleId: miniPageCapsuleId, route: page.route })
-            }
-        ]
+        [pageCapsuleId, (importer) => requirePageEntry(importer, entryByRoute).capsuleId]
     ])
 
     return {
@@ -75,23 +66,7 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
             shellName: appShellFileName
         },
 
-        pageEntries() {
-            return pages.map((page) => ({
-                page,
-                capsuleId: createRouteModuleId({ moduleId: miniPageCapsuleId, route: page.route }),
-                capsuleName: `${page.route}-capsule`,
-                shellId: createRouteModuleId({ moduleId: miniPageShellId, route: page.route }),
-                shellName: `${page.route}.js`
-            }))
-        },
-
-        setPages(declarations: readonly VptPageOption[]) {
-            pages = declarations.map(resolvePage)
-            pageByRoute.clear()
-            for (const page of pages) {
-                pageByRoute.set(page.route, page)
-            }
-        },
+        pageEntries,
 
         resolveId(
             id: string,
@@ -124,7 +99,7 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
             }
 
             if (normalizedId === normalizedPageCapsulePath) {
-                const page = requireConfiguredPage({ moduleId: id, pageByRoute })
+                const { page } = requirePageEntry(id, entryByRoute)
 
                 return specializePageCapsule({
                     code,
@@ -138,26 +113,18 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
     }
 }
 
-/** Creates one route-qualified module ID. */
-function createRouteModuleId({ moduleId, route }: { moduleId: string; route: string }): string {
-    return `${moduleId}?route=${encodeURIComponent(route)}`
-}
-
 /** Returns the configured Page identified by a route-qualified capsule ID. */
-function requireConfiguredPage({
-    moduleId,
-    pageByRoute
-}: {
-    moduleId: string | undefined
-    pageByRoute: ReadonlyMap<string, ResolvedPage>
-}): ResolvedPage {
+function requirePageEntry(
+    moduleId: string | undefined,
+    entryByRoute: ReadonlyMap<string, MiniPageEntry>
+): MiniPageEntry {
     const queryIndex = moduleId?.indexOf('?') ?? -1
     const route = queryIndex === -1 ? undefined : new URLSearchParams(moduleId?.slice(queryIndex + 1)).get('route')
-    const page = route ? pageByRoute.get(route) : undefined
-    if (!page) {
+    const entry = route ? entryByRoute.get(route) : undefined
+    if (!entry) {
         throw new Error(
             route ? `Unknown Page capsule: ${route}` : 'Page capsule import must originate from a route module'
         )
     }
-    return page
+    return entry
 }

@@ -13,14 +13,11 @@ const vptGlobalSrcFile = resolveVptRuntime('global/vpt-global')
 const vptGlobalOutputPath = 'common/vpt-global.js'
 
 /** Shares one standalone native provider between the application's virtual binding and the wrapped HMR runtime. */
-export function createMiniGlobalPlugin(placement: Pick<MiniPlacementPlugin, 'getPhysicalChunkId'>): Plugin[] {
+export function createMiniGlobalPlugin(placer: Pick<MiniPlacementPlugin, 'getPhysicalChunkId'>): Plugin[] {
     function getGlobalReference(chunk: RenderedChunk): string {
         // Insert the physical edge only after linking. A source-level require would pull discovery back into HMR.
         // Placement has already assigned the caller's path; the provider always lives in the main package.
-        const relative = path.posix.relative(
-            path.posix.dirname(placement.getPhysicalChunkId(chunk)),
-            vptGlobalOutputPath
-        )
+        const relative = path.posix.relative(path.posix.dirname(placer.getPhysicalChunkId(chunk)), vptGlobalOutputPath)
 
         const reference = relative.startsWith('.') ? relative : `./${relative}`
 

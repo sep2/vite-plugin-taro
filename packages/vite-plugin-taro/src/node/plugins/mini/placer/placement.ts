@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { Rolldown } from 'vite'
 import type { MiniSubpackage } from '../mini-contract.ts'
+import type { MiniPageEntry } from '../resolve/create-mini-page-entry.ts'
 
 const generatedSubpackageRootPrefix = 'sub/p_'
 
@@ -25,9 +26,6 @@ export type Placement = Readonly<{
 
 /** Shared location for chunks owned by the main package. */
 const mainPackage = { kind: 'main' } as const
-
-/** One named package and its preliminary entry chunk IDs. */
-type NamedSubpackage = Readonly<{ root: string; entries: readonly string[] }>
 
 type PlaceableChunk = {
     chunkId: string
@@ -65,14 +63,14 @@ type PackedSubpackage = {
  */
 export function createPlacement({
     automaticSubpackages,
-    namedSubpackages,
+    pageEntries,
     chunks,
     planningBudgetBytes,
     getAdditionalModuleBytes
 }: {
     automaticSubpackages: boolean
     /** Unlisted entries belong to the main package. */
-    namedSubpackages: readonly NamedSubpackage[]
+    pageEntries: readonly MiniPageEntry[]
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
     planningBudgetBytes: number
     getAdditionalModuleBytes(moduleId: string): number
@@ -87,12 +85,26 @@ export function createPlacement({
         )
     )
 
+    // Group only declared package pages, preserving their manifest order and their original JS entry metadata.
+    const packagePages = new Map<string, MiniPageEntry[]>()
+    for (const entry of pageEntries) {
+        const root = entry.page.option.subpackage
+        if (root !== undefined) {
+            const members = packagePages.get(root)
+            if (members) {
+                members.push(entry)
+            } else {
+                packagePages.set(root, [entry])
+            }
+        }
+    }
+
     // Pin entry closures before packing lazy chunks into the remaining package capacity.
     const locationByChunk =
-        automaticSubpackages || namedSubpackages.length
-            ? placeEntryClosures(chunkById, namedSubpackages)
+        automaticSubpackages || packagePages.size
+            ? placeEntryClosures(chunkById, packagePages)
             : new Map<string, PackageLocation>()
-    const namedRoots = new Set(namedSubpackages.map(({ root }) => root))
+
     if (automaticSubpackages) {
         for (const subpackage of packLazyChunks(
             chunkById,
@@ -135,7 +147,9 @@ export function createPlacement({
                 throw new Error(`Mini Program placement is missing entry module: ${chunk}`)
             }
             const location = getPackageLocation(resolved)
-            return location.kind === 'main' ? resolved.fileName : `${location.root}/${resolved.fileName}`
+            return location.kind === 'main' || resolved.isEntry
+                ? resolved.fileName
+                : `${location.root}/${resolved.fileName}`
         },
 
         /** Assigns each final chunk's Rolldown-owned physical filename and declares typed owners that survived output. */
@@ -154,13 +168,21 @@ export function createPlacement({
                 }
                 // OutputChunk is mutable in generateBundle. Assigning fileName makes Rolldown retain all chunk metadata and
                 // write that same chunk at its physical package path; deleting bundle keys or re-emitting would lose identity.
-                chunk.fileName = `${location.root}/${chunk.fileName}`
-                if (!namedRoots.has(location.root)) {
+                // Entry filenames already carry the public route supplied by their page declaration.
+                if (!chunk.isEntry) {
+                    chunk.fileName = `${location.root}/${chunk.fileName}`
+                }
+                if (!packagePages.has(location.root)) {
                     roots.add(location.root)
                 }
             }
 
-            return [...roots].sort().map((root) => ({ root, pages: [] }))
+            return [
+                ...packagePages
+                    .entries()
+                    .map(([root, members]) => ({ root, pages: members.map((entry) => entry.page.option.path) })),
+                ...[...roots].sort().map((root) => ({ root, pages: [] }))
+            ]
         }
     }
 }
@@ -168,9 +190,10 @@ export function createPlacement({
 /** Entries in one package share one traversal. Once two packages reach a chunk, its entire closure is in main. */
 function placeEntryClosures(
     chunks: ReadonlyMap<string, Rolldown.RenderedChunk>,
-    namedSubpackages: readonly NamedSubpackage[]
+    packagePages: ReadonlyMap<string, readonly MiniPageEntry[]>
 ): Map<string, PackageLocation> {
-    const namedEntries = new Set(namedSubpackages.values().flatMap(({ entries }) => entries))
+    const entryFiles = (page: MiniPageEntry) => [page.shellName, `${page.capsuleName}.js`]
+    const namedEntries = new Set(packagePages.values().flatMap((pages) => pages.values().flatMap(entryFiles)))
     const mainEntries = chunks
         .entries()
         .filter(([id, chunk]) => chunk.isEntry && !namedEntries.has(id))
@@ -178,9 +201,9 @@ function placeEntryClosures(
     // Main ownership is final, so later traversals can stop at an already shared chunk.
     const mainIds = collectStaticClosure(chunks, mainEntries, new Set<string>())
     const owners = new Map<string, PackageLocation>(mainIds.values().map((id) => [id, mainPackage]))
-    for (const { root, entries } of namedSubpackages) {
+    for (const [root, pages] of packagePages) {
         const location = { kind: 'subpackage', root } as const
-        for (const id of collectStaticClosure(chunks, entries, mainIds)) {
+        for (const id of collectStaticClosure(chunks, pages.values().flatMap(entryFiles), mainIds)) {
             if (owners.has(id)) {
                 mainIds.add(id)
                 owners.set(id, mainPackage)

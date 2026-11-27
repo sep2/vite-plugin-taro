@@ -62,9 +62,9 @@ export function createTransportOutput({
             throw new Error(`Amphibious module must be in the main package: ${chunk.fileName}`)
         }
 
-        // Placement prefixes only physical filenames. SystemJS retains the package-neutral identity with resolved hashes.
+        // Entries retain their declared filenames; only non-entry chunks gain a package prefix during placement.
         const logicalId = toLogicalChunkId(
-            asynchronous ? chunk.fileName.slice(location.root.length + 1) : chunk.fileName
+            asynchronous && !chunk.isEntry ? chunk.fileName.slice(location.root.length + 1) : chunk.fileName
         )
         // Only native loading crosses the logical/physical boundary and receives the package-qualified path.
         const relative = path.posix.relative(directory, chunk.fileName)

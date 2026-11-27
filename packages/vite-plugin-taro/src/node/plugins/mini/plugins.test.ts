@@ -32,15 +32,13 @@ const infrastructureEntries = [
 ]
 
 test('expands infrastructure and Page entries from the sole App shell input', async () => {
-    // These test-owned counters track configuration readiness and each App-owned page snapshot.
-    let pagesReady = false
+    // Count page reads across plugin creation and successive outputs.
     let pageReads = 0
     const pages = [{ path: 'pages/home/index' }, { path: 'pages/detail/index' }]
     const contract = createWxMiniContract({
         target: 'wx',
         app: 'src/app.tsx',
         get pages() {
-            assert.equal(pagesReady, true, 'Page metadata is consumed after project configuration is resolved')
             pageReads += 1
             return pages
         },
@@ -48,23 +46,8 @@ test('expands infrastructure and Page entries from the sole App shell input', as
         projectConfigJson: {}
     })
     const plugins = createMiniTargetPlugins(contract)
-    assert.equal(pageReads, 0)
-    const config = await resolveConfig(
-        {
-            configFile: false,
-            plugins: [
-                {
-                    name: 'test:async-page-configuration',
-                    async config() {
-                        await Promise.resolve()
-                        pagesReady = true
-                    }
-                },
-                plugins
-            ]
-        },
-        'build'
-    )
+    assert.equal(pageReads, 1)
+    const config = await resolveConfig({ configFile: false, plugins }, 'build')
     const compiler = config.plugins.find((plugin) => plugin.name === 'vpt:mini')
     assert.ok(typeof compiler?.renderStart === 'function')
     const renderStart = compiler.renderStart
@@ -145,26 +128,21 @@ test('expands infrastructure and Page entries from the sole App shell input', as
     }
 })
 
-test('validates the page snapshot during project initialization', async () => {
-    await assert.rejects(
-        resolveConfig(
-            {
-                configFile: false,
-                plugins: createMiniTargetPlugins(
-                    createWxMiniContract({
-                        target: 'wx',
-                        app: 'src/app.tsx',
-                        pages: [
-                            { path: 'pages/first', entry: true },
-                            { path: 'pages/second', entry: true }
-                        ],
-                        appJson: {},
-                        projectConfigJson: {}
-                    })
-                )
-            },
-            'build'
-        ),
+test('validates pages when creating the Mini plugins', () => {
+    assert.throws(
+        () =>
+            createMiniTargetPlugins(
+                createWxMiniContract({
+                    target: 'wx',
+                    app: 'src/app.tsx',
+                    pages: [
+                        { path: 'pages/first', entry: true },
+                        { path: 'pages/second', entry: true }
+                    ],
+                    appJson: {},
+                    projectConfigJson: {}
+                })
+            ),
         /Only one page may set entry: true/
     )
 })

@@ -62,7 +62,7 @@ const contract = {
     }
 } satisfies Pick<MiniContract, 'options' | 'taro' | 'supportsPagePrerender'>
 
-test('resolves fixed IDs immediately and Page IDs after setPages', () => {
+test('resolves fixed IDs and configured Page IDs', () => {
     const resolver = createMiniResolver(contract)
     const projectRoot = path.resolve('/project')
 
@@ -72,7 +72,6 @@ test('resolves fixed IDs immediately and Page IDs after setPages', () => {
         shellId: modules.appShell,
         shellName: 'app.js'
     })
-    assert.deepEqual(resolver.pageEntries(), [])
     assert.deepEqual(resolver.resolveId(miniTransportId, modules.bootstrap, projectRoot), {
         id: './vpt-transport.js',
         external: true
@@ -85,8 +84,7 @@ test('resolves fixed IDs immediately and Page IDs after setPages', () => {
         normalizePath(path.resolve(projectRoot, 'src/app.tsx'))
     )
 
-    resolver.setPages(contract.options.pages)
-    assert.deepEqual(resolver.pageEntries(), [
+    assert.deepEqual(resolver.pageEntries, [
         {
             page: { option: contract.options.pages[0], route: 'pages/home/index' },
             capsuleId: `${modules.pageCapsule}?route=pages%2Fhome%2Findex`,
@@ -138,9 +136,7 @@ test('resolves custom renderer hosts independently of App/Page entries', () => {
         '/runtime/custom-host.ts'
     )
     assert.deepEqual(resolver.appEntry, customHostResolver.appEntry)
-    resolver.setPages(contract.options.pages)
-    customHostResolver.setPages(contract.options.pages)
-    assert.deepEqual(resolver.pageEntries(), customHostResolver.pageEntries())
+    assert.deepEqual(resolver.pageEntries, customHostResolver.pageEntries)
 })
 
 test('preserves resolved Page order in the App-owned entries', () => {
@@ -149,12 +145,11 @@ test('preserves resolved Page order in the App-owned entries', () => {
         Object.freeze({ path: 'features/account/pages/a-first/index' })
     ]
     Object.freeze(pages)
-    const input = Object.freeze({ ...contract, options: Object.freeze({ ...contract.options }) })
+    const input = Object.freeze({ ...contract, options: Object.freeze({ ...contract.options, pages }) })
     const resolver = createMiniResolver(input)
-    resolver.setPages(pages)
 
     const { appEntry } = resolver
-    const pageEntries = resolver.pageEntries()
+    const pageEntries = resolver.pageEntries
     assert.deepEqual(pageEntries, [
         {
             page: { option: pages[0], route: 'pages/z-last/index' },
@@ -175,9 +170,11 @@ test('preserves resolved Page order in the App-owned entries', () => {
 })
 
 test('resolves a named package entry by public route and loads its declared component', () => {
-    const resolver = createMiniResolver(contract)
-    resolver.setPages([{ path: 'detail', subpackage: 'orders' }])
-    const [entry] = resolver.pageEntries()
+    const resolver = createMiniResolver({
+        ...contract,
+        options: { ...contract.options, pages: [{ path: 'detail', subpackage: 'orders' }] }
+    })
+    const [entry] = resolver.pageEntries
     assert.ok(entry)
     assert.equal(entry.page.route, 'orders/detail')
     assert.equal(entry.page.option.subpackage, 'orders')
@@ -191,7 +188,7 @@ test('resolves a named package entry by public route and loads its declared comp
 })
 
 test('retains App entries with an empty resolved Page list', () => {
-    const resolver = createMiniResolver(contract)
+    const resolver = createMiniResolver({ ...contract, options: { ...contract.options, pages: [] } })
 
     assert.deepEqual(resolver.appEntry, {
         capsuleId: modules.appCapsule,
@@ -199,31 +196,25 @@ test('retains App entries with an empty resolved Page list', () => {
         shellId: modules.appShell,
         shellName: 'app.js'
     })
-    assert.deepEqual(resolver.pageEntries(), [])
+    assert.deepEqual(resolver.pageEntries, [])
 })
 
-test('setPages updates entries, route resolution and capsule metadata together', () => {
-    const resolver = createMiniResolver(contract)
-    const { appEntry, resolveId, specialize } = resolver
+test('uses configured pages for entries, route resolution and capsule metadata', () => {
     const projectRoot = path.resolve('/project')
-    const generations: readonly (readonly VptPageOption[])[] = [
+    const generations: readonly VptPageOption[][] = [
         [{ path: 'pages/home/index', config: { title: 'Home' }, prerender: true }, { path: 'pages/detail/index' }],
         [{ path: 'pages/new/index' }, { path: 'pages/home/index', config: { title: 'Updated home' } }],
         []
     ]
 
     for (const pages of generations) {
-        const previousEntries = resolver.pageEntries()
-        pages.forEach(Object.freeze)
-        resolver.setPages(Object.freeze(pages))
-        assert.equal(resolver.appEntry, appEntry)
-        assert.equal(resolver.resolveId, resolveId)
-        assert.equal(resolver.specialize, specialize)
+        const resolver = createMiniResolver({ ...contract, options: { ...contract.options, pages } })
+        const { appEntry, resolveId, specialize } = resolver
         assert.deepEqual(
-            resolver.pageEntries().map((entry) => entry.page),
+            resolver.pageEntries.map((entry) => entry.page),
             pages.map((page) => ({ option: page, route: page.path }))
         )
-        for (const [index, entry] of resolver.pageEntries().entries()) {
+        for (const [index, entry] of resolver.pageEntries.entries()) {
             const declaration = pages[index]!
             assert.strictEqual(entry.page.option, declaration)
             assert.equal(resolveId(pageCapsuleId, entry.shellId, projectRoot), entry.capsuleId)
@@ -242,22 +233,12 @@ test('setPages updates entries, route resolution and capsule metadata together',
         assert.ok(app && 'meta' in app)
         assert.deepEqual(
             app.meta[pageMetadataKey],
-            resolver.pageEntries().map((entry) => entry.page)
+            resolver.pageEntries.map((entry) => entry.page)
         )
         assert.deepEqual(
             Function(`${app.code}; return config`)().pages,
             pages.map((page) => page.path)
         )
-        for (const entry of previousEntries) {
-            if (!pages.some((page) => page.path === entry.page.route)) {
-                assert.throws(() => resolveId(pageCapsuleId, entry.shellId, projectRoot), /Unknown Page capsule/)
-                assert.throws(() => resolveId(pageComponentId, entry.capsuleId, projectRoot), /Unknown Page capsule/)
-                assert.throws(
-                    () => specialize('const options = __VPT_PAGE_OPTIONS__', entry.capsuleId, false),
-                    /Unknown Page capsule/
-                )
-            }
-        }
     }
 })
 
@@ -270,7 +251,6 @@ for (const supportsPagePrerender of [false, true]) {
             supportsPagePrerender
         })
         const resolver = createMiniResolver(fixedContract)
-        resolver.setPages([page])
         const result = resolver.specialize(
             'const options = __VPT_PAGE_OPTIONS__',
             `${modules.pageCapsule}?route=${encodeURIComponent(page.path)}`,
@@ -285,7 +265,6 @@ for (const supportsPagePrerender of [false, true]) {
 
 test('rejects Page-private imports without one configured route origin', () => {
     const resolver = createMiniResolver(contract)
-    resolver.setPages(contract.options.pages)
     const projectRoot = path.resolve('/project')
 
     assert.throws(
@@ -304,13 +283,12 @@ test('rejects Page-private imports without one configured route origin', () => {
 
 test('specializes the App capsule with the configured App JSON', () => {
     const resolver = createMiniResolver(contract)
-    resolver.setPages(contract.options.pages)
     const result = resolver.specialize('export default __VPT_APP_CONFIG__', modules.appCapsule)
 
     assert.ok(result && 'meta' in result)
     assert.deepEqual(
         result.meta[pageMetadataKey],
-        resolver.pageEntries().map((entry) => entry.page)
+        resolver.pageEntries.map((entry) => entry.page)
     )
     assert.match(result.code, /"pages":\s*\[\s*["']pages\/home\/index["']/)
     assert.doesNotMatch(result.code, /stale\/page/)

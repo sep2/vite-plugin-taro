@@ -31,8 +31,7 @@ test('specializes only the physical H5 App using resolved pages', () => {
     const pages = Object.freeze([
         Object.freeze({ path: 'pages/resolved/index', config: { navigationBarTitleText: 'Resolved page' } })
     ])
-    const resolver = createH5Resolver(Object.freeze(options))
-    resolver.setPages(pages)
+    const resolver = createH5Resolver(Object.freeze({ ...options, pages: [...pages] }))
     const source = `const config = __VPT_H5_APP_CONFIG__
 config.routes = __VPT_H5_ROUTES__
 `
@@ -56,32 +55,7 @@ config.routes = __VPT_H5_ROUTES__
     )
 })
 
-test('setPages replaces, reorders and clears pages through one stable resolver', () => {
-    const resolver = createH5Resolver(
-        Object.freeze({
-            ...options,
-            pages: [{ path: 'pages/unused' }],
-            appJson: { window: { navigationBarTitleText: 'Application' } }
-        })
-    )
-    const { resolveId, transform } = resolver
-    const projectRoot = path.resolve('/project')
-    const render = () => {
-        const result = transform({
-            code: 'const config = __VPT_H5_APP_CONFIG__;\nconst routes = __VPT_H5_ROUTES__;',
-            id: h5AppPath,
-            projectRoot,
-            sourcemap: false
-        })
-        assert.ok(result)
-        const [config, routes] = result.code.split('\n')
-        return {
-            config: JSON.parse(config.slice('const config = '.length, -1)),
-            routes: routes.slice('const routes = '.length, -1)
-        }
-    }
-    assert.deepEqual(render().config.pages, [])
-
+test('uses each configured route list for both App config and route loaders', () => {
     const home = Object.freeze({ path: 'pages/home', config: { navigationBarTitleText: 'Home' } })
     const detail = Object.freeze({ path: 'pages/detail', config: { navigationBarTitleText: 'Detail' } })
     const snapshots: readonly (readonly VptPageOption[])[] = [
@@ -91,14 +65,20 @@ test('setPages replaces, reorders and clears pages through one stable resolver',
         Object.freeze([])
     ]
     for (const pages of snapshots) {
-        resolver.setPages(pages)
-        assert.equal(resolver.resolveId, resolveId)
-        assert.equal(resolver.transform, transform)
-        assert.equal(
-            resolveId({ id: appComponentId, projectRoot }),
-            normalizePath(path.resolve(projectRoot, options.app))
-        )
-        const { config, routes } = render()
+        const resolver = createH5Resolver({
+            ...options,
+            pages: [...pages],
+            appJson: { window: { navigationBarTitleText: 'Application' } }
+        })
+        const result = resolver.transform({
+            code: 'const config = __VPT_H5_APP_CONFIG__;\nconst routes = __VPT_H5_ROUTES__;',
+            id: h5AppPath,
+            projectRoot: path.resolve('/project'),
+            sourcemap: false
+        })
+        assert.ok(result)
+        const [configLine, routes] = result.code.split('\n')
+        const config = JSON.parse(configLine.slice('const config = '.length, -1))
         assert.deepEqual(
             config.pages,
             pages.map((page) => page.path)
@@ -115,5 +95,4 @@ test('setPages replaces, reorders and clears pages through one stable resolver',
             assert.ok(routes.includes(JSON.stringify(page.config)))
         }
     }
-    assert.equal(render().routes, '[]')
 })

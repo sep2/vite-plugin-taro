@@ -2,6 +2,7 @@ import type { Plugin, Rolldown } from 'vite'
 import type { MiniSubpackage } from '../mini-contract.ts'
 import { classifyMiniModule, isMiniFrameworkVendorModule, isMiniPolyfillModule } from '../module/module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
+import type { MiniPageEntry } from '../resolve/create-mini-page-entry.ts'
 import { createPlacement, type PackageLocation, type Placement } from './placement.ts'
 
 export type { Placement } from './placement.ts'
@@ -97,7 +98,10 @@ export function createPlacementRolldownOptions() {
  * performs one whole-state transition, so stale graph state, duplicate planning, and partially reset generations are
  * unrepresentable.
  */
-export function createMiniPlacementPlugin(automaticSubpackages: boolean): MiniPlacementPlugin {
+export function createMiniPlacementPlugin(
+    automaticSubpackages: boolean,
+    pageEntries: readonly MiniPageEntry[]
+): MiniPlacementPlugin {
     // This one mutable cell is the output-generation state machine described above; hooks replace it atomically by phase.
     let state: PlacementState = { phase: 'idle' }
 
@@ -136,7 +140,7 @@ export function createMiniPlacementPlugin(automaticSubpackages: boolean): MiniPl
                     phase: 'planned',
                     placement: createPlacement({
                         automaticSubpackages,
-                        namedSubpackages: [],
+                        pageEntries,
                         chunks: meta.chunks,
                         planningBudgetBytes: miniSubpackagePlanningBudget,
                         getAdditionalModuleBytes: (moduleId) =>
@@ -149,7 +153,10 @@ export function createMiniPlacementPlugin(automaticSubpackages: boolean): MiniPl
         generateBundle: {
             order: 'pre',
             handler(_outputOptions, bundle) {
-                const placement = requirePlacement()
+                if (state.phase !== 'planned') {
+                    throw new Error('Mini Program subpackages require a planned chunk graph')
+                }
+                const { placement } = state
                 state = {
                     phase: 'finalized',
                     placement: placement,

@@ -4,7 +4,6 @@ import type { VptOptions } from '../../../options.ts'
 import { esTarget } from '../../utils/constant.ts'
 import { createExactModuleIdFilter, toViteFileImportPath } from '../../utils/modules.ts'
 import { resolveTaroRuntime } from '../../utils/packages.ts'
-import { orderPages } from '../page/order-pages.ts'
 import { tailwindcssBasedir } from '../tailwind/tailwind-css.ts'
 import { h5AppPath } from './constant.ts'
 import { createStencilClientAdapter } from './create-stencil-client-adapter.ts'
@@ -26,9 +25,6 @@ function createH5Plugin(options: Readonly<VptOptions>): Plugin {
 
     return {
         name: 'vpt:h5',
-        configResolved() {
-            resolver.setPages(orderPages(options.pages))
-        },
 
         config() {
             return {
