@@ -390,6 +390,11 @@ test('executes generated development code with a bundled runtime and no ambient 
         }
     )
     assert.equal(exports.answer, 42)
+    const runtime = shared.__rolldown_runtime__
+    assert.ok(runtime && typeof runtime === 'object' && 'loadLazyChunk' in runtime)
+    const loadLazyChunk = runtime.loadLazyChunk
+    assert.ok(typeof loadLazyChunk === 'function')
+    await assert.rejects(Reflect.apply(loadLazyChunk, runtime, ['probe']), /development uses an eager module graph/)
 })
 
 test('minified development emits ES2018 syntax for colliding class names', async (context) => {
