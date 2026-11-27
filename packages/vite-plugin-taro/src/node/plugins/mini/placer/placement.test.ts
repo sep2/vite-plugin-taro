@@ -145,7 +145,7 @@ for (const automaticSubpackages of [false, true]) {
                 'home.js': { isEntry: true, imports: ['shared.js'] },
                 'detail.js': { isEntry: true, imports: ['popup.js', 'shared.js', 'format.js'] },
                 'list.js': { isEntry: true, imports: ['popup.js'] },
-                'profile.js': { isEntry: true, imports: ['format.js'] },
+                'profile.js': { isEntry: true, imports: ['format.js'], bytes: 500_000 },
                 'popup.js': { dynamicImports: ['invoice.js'] },
                 'format.js': { imports: ['locale.js'] },
                 'locale.js': { imports: ['format.js'] },
@@ -170,13 +170,35 @@ for (const automaticSubpackages of [false, true]) {
         }
         assert.equal(output.placement.getPhysicalChunkId(output.chunks['detail.js']!), 'orders/detail.js')
         const invoice = getLocation(output, 'invoice.js')
-        if (automaticSubpackages) {
-            assert.ok(invoice.kind === 'subpackage' && invoice.root.startsWith('sub/p_'))
-        } else {
-            assert.deepEqual(invoice, { kind: 'main' })
-        }
+        assert.deepEqual(invoice, automaticSubpackages ? { kind: 'subpackage', root: 'orders' } : { kind: 'main' })
     })
 }
+
+test('charges both the named entry and its eager dependencies before packing lazy chunks', () => {
+    const chunks = {
+        'detail.js': { isEntry: true, imports: ['popup.js'], bytes: 600_000 },
+        'popup.js': { dynamicImports: ['invoice.js'], bytes: 700_000 },
+        'invoice.js': { bytes: 500_000 }
+    }
+    const options = { automaticSubpackages: true, namedSubpackages: [{ root: 'orders', entries: ['detail.js'] }] }
+    const fits = createTestPlacement(chunks, options)
+    assert.deepEqual(getLocation(fits, 'invoice.js'), { kind: 'subpackage', root: 'orders' })
+
+    const full = { ...chunks, 'invoice.js': { bytes: 650_000 } }
+    const spill = createTestPlacement(full, options)
+    const invoice = getLocation(spill, 'invoice.js')
+    assert.ok(invoice.kind === 'subpackage' && invoice.root.startsWith('sub/p_'))
+    assert.deepEqual(getLocation(spill, 'popup.js'), { kind: 'subpackage', root: 'orders' })
+
+    const fallback = createTestPlacement(
+        { ...full, 'profile.js': { isEntry: true } },
+        {
+            automaticSubpackages: true,
+            namedSubpackages: [...options.namedSubpackages, { root: 'account', entries: ['profile.js'] }]
+        }
+    )
+    assert.deepEqual(getLocation(fallback, 'invoice.js'), { kind: 'subpackage', root: 'account' })
+})
 
 test('resolves exact entry module IDs and chunk objects through the same physical placement', () => {
     const bootstrapId = '/runtime/bootstrap.ts?target=wx'
@@ -323,14 +345,22 @@ test('ignores dangling graph edges and rejects chunks absent from the final plan
     assert.throws(() => output.placement.getPackageLocation(unknown), /placement is missing final chunk: \/unknown\.js/)
 })
 
-test('produces stable roots independent of chunk object order', () => {
+test('produces stable roots independent of chunk and dynamic import order', () => {
     const chunks = {
-        '/entry.js': { isEntry: true, dynamicImports: ['/feature.js'] },
-        '/feature.js': { bytes: 300, imports: ['/dependency.js'] },
+        '/entry.js': { isEntry: true, dynamicImports: ['/feature.js', '/report.js'] },
+        '/feature.js': { bytes: 1_000_000, imports: ['/dependency.js'] },
+        '/report.js': { bytes: 1_000_000, imports: ['/dependency.js'] },
         '/dependency.js': { bytes: 300 }
     }
     const forward = createTestPlacement(chunks)
-    const reverse = createTestPlacement(Object.fromEntries(Object.entries(chunks).reverse()))
+    const reverse = createTestPlacement(
+        Object.fromEntries(
+            Object.entries({
+                ...chunks,
+                '/entry.js': { isEntry: true, dynamicImports: chunks['/entry.js'].dynamicImports.toReversed() }
+            }).reverse()
+        )
+    )
 
     assert.deepEqual(sortedLocations(forward), sortedLocations(reverse))
 })

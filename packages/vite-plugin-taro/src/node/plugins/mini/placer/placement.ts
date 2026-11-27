@@ -39,18 +39,14 @@ type PlaceableChunk = {
 }
 
 type ChunkBin = {
+    name: string | null
     chunkIds: string[]
     estimatedBytes: number
     transitions: Set<number>
 }
 
-type BinCandidate = {
-    bin: ChunkBin
-    overlap: number
-    remainingBytes: number
-}
-
-type PackedSubpackage = SubpackageLocation & {
+type PackedSubpackage = {
+    root: string
     chunkIds: readonly string[]
 }
 
@@ -65,7 +61,7 @@ type PackedSubpackage = SubpackageLocation & {
  *    assigned according to the first source module or dynamic root that happens to visit them.
  * 5. Order chunks by transition demand, estimated emitted bytes, then preliminary filename. Place each chunk once into the
  *    fitting bin with maximum transition overlap, using best-fit remaining capacity only as a tie-breaker.
- * 6. Hash each bin's sorted preliminary filenames into a deterministic physical package root and return unique ownership.
+ * 6. Preserve named roots and derive each generated root from its bin's sorted preliminary filenames.
  *
  * Analysis costs the sum of transition static-closure traversals. Packing scans fitting bins and intersects sparse
  * transition sets; its worst case is O(CBT), while practical graphs have few bins and sparse transition membership.
@@ -94,13 +90,12 @@ export function createPlacement({
         )
     )
 
-    // Eager assignments are fixed before lazy packing; only unassigned chunks can enter generated packages.
+    // Pin entry closures before packing lazy chunks into the remaining package capacity.
     const locationByChunk =
         automaticSubpackages || namedSubpackages.length
             ? placeEntryClosures(chunkById, namedSubpackages)
             : new Map<string, PackageLocation>()
-    // Only roots allocated by the packer need generated declarations.
-    const generatedPackages = new Set<PackageLocation>()
+    const namedRoots = new Set(namedSubpackages.map(({ root }) => root))
     if (automaticSubpackages) {
         for (const subpackage of packLazyChunks(
             chunkById,
@@ -108,9 +103,9 @@ export function createPlacement({
             planningBudgetBytes,
             getAdditionalModuleBytes
         )) {
-            generatedPackages.add(subpackage)
+            const location = { kind: 'subpackage', root: subpackage.root } as const
             for (const chunkId of subpackage.chunkIds) {
-                locationByChunk.set(chunkId, subpackage)
+                locationByChunk.set(chunkId, location)
             }
         }
     } else {
@@ -163,7 +158,7 @@ export function createPlacement({
                 // OutputChunk is mutable in generateBundle. Assigning fileName makes Rolldown retain all chunk metadata and
                 // write that same chunk at its physical package path; deleting bundle keys or re-emitting would lose identity.
                 chunk.fileName = `${location.root}/${chunk.fileName}`
-                if (generatedPackages.has(location)) {
+                if (!namedRoots.has(location.root)) {
                     roots.add(location.root)
                 }
             }
@@ -208,19 +203,41 @@ function packLazyChunks(
     getAdditionalModuleBytes: (moduleId: string) => number
 ): PackedSubpackage[] {
     const transitionsByChunk = collectTransitionsByChunk(chunkById, locationByChunk)
-    const placeableChunks = [...chunkById]
-        .filter(([chunkId]) => !locationByChunk.has(chunkId))
-        .map(([chunkId, chunk]) => ({
-            chunkId: chunkId,
+    // Seed named bins from pinned membership in stable chunk order. Main never participates in packing.
+    const namedBins = new Map<string, ChunkBin>()
+    const lazy: PlaceableChunk[] = []
+    for (const [chunkId, chunk] of chunkById) {
+        const owner = locationByChunk.get(chunkId)
+        if (owner?.kind === 'main') {
+            continue
+        }
+        const item = {
+            chunkId,
             estimatedBytes:
-                estimateChunkBytes(chunk) +
-                chunk.moduleIds.reduce((bytes, moduleId) => bytes + getAdditionalModuleBytes(moduleId), 0),
+                estimateChunkBytes(chunk) + chunk.moduleIds.reduce((sum, id) => sum + getAdditionalModuleBytes(id), 0),
             transitions: transitionsByChunk.get(chunkId) ?? new Set<number>()
-        }))
-    return packChunks({
-        chunks: placeableChunks,
-        planningBudgetBytes: planningBudgetBytes
-    }).map(createPackedSubpackage)
+        }
+        if (owner) {
+            const bin = namedBins.get(owner.root) ?? createBin(owner.root)
+            namedBins.set(owner.root, bin)
+            reserveChunk(bin, item)
+        } else {
+            lazy.push(item)
+        }
+    }
+    // Each placement consumes capacity before the next candidate is scored.
+    const bins = [...namedBins.values()]
+    for (const chunk of lazy.sort(compareChunks)) {
+        let bin =
+            chunk.estimatedBytes <= planningBudgetBytes ? findBestBin({ bins, chunk, planningBudgetBytes }) : undefined
+        if (!bin) {
+            bin = createBin(null)
+            bins.push(bin)
+        }
+        bin.chunkIds.push(chunk.chunkId)
+        reserveChunk(bin, chunk)
+    }
+    return bins.map(createPackedSubpackage)
 }
 
 /** Creates every load-transition hyperedge and indexes its static closure by chunk. */
@@ -230,12 +247,18 @@ function collectTransitionsByChunk(
 ): Map<string, ReadonlySet<number>> {
     const transitionsByChunk = new Map<string, Set<number>>()
     let transitionId = 0
-    for (const chunk of chunks.values()) {
-        for (const targetId of [...chunk.dynamicImports].sort()) {
+    for (const [importerId, chunk] of chunks) {
+        // Transition IDs distinguish edges; their numeric order does not affect overlap.
+        for (const targetId of chunk.dynamicImports) {
             if (!chunks.has(targetId) || assigned.has(targetId)) {
                 continue
             }
-            for (const chunkId of collectStaticClosure(chunks, [targetId], assigned)) {
+            const closure = collectStaticClosure(chunks, [targetId], assigned)
+            // A transition already touches its importer's package; packing its target there avoids another package load.
+            if (assigned.get(importerId)?.kind === 'subpackage') {
+                closure.add(importerId)
+            }
+            for (const chunkId of closure) {
                 const transitions = transitionsByChunk.get(chunkId) ?? new Set<number>()
                 transitions.add(transitionId)
                 transitionsByChunk.set(chunkId, transitions)
@@ -269,27 +292,6 @@ function collectStaticClosure(
     return closure
 }
 
-/** Partitions final chunks by transition overlap before best-fit capacity. */
-function packChunks({
-    chunks,
-    planningBudgetBytes
-}: {
-    chunks: readonly PlaceableChunk[]
-    planningBudgetBytes: number
-}): ChunkBin[] {
-    const bins: ChunkBin[] = []
-    const orderedChunks = [...chunks].sort(compareChunks)
-    for (const chunk of orderedChunks) {
-        const bin =
-            chunk.estimatedBytes <= planningBudgetBytes
-                ? (findBestBin({ bins: bins, chunk: chunk, planningBudgetBytes: planningBudgetBytes }) ??
-                  createBin(bins))
-                : createBin(bins)
-        placeChunk(bin, chunk)
-    }
-    return bins
-}
-
 /** Gives globally shared transition demand priority, then size and stable preliminary filename. */
 function compareChunks(left: PlaceableChunk, right: PlaceableChunk): number {
     return (
@@ -309,30 +311,34 @@ function findBestBin({
     chunk: PlaceableChunk
     planningBudgetBytes: number
 }): ChunkBin | undefined {
-    let best: BinCandidate | undefined
+    // Track the best fitting bin directly; a tie retains the earlier bin.
+    let best: ChunkBin | undefined
+    let bestOverlap = -1
+    const maxBytes = planningBudgetBytes - chunk.estimatedBytes
     for (const bin of bins) {
-        if (bin.estimatedBytes + chunk.estimatedBytes > planningBudgetBytes) {
+        if (bin.estimatedBytes > maxBytes) {
             continue
         }
-        const candidate = {
-            bin: bin,
-            overlap: countOverlap(bin.transitions, chunk.transitions),
-            remainingBytes: planningBudgetBytes - bin.estimatedBytes - chunk.estimatedBytes
-        }
+        const overlapLimit = Math.min(bin.transitions.size, chunk.transitions.size)
         if (
-            !best ||
-            candidate.overlap > best.overlap ||
-            (candidate.overlap === best.overlap && candidate.remainingBytes < best.remainingBytes)
+            best &&
+            (overlapLimit < bestOverlap || (overlapLimit === bestOverlap && bin.estimatedBytes <= best.estimatedBytes))
         ) {
-            best = candidate
+            continue
+        }
+        const overlap = countOverlap(bin.transitions, chunk.transitions)
+        if (!best || overlap > bestOverlap || (overlap === bestOverlap && bin.estimatedBytes > best.estimatedBytes)) {
+            best = bin
+            bestOverlap = overlap
         }
     }
-    return best?.bin
+    return best
 }
 
 /** Counts transition-package incidences removed by one candidate placement. */
 function countOverlap(left: ReadonlySet<number>, right: ReadonlySet<number>): number {
-    const [smaller, larger] = left.size <= right.size ? [left, right] : [right, left]
+    const smaller = left.size <= right.size ? left : right
+    const larger = smaller === left ? right : left
     let overlap = 0
     for (const transition of smaller) {
         if (larger.has(transition)) {
@@ -343,19 +349,17 @@ function countOverlap(left: ReadonlySet<number>, right: ReadonlySet<number>): nu
 }
 
 /** Creates one planner-local mutable package. */
-function createBin(bins: ChunkBin[]): ChunkBin {
-    const bin: ChunkBin = {
+function createBin(name: string | null): ChunkBin {
+    return {
+        name,
         chunkIds: [],
         estimatedBytes: 0,
         transitions: new Set<number>()
     }
-    bins.push(bin)
-    return bin
 }
 
-/** Applies one irreversible, non-duplicating final chunk assignment. */
-function placeChunk(bin: ChunkBin, chunk: PlaceableChunk): void {
-    bin.chunkIds.push(chunk.chunkId)
+/** Both pinned and newly placed chunks consume capacity and contribute their load transitions. */
+function reserveChunk(bin: ChunkBin, chunk: PlaceableChunk): void {
     bin.estimatedBytes += chunk.estimatedBytes
     for (const transition of chunk.transitions) {
         bin.transitions.add(transition)
@@ -375,10 +379,12 @@ function estimateChunkBytes(chunk: Rolldown.RenderedChunk): number {
 
 /** Freezes membership and derives a stable root from sorted preliminary filenames. */
 function createPackedSubpackage(bin: ChunkBin): PackedSubpackage {
+    if (bin.name !== null) {
+        return { root: bin.name, chunkIds: bin.chunkIds }
+    }
     const chunkIds = [...bin.chunkIds].sort()
     const hash = createHash('sha256').update(chunkIds.join('\0')).digest('hex').slice(0, 8)
     return {
-        kind: 'subpackage',
         root: `${generatedSubpackageRootPrefix}${hash}`,
         chunkIds: chunkIds
     }
