@@ -1,8 +1,8 @@
 ---
 name: previewer
 description: >-
-  小程序/小游戏预览与发布：自动推送手机预览、生成预览二维码、上传体验版。
-  用户说预览、发到手机、扫码预览、上传代码、发布体验版时使用。
+  小程序/小游戏预览与发布：自动推送微信预览（手机/电脑）、生成预览二维码、上传体验版。
+  用户说预览、发到手机、电脑微信预览、扫码预览、上传代码、发布体验版时使用。
 ---
 
 # previewer
@@ -15,18 +15,21 @@ description: >-
 
 | 意图 | 工具 |
 |------|------|
-| 预览 / 发到手机 / 真机预览 / 自动预览 | `auto_preview`（必填 `project`；用户指定页面时可加 `--page-path` / `--query` / `--scene`） |
+| 预览 / 发到手机 / 电脑微信预览 / 真机预览 / 自动预览 | `auto_preview`（必填 `project`；用户指定页面时可加 `--page-path` / `--query` / `--scene`；推电脑微信加 `--auto-preview-type pc`） |
 | 要二维码 / 扫码预览 | `create_preview_qrcode`（优先 `--qr-format window`） |
 | 上传代码 / 发布体验版（须用户明确要求） | `upload` |
 
 ```bash
 wechatide -c <clientName> auto_preview --project <project>
 wechatide -c <clientName> auto_preview --project <project> --page-path pages/index/index --query id=1
+wechatide -c <clientName> auto_preview --project <project> --auto-preview-type pc
 wechatide -c <clientName> create_preview_qrcode --project <project> --qr-format window
-wechatide -c <clientName> upload --project <project> --upload-version 1.0.0 [--desc "备注"]
+wechatide -c <clientName> upload --project <project> --upload-version 1.0.0 [--desc "备注"] [--file-size true]
 ```
 
-`auto_preview` **不要**传本地输出路径类参数；需要落地二维码/信息文件时用 `create_preview_qrcode`。
+`--file-size` 可选，默认关闭。传入后，成功结果会带上文件级大小。
+
+`auto_preview` **不要**传本地输出路径类参数；需要落地二维码/信息文件时用 `create_preview_qrcode`。未传 `--auto-preview-type` 时沿用 IDE 当前设置（默认 mobile）。
 
 ## 边界
 

@@ -6,7 +6,7 @@
     {
       "id": "check_wechatide_status",
       "name": "读取微信开发者工具状态",
-      "summary": "只读获取登录态（loginExpired）、当前用户（loginUser）、skill 版本关系（versionRelation）以及是否启用 CLI 令牌（tokenRequired）；不触发登录。tokenRequired 为 true 时后续业务工具须带令牌。",
+      "summary": "只读获取登录态（loginExpired）、当前用户（loginUser）、skill 版本关系（versionRelation）、CLI 可选令牌（cliTokenRequired / 兼容字段 tokenRequired）以及 MCP 是否需要独立 Token（mcpTokenRequired，始终为 true）；不触发登录。wechatide -c / skill-call 走可选 CLI 令牌（未配置则不验，本工具还可跳过 CLI 令牌）；wechatide mcp / Inspector 等 MCP 入口始终需要独立 MCP Token。MCP 缺 Token 时应提示用户重新复制 MCP 配置；仅当 cliTokenRequired 为 true 时后续 CLI / skill-call 命令须带 CLI 令牌。",
       "group": "ide",
       "source": {
         "type": "wechatide"
@@ -52,7 +52,7 @@
     {
       "id": "open_project_window",
       "name": "打开项目窗口",
-      "summary": "打开包含模拟器的项目窗口。如果之前窗口已存在，则不打开新窗口，直接返回已打开的窗口 ID",
+      "summary": "打开包含模拟器的项目窗口。已存在则不新开且 windowMode 不切换；lite 不传 alwaysOnTop 时沿用上次置顶。",
       "group": "ide",
       "source": {
         "type": "wechatide"
@@ -74,6 +74,11 @@
             "fullMode"
           ],
           "description": "窗口模式：默认 liteMode（仅模拟器）；fullMode 包含编辑器、模拟器和调试器"
+        },
+        "alwaysOnTop": {
+          "type": "boolean",
+          "required": false,
+          "description": "是否置顶。仅 liteMode 生效：不传时沿用上次置顶（没有记录则默认置顶），传 false 关闭并记住。fullMode 忽略该参数。已打开的 lite 窗口不传则保持当前置顶，显式传入才会更新"
         }
       },
       "execution": {
@@ -276,8 +281,8 @@
     },
     {
       "id": "auto_preview",
-      "name": "推送手机预览",
-      "summary": "把预览直接推送到开发者微信，无需生成二维码文件。",
+      "name": "推送预览",
+      "summary": "把预览直接推送到开发者微信（手机或电脑），无需生成二维码文件。",
       "group": "project-action",
       "source": {
         "type": "wechatide"
@@ -304,6 +309,12 @@
           "type": "string",
           "required": false,
           "description": "指定的预览进入的场景值，如 1001"
+        },
+        "auto-preview-type": {
+          "type": "string",
+          "required": false,
+          "enum": ["mobile", "pc"],
+          "description": "推送平台：mobile（手机微信）或 pc（电脑微信）；不传则使用 IDE 当前设置"
         }
       },
       "execution": {
@@ -417,6 +428,12 @@
           "type": "string",
           "description": "上传的代码版本的描述信息。",
           "required": false
+        },
+        "file-size": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "为 true 时，成功结果的 info 增加 package_file_size，包含各分包内每个文件的 name 与 size（字节）。默认 false，不传时 info 不含该字段。"
         }
       },
       "execution": {
@@ -528,6 +545,112 @@
       "execution": {
         "transport": "skill_call",
         "toolName": "simulator_refresh"
+      }
+    },
+    {
+      "id": "simulator_get_device",
+      "name": "查询模拟器机型",
+      "summary": "查询当前模拟器机型和工具栏可选机型列表，不切换机型。返回项含 os，可用于区分 iOS 与 Android。",
+      "group": "project-action",
+      "source": {
+        "type": "wechatide"
+      },
+      "scenes": [
+        "simulator"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true,
+          "description": "项目绝对路径"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "simulator_get_device"
+      }
+    },
+    {
+      "id": "simulator_set_device",
+      "name": "设置模拟器机型",
+      "summary": "设置模拟器机型，名称与工具栏机型菜单一致。查询列表用 simulator_get_device。未知机型返回 success=false 和 devices，不切换。",
+      "group": "project-action",
+      "source": {
+        "type": "wechatide"
+      },
+      "scenes": [
+        "simulator"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true,
+          "description": "项目绝对路径"
+        },
+        "device": {
+          "type": "string",
+          "required": true,
+          "description": "机型名称，如 iPhone 15。先用 simulator_get_device 查看可选名称"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "simulator_set_device"
+      }
+    },
+    {
+      "id": "simulator_set_darkmode",
+      "name": "设置模拟器暗黑模式",
+      "summary": "设置模拟器暗黑模式。dark 为暗黑，light 为浅色，会立刻作用到当前模拟器。小游戏不支持，直接返回「小游戏不支持模拟器暗黑模式」。",
+      "group": "project-action",
+      "source": {
+        "type": "wechatide"
+      },
+      "scenes": [
+        "simulator"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true,
+          "description": "项目绝对路径"
+        },
+        "mode": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "dark",
+            "light"
+          ],
+          "description": "dark 为暗黑模式，light 为浅色模式"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "simulator_set_darkmode"
+      }
+    },
+    {
+      "id": "simulator_popup",
+      "name": "弹出模拟器",
+      "summary": "把模拟器弹出为独立窗口。窗口未开时先打开完整窗口再弹出。已打开的精简窗口无法改成完整窗口，弹出仍会失败。已弹出不重复拆窗。",
+      "group": "project-action",
+      "source": {
+        "type": "wechatide"
+      },
+      "scenes": [
+        "simulator"
+      ],
+      "inputSchema": {
+        "project": {
+          "type": "string",
+          "required": true,
+          "description": "项目绝对路径"
+        }
+      },
+      "execution": {
+        "transport": "skill_call",
+        "toolName": "simulator_popup"
       }
     },
     {
@@ -738,7 +861,7 @@
     {
       "id": "automation_element_action",
       "name": "元素级操作",
-      "summary": "读取或操作 selector 命中的元素；交互 action 会真实触发点击、输入、滚动或触摸事件，支持操作前等待。",
+      "summary": "读取或操作页面元素；有 selector 时按元素操作；tap/touch*/longpress 可改传 x/y（视口 CSS 像素）直接坐标触控，二者勿同时传；支持操作前等待。",
       "group": "automation",
       "source": {
         "type": "wechatide"
@@ -778,7 +901,8 @@
         },
         "selector": {
           "type": "string",
-          "required": true
+          "required": false,
+          "description": "元素选择器；tap/touch*/longpress 可省略并改传 x/y；其余 action 必填"
         },
         "type": {
           "type": "string",
@@ -798,19 +922,23 @@
         },
         "x": {
           "type": "number",
-          "required": false
+          "required": false,
+          "description": "x：坐标触控为视口 CSS 像素；scrollTo 为横向滚动位置"
         },
         "y": {
           "type": "number",
-          "required": false
+          "required": false,
+          "description": "y：坐标触控为视口 CSS 像素；scrollTo 为纵向滚动位置"
         },
         "touches": {
           "type": "array",
-          "required": false
+          "required": false,
+          "description": "触摸点数组（有 selector 的 touchstart/touchmove/touchend 需要）"
         },
         "changedTouches": {
           "type": "array",
-          "required": false
+          "required": false,
+          "description": "变化触摸点数组（有 selector 的 touchstart/touchmove/touchend 需要）"
         },
         "wait": {
           "type": "number",

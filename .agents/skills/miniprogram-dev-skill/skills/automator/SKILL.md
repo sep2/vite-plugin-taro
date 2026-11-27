@@ -29,7 +29,7 @@ description: >-
 | 意图 | 工具 |
 |------|------|
 | 页面导航 | `automation_navigate` |
-| 点击/输入/长按/读文本/样式/触摸 | `automation_element_action`（必须带 `selector`） |
+| 点击/输入/长按/读文本/样式/触摸 | `automation_element_action`（元素用 `selector`；`tap`/`touch*`/`longpress` 也可只传 `x`/`y` 坐标） |
 | 读/写 page data、querySelector、callMethod | `automation_page_action` |
 | 页面滚动；真机调试 / 关工具 | `automation_viewport_action`（`pageScrollTo` / `remote` / `close`） |
 | 截图 | `simulator_screenshot` |
@@ -43,6 +43,7 @@ description: >-
 
 ```bash
 wechatide -c <clientName> automation_element_action --project <project> --selector button --action tap --wait-for-selector button
+wechatide -c <clientName> automation_element_action --project <project> --action tap --x 195 --y 471
 wechatide -c <clientName> automation_page_action --project <project> --action querySelectorAll --selector button
 wechatide -c <clientName> simulator_screenshot --project <project> --path <localOutputPath>
 ```
@@ -51,8 +52,10 @@ wechatide -c <clientName> simulator_screenshot --project <project> --path <local
 
 - 元素交互只用 `automation_element_action`，不是 `automation_viewport_action`
 - `automation_viewport_action` **不支持** tap/input
+- `tap` / `touch*` / `longpress`：传 `selector` 或传 `x`+`y`（视口 CSS 像素），**不要同时传**；其余 action 仍必须 `selector`
+- 坐标点击可先 `simulator_screenshot` / `offset` 估点，再 `--action tap --x … --y …`
 - 不要对小程序项目调用 `automation_game_action`
-- 生成脚本先在项目目录 `npm i miniprogram-automator`，再用 `node <script> [projectPath]` 运行；不传路径时用录制时的项目路径
+- 生成脚本先在项目目录 `npm i miniprogram-automator`，再用 `node <script> [projectPath]` 运行；不传路径时用录制时的项目路径；坐标触控不会生成可运行的 element.tap 语句
 
 ### 失败快表
 

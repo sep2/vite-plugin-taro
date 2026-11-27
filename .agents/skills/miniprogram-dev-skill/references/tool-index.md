@@ -6,9 +6,9 @@
 
 | id | scene | 摘要 |
 |----|-------|------|
-| `check_wechatide_status` | initializer | 只读获取登录态（loginExpired）、当前用户（loginUser）、skill 版本关系（versionRelation）以及是否启用 CLI 令... |
+| `check_wechatide_status` | initializer | 只读获取登录态（loginExpired）、当前用户（loginUser）、skill 版本关系（versionRelation）、CLI 可选令牌（cl... |
 | `close_project_window` | initializer | 关闭包含模拟器的项目窗口，不等于完全退出微信开发者工具 |
-| `open_project_window` | initializer | 打开包含模拟器的项目窗口。如果之前窗口已存在，则不打开新窗口，直接返回已打开的窗口 ID |
+| `open_project_window` | initializer | 打开包含模拟器的项目窗口。已存在则不新开且 windowMode 不切换；lite 不传 alwaysOnTop 时沿用上次置顶。 |
 | `quit` | initializer | 关闭 WechatIDE。 |
 | `login` | initializer | 触发扫码登录并返回 taskId；可打开独立置顶窗口，或直接向 agent 返回二维码图片。 |
 | `polling_task_result` | initializer（主；亦可 project-manager, compiler, previewer, debugger, automator, cloudbase-operator） | 通用异步结果查询：任何需要用户授权、扫码或操作确认的 toolCall 都会返回 taskId。 |
@@ -17,19 +17,23 @@
 | `import_minicode` | project-manager | 通过代码片段链接导入项目并加入项目列表，不打开项目窗口；导入后须先检查代码安全性。 |
 | `project_list` | project-manager | 只读列出微信开发者工具已导入的项目列表；默认返回主列表（小程序/小游戏等），可通过 scope 查看其他项目。不等于打开项目窗口。 |
 | `project_remove` | project-manager | 从项目列表移除项目，不删除磁盘文件，不等于关闭整个微信开发者工具。 |
-| `auto_preview` | previewer | 把预览直接推送到开发者微信，无需生成二维码文件。 |
+| `auto_preview` | previewer | 把预览直接推送到开发者微信（手机或电脑），无需生成二维码文件。 |
 | `build_npm` | compiler | 构建 npm。 |
 | `create_preview_qrcode` | previewer | 生成可扫码的小程序预览二维码。默认使用 qr-format=window 在新窗口中展示，无需指定本地输出路径。 |
 | `upload` | previewer | 上传代码包(发布体验版)。仅在用户明确要求「上传代码」或者「发布体验版」时调用。 |
 | `simulator_open_page` | compiler | 触发项目窗口模拟器编译并打开指定页面。 |
 | `simulator_refresh` | compiler | 触发项目窗口模拟器重新编译/刷新当前页面；不返回编译结果 |
+| `simulator_get_device` | simulator | 查询当前模拟器机型和工具栏可选机型列表，不切换机型。返回项含 os，可用于区分 iOS 与 Android。 |
+| `simulator_set_device` | simulator | 设置模拟器机型，名称与工具栏机型菜单一致。查询列表用 simulator_get_device。未知机型返回 success=false 和 device... |
+| `simulator_set_darkmode` | simulator | 设置模拟器暗黑模式。dark 为暗黑，light 为浅色，会立刻作用到当前模拟器。小游戏不支持，直接返回「小游戏不支持模拟器暗黑模式」。 |
+| `simulator_popup` | simulator | 把模拟器弹出为独立窗口。窗口未开时先打开完整窗口再弹出。已打开的精简窗口无法改成完整窗口，弹出仍会失败。已弹出不重复拆窗。 |
 | `get_simulator_console` | debugger | 对小程序 console 缓冲区执行 grep 过滤并返回命中行。command 是 grep 命令字符串（不含文件名），如 'grep -i error... |
 | `get_simulator_network` | debugger | 对小程序 network 缓冲区执行 grep 过滤并返回命中行。command 是 grep 命令字符串（不含文件名）。要获取全部请求记录请用 'gre... |
 | `simulator_screenshot` | debugger（主；亦可 automator） | 截图；返回 path + imageWidth/imageHeight；默认优化尺寸（长边 1280 JPEG） |
 | `get_user_appids` | initializer | 获取当前登录用户可管理的全部 AppID 列表。可通过 type 按小程序/小游戏过滤。 |
 | `compile_wxml` | compiler | 只读获取 WXML 模板的编译结果摘要，用于诊断模板编译产物；不是整页编译或预览。 |
 | `compile_wxss` | compiler | 只读获取 WXSS 样式的编译结果摘要，用于诊断样式编译产物；不是整页编译或预览。 |
-| `automation_element_action` | automator | 读取或操作 selector 命中的元素；交互 action 会真实触发点击、输入、滚动或触摸事件，支持操作前等待。 |
+| `automation_element_action` | automator | 读取或操作页面元素；有 selector 时按元素操作；tap/touch*/longpress 可改传 x/y（视口 CSS 像素）直接坐标触控，二者勿... |
 | `automation_game_action` | automator | 小游戏画布触摸：tap / swipe / touch*；坐标默认画布空间，可用 coordinateSpace=image + imageWidth/H... |
 | `automation_evaluate` | automator | 在当前小程序或小游戏运行时执行一段 JS 函数字符串并返回结果。该工具会实际执行代码，不是只读查询 |
 | `automation_generate_script` | automator | 把已记录调用生成可用 node 运行的 automator 脚本；不传项目路径时使用录制时的路径。 |

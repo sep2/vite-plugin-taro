@@ -1,11 +1,14 @@
 ---
 name: wechatide-skill
-version: 0.3.10
+version: 0.3.18
 description: >-
   微信开发者工具（wechatide）工作流根入口：小程序/小游戏的创建与导入、编译预览上传、
   登录与项目管理、页面自动化、调试取证、云开发，以及开发者工具的下载安装更新。
   当当前项目明确是微信小程序或小游戏时使用；用户提到微信开发者工具、小程序/小游戏模拟器、
   新建项目、预览上传、自动化点击、console/network、云函数/云数据库、下载安装开发者工具时也使用。
+  询问 CLI/HTTP、设置项、Nightly 与稳定版差异、Skills 安装等官方文档口径时也使用，
+  先读 references/docs-skill-index.md，不要改调 wechatide。
+  project.config 字段含义以 references/project-config-fields.md 为准，官方文档只补充未覆盖字段。
 metadata:
   short-description: 微信开发者工具 skill 包
 related-skills:
@@ -33,7 +36,7 @@ related-skills:
 
 日常业务会话：默认假设本机已可调用 `wechatide`，需要时先跑 `check_wechatide_status`（见下方门禁），再进对应 scene。**不要**每个业务会话开头先跑安装检查。
 
-**应使用**：小程序/小游戏的编译、预览、上传、登录、项目管理与 `project.config.json`；页面自动化与验证；运行时/截图/日志排查；云环境与云函数；以及下载、安装或更新微信开发者工具。
+**应使用**：小程序/小游戏的编译、预览、上传、登录、项目管理与 `project.config.json`；页面自动化与验证；运行时/截图/日志排查；云环境与云函数；下载、安装或更新微信开发者工具；以及 CLI/HTTP、设置项、版本线差异的官方文档口径。`project.config.json` 字段含义以包内字段表为准。
 
 **不应使用**：通用编码辅助；与小程序/小游戏无关的桌面自动化；任意 shell / 未注册工具调用。
 
@@ -45,7 +48,7 @@ related-skills:
 
 ## 运行前门禁（必须）
 
-**按实际访问能力判断环境是否可用，不因 sandbox 标签直接停止。** 可在当前 shell 中执行下方状态检查；若系统权限或隔离策略阻止访问开发者工具，报告具体错误并请求所需授权或切换环境，勿绕过系统限制或反复重试。
+**禁止在沙箱 / sandbox 中运行 `wechatide`。** 须在非沙箱、可访问本机桌面的 shell 中执行；环境强制沙箱时先向用户说明并改用非沙箱，勿反复重试。
 
 需要 `wechatide` 时按下面做；完整规则见 [运行前检查](references/environment-readiness.md)。
 
@@ -54,9 +57,9 @@ related-skills:
    `wechatide -c <clientName> check_wechatide_status --skill-version <本文件 frontmatter 的 version>`
    → 按运行前检查处理返回。**可继续业务**仅当：`versionRelation` 为 `equal` / `agent_ahead`，且 `loginExpired: false`（再按第 3 步处理 token）
 2. 若上一步（或任意 `wechatide` 调用）命令不存在 / 无法执行 → 安装诊断；命令可用时不要主动跑
-3. `tokenRequired: true` → 复用已记 token，否则问用户（「设置 → 安全」）；禁止猜 / 翻本地
+3. 分入口处理 Token：`wechatide -c` / skill-call 走可选 CLI 令牌，未配置则不验；仅当 `cliTokenRequired` / 兼容字段 `tokenRequired` 为 true 或返回 `cli_token_required` 时才带 CLI 令牌（复用已记 token，否则问用户）。`wechatide mcp` / Inspector 才需要独立 MCP Token（`mcpTokenRequired: true`）；缺 Token / `mcp_token_required` → 请用户到「设置 → 安全」**重新复制 MCP 配置**，不要把 CLI 可选令牌当成 MCP Token。禁止猜 / 翻本地
 
-跳过：`installer`、`project-config`。用户要下载/安装/更新可直接进 `installer`。
+跳过：`installer`、`project-config`、只查官方文档（[docs-skill-index](references/docs-skill-index.md)，不调用 `wechatide`）。用户要下载/安装/更新可直接进 `installer`。
 
 ## 异步任务（全局）
 
@@ -74,7 +77,7 @@ wechatide -c <clientName> <toolName> [flags...] [--token <cliAccessToken>]
 - `-c`：当前 agent 产品简称（如 `CodeBuddy`、 `Cursor`），须与授权弹窗一致，同一会话内不变
 - `<toolName>`：下划线工具名；勿编造，先查 [tool-index](references/tool-index.md) 或 `wechatide <toolName> -h`
 - `--token` / clientName 细则 → [运行前检查](references/environment-readiness.md)
-- `--project` 等需要路径的参数，使用本地绝对路径；
+- `--project` 等需要路径的参数，使用本地绝对路径；项目目录与存放位置的区别见 [项目目录的判断](wechatide-tools/references/project-tool-error-guide.md#项目目录的判断)，路径不明时先定位，不靠补配置让工具通过；
 - 参数类型是 `object`/`array` 可用 JSON 或 `--<field>-file` 指定一个本地绝对路径
 
 共享工具以 tool-index **主归属**为准；次要 scene 仅可按本 scene 文档调用，勿跨 scene 随便混用：
@@ -99,10 +102,12 @@ wechatide -c <clientName> <toolName> [flags...] [--token <cliAccessToken>]
 | 项目列表查询 / 导入 / 从列表删除、代码片段分享 / 导入（不开窗口） | `skills/project-manager/SKILL.md` |
 | 改 `project.config.json`（修改基础库版本、域名校验、热重载、编译开关等，不调 MCP） | `skills/project-config/SKILL.md` |
 | 编译页面、单文件编译、构建 npm、刷新模拟器 | `skills/compiler/SKILL.md` |
+| 模拟器工具栏：查询/切换机型、暗黑模式、弹出模拟器 | `skills/simulator/SKILL.md` |
 | 预览、二维码、上传体验版（预览优先 `auto_preview`；可不打开窗口） | `skills/previewer/SKILL.md` |
 | 点击、输入、滚动、页面断言、自动化脚本 | `skills/automator/SKILL.md` |
 | console / network / 截图取证 / 状态诊断 | `skills/debugger/SKILL.md` |
 | 云环境、云函数、云数据库、云存储、消息推送 | `skills/cloudbase-operator/SKILL.md` |
+| 问开发者工具官方文档：CLI/HTTP、设置项、Nightly 与稳定版差异、Skills 安装说明（只解释，不执行）。`project.config.json` 字段含义以包内字段表为准 | 包内索引：[docs-skill-index](references/docs-skill-index.md) |
 | 小程序地图组件 / 腾讯位置服务 API | 外部 skill：`tencentmap-miniprogram-skill`（前端）/ `tencentmap-webservice-skill`（后端）——本包不处理，需触发主动下载；详见 [map-skill-index](references/map-skill-index.md) |
 
 选择原则：按**当前主目标**进一个 scene；不要跨 scene 混用原子工具。多目标时先完成 blocker，再移交。
@@ -125,6 +130,7 @@ wechatide -c <clientName> <toolName> [flags...] [--token <cliAccessToken>]
 ## 标准工作流
 
 1. 识别目标并路由（见上表）：
+   - 只查官方文档口径 → [docs-skill-index](references/docs-skill-index.md)（跳过门禁，不调用 `wechatide`）
    - 只改项目配置 → `project-config`（跳过门禁）
    - 从零创建 → `create-project-guide.md`（本地目录/配置可先做；**第一次**调用 `wechatide` 前完成门禁）
    - 管理项目列表或分享 / 导入代码片段 → `project-manager`
@@ -137,7 +143,7 @@ wechatide -c <clientName> <toolName> [flags...] [--token <cliAccessToken>]
 
 异步任务 → [异步任务与轮询](references/async-task-polling.md)（规则见上方「异步任务（全局）」）。安全边界 → [approval-policy.md](references/approval-policy.md)。
 
-执行失败：原样抛出错误，不要吞掉或猜测修复。`PROJECT_PATH_NOT_FOUND` / `PROJECT_CONFIG_JSON_ERROR` / `APPID_ERROR` 见 [project-tool-error-guide.md](wechatide-tools/references/project-tool-error-guide.md)（勿改成调用前预检）。各 scene「失败快表」只补充本场景特有处理。
+执行失败：原样抛出错误，不要吞掉或猜测修复。`PROJECT_PATH_NOT_FOUND` / `PROJECT_CONFIG_JSON_ERROR` / `APPID_ERROR` 见 [project-tool-error-guide.md](wechatide-tools/references/project-tool-error-guide.md)；已有项目缺配置时先定位项目 / 构建输出，不能自动转为新建。各 scene「失败快表」只补充本场景特有处理。
 
 ## 参考
 
@@ -148,3 +154,4 @@ wechatide -c <clientName> <toolName> [flags...] [--token <cliAccessToken>]
 - `--project` 配置/appid 错误：`wechatide-tools/references/project-tool-error-guide.md`
 - 创建项目：`wechatide-tools/references/create-project-guide.md`
 - 地图外部 skill：`tencentmap-miniprogram-skill` / `tencentmap-webservice-skill`，索引见 `references/map-skill-index.md`
+- 官方文档口径：`references/docs-skill-index.md`

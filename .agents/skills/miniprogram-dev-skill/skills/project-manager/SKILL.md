@@ -16,7 +16,7 @@ description: >-
 ## 流程
 
 1. `project_list`（默认 `miniprogram`；可用 `--scope other|all`）
-2. 纳入列表：`project_import --project <absPath>`
+2. 明确目标目录后纳入列表：`project_import --project <absPath>`；目录选择见 [项目目录的判断](../../wechatide-tools/references/project-tool-error-guide.md#项目目录的判断)
 3. 分享代码片段：`share_minicode --project <absPath>`
 4. 导入代码片段：`import_minicode --link <link>`；检查导入目录中的代码后，才能调用 `open_project_window`
 5. 移除列表：`project_remove --project <absPath>`（需用户确认；只删列表项，不删磁盘；窗口开着会一并关）
@@ -34,7 +34,7 @@ wechatide -c <clientName> project_remove --project <absPath>
 
 | vs initializer | |
 |----------------|--|
-| `project_import` | 导入到项目列表（会校验路径/配置/appid；错误见 [project-tool-error-guide.md](../../wechatide-tools/references/project-tool-error-guide.md)） |
+| `project_import` | 校验路径、配置和 AppID 后登记到项目列表；导入成功不代表项目可运行或目录选择正确（错误见 [project-tool-error-guide.md](../../wechatide-tools/references/project-tool-error-guide.md)） |
 | `open_project_window` | 打开模拟器窗口 |
 | `close_project_window` | 关窗，列表项仍在（不做上述校验） |
 
@@ -42,7 +42,7 @@ wechatide -c <clientName> project_remove --project <absPath>
 
 | 情况 | 处理 |
 |------|------|
-| `PROJECT_*` / `APPID_ERROR`（import） | [project-tool-error-guide.md](../../wechatide-tools/references/project-tool-error-guide.md) |
+| `project_import` 的 `PROJECT_*` / `APPID_ERROR`，或 `share_minicode` 的 `PROJECT_*` | [project-tool-error-guide.md](../../wechatide-tools/references/project-tool-error-guide.md)；分享不校验 AppID |
 | `share_minicode` 登录态失效 | 先完成登录，再重试分享 |
 | `import_minicode` 返回项目路径 | 先安全检查代码，再调用 `open_project_window` |
 | `project_remove` 待确认（`pending`）或用户拒绝 / 取消 | 勿自动再删；pending 按 [异步任务与轮询](../../references/async-task-polling.md)（根 SKILL「异步任务（全局）」） |

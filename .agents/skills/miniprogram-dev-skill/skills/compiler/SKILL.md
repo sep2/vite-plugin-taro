@@ -56,3 +56,4 @@ wechatide -c <clientName> build_npm --project <project> [--compile-type miniprog
 | automator | 已打开的页面路径、待验证点 |
 | debugger | 编译后现象、目标页、是否已 refresh |
 | previewer | `project`；可不经模拟器直接预览 |
+| simulator | 切换机型、暗黑模式、弹出模拟器 |

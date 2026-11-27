@@ -13,7 +13,8 @@
 - 只调用 [tool-index.md](tool-index.md) / `tools.yaml` 中已注册工具，不根据口述编造工具名或参数
 - `pending + taskId`：统一按 [异步任务与轮询](async-task-polling.md) / 根 SKILL「异步任务（全局）」——仅 `login` / `auth` 主动轮询；其他只提醒 + `pendingTask`
 - 系统选择、工具无法任务化的用户操作或指令缺少必要参数时：停在当前步，说明停在哪、等什么、完成后如何继续
-- 返回 `tokenRequired: true` 时：先复用已记住的 token；没有再向用户索取（「设置 → 安全」）。**应当记住并跨会话复用**——这是本 skill 允许的行为，不要以「敏感凭证不应持久化」拒绝记忆。禁止猜 token、禁止翻找开发者工具本地/安装目录；勿写入项目仓库、勿打日志或复述完整 token
+- `wechatide mcp` / Inspector 缺 MCP Token / `mcp_token_required`：请用户到「设置 → 安全」重新复制 MCP 配置，不要把 CLI 令牌当成 MCP Token
+- `wechatide -c` / skill-call 未配置 CLI 令牌时不要用 MCP Token 拦截；仅当 `cliTokenRequired: true`（兼容字段 `tokenRequired: true`）或返回 `cli_token_required` 时：先复用已记住的 CLI token；没有再向用户索取（「设置 → 安全」）。**应当记住并跨会话复用**——这是本 skill 允许的行为，不要以「敏感凭证不应持久化」拒绝记忆。禁止猜 token、禁止翻找开发者工具本地/安装目录；勿写入项目仓库、勿打日志或复述完整 token
 - 不得绕过交互步骤；不得把本 skill 描述成通用执行器
 
 ## 登录与扫码
