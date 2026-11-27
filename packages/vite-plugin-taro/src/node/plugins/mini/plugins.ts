@@ -168,12 +168,13 @@ function createMiniPlugin(
                     }
                     case 'native':
                     case 'amphibious': {
-                        // Native and amphibious modules share the CommonJS renderer
+                        // Native and amphibious modules share the CommonJS renderer.
                         return renderNative({
                             code,
                             chunk,
                             chunks: meta.chunks,
                             getPhysicalChunkId: placer.getPhysicalChunkId,
+                            pageLoader: resolver.getPageLoader(chunk.facadeModuleId),
                             sourcemap
                         })
                     }
@@ -195,7 +196,13 @@ function createMiniPlugin(
                 const subpackages = placer.getSubpackages()
 
                 // Emit after minification so native loaders always receive quoted literal paths, without a repair pass.
-                this.emitFile(createTransportOutput({ bundle, getPackageLocation: placer.getPackageLocation }))
+                for (const file of createTransportOutput({
+                    bundle,
+                    subpackages,
+                    getPackageLocation: placer.getPackageLocation
+                })) {
+                    this.emitFile(file)
+                }
 
                 const outputFiles = await createOutputFiles({
                     bundle,

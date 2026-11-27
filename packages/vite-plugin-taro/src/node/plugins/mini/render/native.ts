@@ -98,12 +98,14 @@ export function renderNative({
     chunk,
     chunks,
     getPhysicalChunkId,
+    pageLoader,
     sourcemap
 }: {
     code: string
     chunk: Rolldown.RenderedChunk
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
     getPhysicalChunkId: (chunk: Rolldown.RenderedChunk | string) => string
+    pageLoader?: string
     sourcemap: boolean
 }): AstTransformResult {
     const parsed = parseSync(chunk.fileName, code)
@@ -113,7 +115,7 @@ export function renderNative({
     }
 
     // Resolve scopes, helper names, and capsule identities before creating the local source editor.
-    const model = analyzeNativeModule(parsed.program, chunk, chunks, getPhysicalChunkId)
+    const model = analyzeNativeModule(parsed.program, chunk, chunks, getPhysicalChunkId, pageLoader)
     const editor = new RolldownMagicString(code, { filename: chunk.fileName })
 
     // Expression edits split untouched source ranges first. Declaration replacement runs afterwards because MagicString must
@@ -151,7 +153,8 @@ function analyzeNativeModule(
     program: Program,
     chunk: Rolldown.RenderedChunk,
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>,
-    getPhysicalChunkId: (chunk: Rolldown.RenderedChunk | string) => string
+    getPhysicalChunkId: (chunk: Rolldown.RenderedChunk | string) => string,
+    pageLoader: string | undefined
 ): NativeModuleModel {
     // Analysis-local collections accumulate the complete module model before any source edits.
     const identifierNames = new Set<string>()
@@ -253,7 +256,7 @@ function analyzeNativeModule(
         // Placement owns physical paths; capsule identities below stay package-neutral. Resolve only loader users.
         const relative = path.posix.relative(
             path.posix.dirname(getPhysicalChunkId(chunk)),
-            getPhysicalChunkId(miniBootstrapId)
+            pageLoader ?? getPhysicalChunkId(miniBootstrapId)
         )
         const reference = relative.startsWith('../') ? relative : `./${relative}`
         const local = takeGeneratedName('__nativeSystem', identifierNames)

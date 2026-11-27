@@ -46,7 +46,7 @@ function getPackageLocation(chunk: Rolldown.OutputChunk): PackageLocation {
 }
 
 function emit(bundle: Rolldown.OutputBundle) {
-    return createTransportOutput({ bundle, getPackageLocation })
+    return createTransportOutput({ bundle, subpackages: [], getPackageLocation })[0]
 }
 
 /** Evaluates the emitted CommonJS directly, without another code generator changing its literal paths. */
@@ -259,10 +259,50 @@ test('emits an empty table without loading native shells', () => {
     const shell = createChunk('app.js', 'native')
     const output = createTransportOutput({
         bundle: { [shell.fileName]: shell },
+        subpackages: [],
         getPackageLocation: () => assert.fail('Native shells have no transport route')
-    })
+    })[0]
     const load = evaluate(output.source, () => assert.fail('An empty table must never load a module'))
     assert.throws(() => load('missing.js'), { message: 'Unknown module: missing.js' })
+})
+
+test('emits a local loader only for a package with pages and uses the final bootstrap filename', () => {
+    const bootstrap = { ...createChunk('runtime/bootstrap-resolved.js', 'amphibious'), facadeModuleId: miniBootstrapId }
+    const orders = { ...createChunk('orders/detail.js', 'entry-capsule'), isEntry: true }
+    const account = createChunk('account/common/profile-resolved.js', 'normal-capsule')
+    const files = createTransportOutput({
+        bundle: Object.fromEntries([orders, account, bootstrap].map((chunk) => [chunk.fileName, chunk])),
+        subpackages: [
+            { root: 'orders', pages: ['detail'] },
+            { root: 'account', pages: [] }
+        ],
+        getPackageLocation(chunk) {
+            return chunk === bootstrap
+                ? { kind: 'main' }
+                : { kind: 'subpackage', root: chunk === orders ? 'orders' : 'account' }
+        }
+    })
+    assert.deepEqual(
+        files.map((file) => file.fileName),
+        [miniTransportOutputPath, 'orders/common/vpt-page-loader.js']
+    )
+    const loader = files[1]
+    assert.ok(loader)
+    assert.ok(loader.source.includes('require("../../runtime/bootstrap-resolved.js")'))
+    assert.ok(loader.source.includes('case "orders/detail.js":return require("../detail.js")'))
+    assert.doesNotMatch(loader.source, /account|profile/)
+})
+
+test('requires a bootstrap entry to generate a package page loader', () => {
+    assert.throws(
+        () =>
+            createTransportOutput({
+                bundle: {},
+                subpackages: [{ root: 'orders', pages: ['detail'] }],
+                getPackageLocation
+            }),
+        /shared Mini Program bootstrap entry/
+    )
 })
 
 test('rejects amphibious modules outside the main package', () => {

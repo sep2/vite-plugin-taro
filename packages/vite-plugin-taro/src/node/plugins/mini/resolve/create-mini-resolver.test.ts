@@ -91,7 +91,8 @@ test('resolves fixed IDs and configured Page IDs', () => {
             capsuleId: `${modules.pageCapsule}?route=pages%2Fhome%2Findex`,
             capsuleName: 'pages/home/index-capsule',
             shellId: `${modules.pageShell}?route=pages%2Fhome%2Findex`,
-            shellName: 'pages/home/index.js'
+            shellName: 'pages/home/index.js',
+            pageLoader: undefined
         }
     ])
     const pageCapsule = resolver.resolveId(pageCapsuleId, '/runtime/page.js?route=pages%2Fhome%2Findex', projectRoot)
@@ -158,7 +159,8 @@ test('preserves resolved Page order in the App-owned entries', () => {
             capsuleId: `${modules.pageCapsule}?route=pages%2Fz-last%2Findex`,
             capsuleName: 'pages/z-last/index-capsule',
             shellId: `${modules.pageShell}?route=pages%2Fz-last%2Findex`,
-            shellName: 'pages/z-last/index.js'
+            shellName: 'pages/z-last/index.js',
+            pageLoader: undefined
         },
         {
             option: pages[1],
@@ -166,7 +168,8 @@ test('preserves resolved Page order in the App-owned entries', () => {
             capsuleId: `${modules.pageCapsule}?route=features%2Faccount%2Fpages%2Fa-first%2Findex`,
             capsuleName: 'features/account/pages/a-first/index-capsule',
             shellId: `${modules.pageShell}?route=features%2Faccount%2Fpages%2Fa-first%2Findex`,
-            shellName: 'features/account/pages/a-first/index.js'
+            shellName: 'features/account/pages/a-first/index.js',
+            pageLoader: undefined
         }
     ])
     assert.deepEqual(appEntry, createMiniResolver(input).appEntry)
@@ -182,12 +185,33 @@ test('resolves a named package entry by public route and loads its declared comp
     assert.equal(entry.route, 'orders/detail')
     assert.equal(entry.option.subpackage, 'orders')
     assert.equal(entry.shellName, 'orders/detail.js')
+    assert.equal(entry.pageLoader, 'orders/common/vpt-page-loader.js')
     const root = path.resolve('/project')
     assert.equal(resolver.resolveId(pageCapsuleId, entry.shellId, root), entry.capsuleId)
     assert.equal(
         resolver.resolveId(pageComponentId, entry.capsuleId, root),
         normalizePath(path.join(root, 'src/detail.tsx'))
     )
+})
+
+test('selects the package loader by declared Page shell identity', () => {
+    const resolver = createMiniResolver({
+        ...contract,
+        options: { ...contract.options, pages: [{ path: 'home' }, { path: 'detail', subpackage: 'orders' }] }
+    })
+    const [home, detail] = resolver.pages
+    assert.ok(home && detail)
+    assert.equal(resolver.getPageLoader(detail.shellId), 'orders/common/vpt-page-loader.js')
+    for (const facade of [
+        home.shellId,
+        detail.capsuleId,
+        miniAppShellId,
+        miniBootstrapId,
+        null,
+        `${miniPageShellId}?route=orders%2Fmissing`
+    ]) {
+        assert.equal(resolver.getPageLoader(facade), undefined, String(facade))
+    }
 })
 
 test('retains App entries with an empty resolved Page list', () => {

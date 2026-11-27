@@ -45,6 +45,11 @@ export const miniTransportId = '\0vpt:mini-transport'
 
 export const miniTransportOutputPath = 'common/vpt-transport.js'
 
+/** Shared by the page shells in one declared package. */
+export function pageLoaderFileName(root: string): string {
+    return `${root}/common/vpt-page-loader.js`
+}
+
 /** Resolves the host implementation used by the shared React renderer. */
 export const rendererHostId = '\0vpt:renderer-host'
 

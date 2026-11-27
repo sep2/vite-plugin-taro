@@ -8,6 +8,7 @@ import { pageMetadataKey } from '../../page/page-metadata-key.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import {
     appShellFileName,
+    isMiniPageShell,
     miniAppCapsuleId,
     miniAppShellId,
     miniBootstrapId,
@@ -66,6 +67,15 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
 
         pages,
 
+        /** Only a declared subpackage Page shell enters the graph through its package-local loader. */
+        getPageLoader(facadeModuleId: string | null): string | undefined {
+            if (!isMiniPageShell(facadeModuleId)) {
+                return undefined
+            }
+            const route = readPageRoute(facadeModuleId)
+            return route ? pageByRoute.get(route)?.pageLoader : undefined
+        },
+
         resolveId(
             id: string,
             importer: string | undefined,
@@ -111,13 +121,18 @@ export function createMiniResolver(contract: Pick<MiniContract, 'options' | 'tar
     }
 }
 
+/** Shell and capsule facades identify the same declared Page through their route query. */
+function readPageRoute(moduleId: string | null | undefined): string | null {
+    const queryIndex = moduleId?.indexOf('?') ?? -1
+    return queryIndex === -1 ? null : new URLSearchParams(moduleId?.slice(queryIndex + 1)).get('route')
+}
+
 /** Returns the configured Page identified by a route-qualified capsule ID. */
 function requirePage(
     moduleId: string | undefined,
     pageByRoute: ReadonlyMap<string, MiniResolvedPage>
 ): MiniResolvedPage {
-    const queryIndex = moduleId?.indexOf('?') ?? -1
-    const route = queryIndex === -1 ? undefined : new URLSearchParams(moduleId?.slice(queryIndex + 1)).get('route')
+    const route = readPageRoute(moduleId)
     const page = route ? pageByRoute.get(route) : undefined
     if (!page) {
         throw new Error(

@@ -207,8 +207,14 @@ function createMiniOutputPlugin(): Plugin {
         },
         generateBundle(_outputOptions, bundle) {
             assert.ok(placement)
-            placement.finalize(bundle)
-            this.emitFile(createTransportOutput({ bundle, getPackageLocation: placement.getPackageLocation }))
+            const subpackages = placement.finalize(bundle)
+            for (const file of createTransportOutput({
+                bundle,
+                subpackages,
+                getPackageLocation: placement.getPackageLocation
+            })) {
+                this.emitFile(file)
+            }
         }
     }
 }
