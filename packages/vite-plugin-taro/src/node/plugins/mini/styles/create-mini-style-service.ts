@@ -1,13 +1,14 @@
 import path from 'node:path'
 import { Scanner } from '@tailwindcss/oxide'
 import { createTailwindV4Engine, resolveTailwindV4Source, type TailwindV4Engine } from '@tailwindcss-mangle/engine/v4'
-import { type BuildOptions, type Logger, normalizePath } from 'vite'
+import { type BuildOptions, type Logger, normalizePath, type Rolldown } from 'vite'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { tailwindcssBasedir } from '../../tailwind/tailwind-css.ts'
 import type { MiniContract } from '../mini-contract.ts'
 import { createMiniTransformer } from './create-mini-transformer.ts'
 import { miniHtmlBase } from './mini-html-base.ts'
 import { minifyMiniStylesheet } from './minify-mini-stylesheet.ts'
+import { pageStyleBytesKey } from './page-style-bytes.ts'
 import { projectMiniStyles } from './project-mini-styles.ts'
 
 /** Persistent Tailwind state owned by one physical CSS root across incremental Rolldown transforms. */
@@ -50,7 +51,8 @@ type MiniEntries = Parameters<typeof projectMiniStyles>[0]
 
 type ModuleGraph = Parameters<typeof projectMiniStyles>[2]
 
-type BuildContext = ModuleGraph & {
+type BuildContext = {
+    getModuleInfo(id: string): Pick<Rolldown.ModuleInfo, 'importedIds' | 'dynamicallyImportedIds' | 'meta'> | null
     resolve(id: string): Promise<{ id: string } | null>
 }
 
@@ -157,8 +159,9 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
  *
  * ### 5a. Complete-build commit
  *
- * The adapter's post-order `generateBundle` hook gathers all JavaScript chunks, finalizes them as one operation, and only then mutates the
- * bundle. It assigns converted code, clears invalid source maps, removes Vite's intermediate browser stylesheet, and always
+ * Automatic placement of split-style Page packages prepares native CSS at renderStart so packing counts emitted bytes.
+ * The adapter's post-order generateBundle reuses that transaction, or prepares it here when no reservation is needed.
+ * It gathers all JavaScript chunks, finalizes them as one operation, and only then mutates the bundle. It assigns converted code, clears invalid source maps, removes Vite's intermediate browser stylesheet, and always
  * emits the App stylesheet with HTML defaults and every Page stylesheet, including empty Pages. Native output hooks run
  * afterward without Page-style placeholders; opaque native-component styles remain independently owned.
  *
@@ -205,6 +208,8 @@ const tailwindcssEntryPath = normalizePath(path.join(tailwindcssBasedir, 'index.
 export function createMiniStyleService(contract: Pick<MiniContract, 'styles'>, policy: StylePolicy) {
     // Construction fixes the output policy and transformer; all builds and HMR reuse this bounded conversion cache.
     const finalizeOutput = createFinalizeOutput(contract.styles, policy.cssMinify, policy.logger)
+    // Page shells publish their stylesheet sizes before renderChunk; generateBundle emits those same bytes.
+    let budgetedStyles: Awaited<ReturnType<typeof finalizeOutput.build>> | undefined
     // bindEntries atomically replaces these entry records with resolved capsules while preserving native output metadata.
     let resolvedEntries: MiniEntries
     // bindEntries installs this mutable context because the development host finalizes output outside a Rolldown plugin hook.
@@ -213,6 +218,10 @@ export function createMiniStyleService(contract: Pick<MiniContract, 'styles'>, p
     const styleByModuleId = new Map<string, StyleModule>()
     // Each mutable per-file frontier advances after a durable write, allowing partial publication failures to retry safely.
     const publishedStylesheets = new Map<string, string>()
+
+    function prepareBuildStyles(graph: ModuleGraph) {
+        return finalizeOutput.build(projectMiniStyles(resolvedEntries, styleByModuleId, graph, policy.cssCodeSplit))
+    }
 
     return {
         /** Resolves exact graph roots and captures the graph reader used by host calls outside plugin hooks. */
@@ -229,6 +238,17 @@ export function createMiniStyleService(contract: Pick<MiniContract, 'styles'>, p
             // Commit App and Pages together so finalization never observes a partially resolved ownership snapshot.
             resolvedEntries = { appEntry, pageEntries }
             graphContext = context
+            const packagePages = policy.cssCodeSplit ? pageEntries.filter((page) => page.option.subpackage) : []
+            budgetedStyles = packagePages.length ? await prepareBuildStyles(context) : undefined
+            if (budgetedStyles) {
+                for (const page of packagePages) {
+                    const shell = (await context.resolve(page.shellId))!
+                    // Refresh even cached shells: a CSS-only edit can change the emitted companion without touching JS.
+                    context.getModuleInfo(shell.id)!.meta[pageStyleBytesKey] = budgetedStyles.getPageStyleBytes(
+                        page.shellName
+                    )
+                }
+            }
         },
 
         /** Captures CSS after the owning preprocessor and CSS Modules pipeline succeeds. */
@@ -276,12 +296,11 @@ export function createMiniStyleService(contract: Pick<MiniContract, 'styles'>, p
             })
         },
 
-        /** Returns a complete conversion transaction for the adapter to commit to its bundle. */
-        finalizeBuild(artifacts: readonly JavaScriptArtifact[], graph: ModuleGraph) {
-            return finalizeOutput.build(
-                projectMiniStyles(resolvedEntries, styleByModuleId, graph, policy.cssCodeSplit),
-                artifacts
-            )
+        /** Converts the final chunks with the candidates that produced this output's stylesheets. */
+        async finalizeBuild(artifacts: readonly JavaScriptArtifact[], graph: ModuleGraph) {
+            const prepared = budgetedStyles ?? (await prepareBuildStyles(graph))
+            budgetedStyles = undefined
+            return prepared.finish(artifacts)
         },
 
         /** Publishes valid native CSS before patch factories; native CSS errors log and retain the last valid styles. */
@@ -295,10 +314,10 @@ export function createMiniStyleService(contract: Pick<MiniContract, 'styles'>, p
                 filename: artifact.filename
             }))
             // Step 1: convert the current graph, retaining valid styles on CSS errors rather than dropping patch sequences.
-            const output = await finalizeOutput.update(
-                projectMiniStyles(resolvedEntries, styleByModuleId, graphContext, policy.cssCodeSplit),
-                javaScript
+            const prepared = await finalizeOutput.update(
+                projectMiniStyles(resolvedEntries, styleByModuleId, graphContext, policy.cssCodeSplit)
             )
+            const output = prepared.finish(javaScript)
             // Step 2: publish every changed file before JavaScript; keep successful writes durable across a later failure.
             for (const { fileName, source } of output.stylesheets) {
                 if (publishedStylesheets.get(fileName) !== source) {
@@ -327,6 +346,7 @@ export function createMiniStyleService(contract: Pick<MiniContract, 'styles'>, p
 function createFinalizeOutput(styles: MiniContract['styles'], minify: BuildOptions['cssMinify'], logger: Logger) {
     const miniTransformer = createMiniTransformer()
     const extension = path.posix.extname(styles.appFileName)
+    const pageStyleName = (shellName: string) => shellName.replace(/\.js$/, extension)
     // Commit after JS conversion succeeds; tolerated HMR CSS failures retain the affected file's last valid conversion.
     let previousOutput:
         | Readonly<{
@@ -360,10 +380,7 @@ function createFinalizeOutput(styles: MiniContract['styles'], minify: BuildOptio
 
     /** Share graph projection, caching, and strict JavaScript conversion without a build/HMR mode flag. */
     function createFinalizer(convert: typeof convertUpdatedStylesheet) {
-        return async function finalizeOutput(
-            projection: ReturnType<typeof projectMiniStyles>,
-            javaScript: readonly JavaScriptArtifact[]
-        ) {
+        return async function prepareStyles(projection: ReturnType<typeof projectMiniStyles>) {
             const classSet =
                 previousOutput && equalCandidates(previousOutput.classSet, projection.classSet)
                     ? previousOutput.classSet
@@ -371,7 +388,7 @@ function createFinalizeOutput(styles: MiniContract['styles'], minify: BuildOptio
             const inputs = [
                 { fileName: styles.globalFileName, css: projection.appEntry.css, app: true },
                 ...projection.pageEntries.map((entry) => ({
-                    fileName: entry.shellName.replace(/\.js$/, extension),
+                    fileName: pageStyleName(entry.shellName),
                     css: entry.css,
                     app: false
                 }))
@@ -388,11 +405,22 @@ function createFinalizeOutput(styles: MiniContract['styles'], minify: BuildOptio
                 }
             }
 
-            const transformedJavaScript = javaScript.map((artifact) =>
-                miniTransformer.transformJavaScript({ classSet, code: artifact.code, filename: artifact.filename })
-            )
-            previousOutput = { stylesheets: nextStylesheets, classSet }
-            return { javaScript: transformedJavaScript, stylesheets }
+            return {
+                getPageStyleBytes(shellName: string): number {
+                    return Buffer.byteLength(nextStylesheets.get(pageStyleName(shellName))!.source)
+                },
+                finish(artifacts: readonly JavaScriptArtifact[]) {
+                    const javaScript = artifacts.map((artifact) =>
+                        miniTransformer.transformJavaScript({
+                            classSet,
+                            code: artifact.code,
+                            filename: artifact.filename
+                        })
+                    )
+                    previousOutput = { stylesheets: nextStylesheets, classSet }
+                    return { javaScript, stylesheets }
+                }
+            }
         }
     }
 

@@ -3,6 +3,7 @@ import type { MiniSubpackage } from '../mini-contract.ts'
 import { classifyMiniModule, isMiniFrameworkVendorModule, isMiniPolyfillModule } from '../module/module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
 import type { MiniResolvedPage } from '../resolve/resolve-mini-page.ts'
+import { getPageStyleBytes } from '../styles/page-style-bytes.ts'
 import { createPlacement, type PackageLocation, type Placement } from './placement.ts'
 
 export type { Placement } from './placement.ts'
@@ -143,8 +144,11 @@ export function createMiniPlacementPlugin(
                         pageEntries,
                         chunks: meta.chunks,
                         planningBudgetBytes: miniSubpackagePlanningBudget,
-                        getAdditionalModuleBytes: (moduleId) =>
-                            getNativeComponentAssetBytes(this.getModuleInfo(moduleId)?.meta)
+                        warn: (message) => this.warn(message),
+                        getAdditionalModuleBytes: (id) => {
+                            const meta = this.getModuleInfo(id)?.meta
+                            return getNativeComponentAssetBytes(meta) + getPageStyleBytes(meta)
+                        }
                     })
                 }
             }

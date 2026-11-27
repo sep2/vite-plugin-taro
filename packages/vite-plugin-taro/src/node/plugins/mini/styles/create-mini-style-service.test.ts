@@ -23,7 +23,8 @@ for (const cssCodeSplit of [true, false]) {
             resolve: async (id: string) => ({ id: `/${id}.js` }),
             getModuleInfo(id: string) {
                 assert.equal(this, graph)
-                return modules.get(id) ?? null
+                const edges = modules.get(id)
+                return edges ? { ...edges, meta: {} } : null
             }
         }
         const appCss = '.app-style { color: red; }'
@@ -83,7 +84,8 @@ for (const cssCodeSplit of [true, false]) {
             resolve: async (id: string) => ({ id: `/next-${id}.js` }),
             getModuleInfo(id: string) {
                 assert.equal(this, nextGraph)
-                return nextModules.get(id) ?? null
+                const edges = nextModules.get(id)
+                return edges ? { ...edges, meta: {} } : null
             }
         }
         service.captureCss('.new-style { color: green; }', '/next.css')

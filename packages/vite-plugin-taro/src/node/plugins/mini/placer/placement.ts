@@ -66,7 +66,8 @@ export function createPlacement({
     pageEntries,
     chunks,
     planningBudgetBytes,
-    getAdditionalModuleBytes
+    getAdditionalModuleBytes,
+    warn
 }: {
     automaticSubpackages: boolean
     /** Unlisted entries belong to the main package. */
@@ -74,6 +75,7 @@ export function createPlacement({
     chunks: Readonly<Record<string, Rolldown.RenderedChunk>>
     planningBudgetBytes: number
     getAdditionalModuleBytes(moduleId: string): number
+    warn?: (message: string) => void
 }): Placement {
     const chunkById = new Map(Object.entries(chunks).sort(([left], [right]) => left.localeCompare(right)))
 
@@ -110,7 +112,8 @@ export function createPlacement({
             chunkById,
             locationByChunk,
             planningBudgetBytes,
-            getAdditionalModuleBytes
+            getAdditionalModuleBytes,
+            warn
         )) {
             const location = { kind: 'subpackage', root: subpackage.root } as const
             for (const chunkId of subpackage.chunkIds) {
@@ -220,7 +223,8 @@ function packLazyChunks(
     chunkById: ReadonlyMap<string, Rolldown.RenderedChunk>,
     locationByChunk: ReadonlyMap<string, PackageLocation>,
     planningBudgetBytes: number,
-    getAdditionalModuleBytes: (moduleId: string) => number
+    getAdditionalModuleBytes: (moduleId: string) => number,
+    warn: ((message: string) => void) | undefined
 ): PackedSubpackage[] {
     const transitionsByChunk = collectTransitionsByChunk(chunkById, locationByChunk)
     // Seed named bins from pinned membership in stable chunk order. Main never participates in packing.
@@ -245,8 +249,15 @@ function packLazyChunks(
             lazy.push(item)
         }
     }
-    // Each placement consumes capacity before the next candidate is scored.
     const bins = [...namedBins.values()]
+    for (const bin of bins) {
+        if (bin.estimatedBytes > planningBudgetBytes) {
+            warn?.(
+                `Page subpackage "${bin.name}" already needs an estimated ${bin.estimatedBytes} bytes for its pages, static dependencies and native assets (planning budget: ${planningBudgetBytes} bytes). Move a page or reduce its dependencies or styles.`
+            )
+        }
+    }
+    // Each placement consumes capacity before the next candidate is scored.
     for (const chunk of lazy.sort(compareChunks)) {
         let bin =
             chunk.estimatedBytes <= planningBudgetBytes ? findBestBin({ bins, chunk, planningBudgetBytes }) : undefined
