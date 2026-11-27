@@ -31,13 +31,9 @@ const runtimeFile = resolveVptRuntime('wx/dev/devtools-runtime')
 
 const hmrMode = createDevtoolsHmrMode(runtimeFile)
 
-/** Names survive the minifier's existing compression and mangling passes within the Mini syntax target. */
 function assertDevelopmentMinification(output: OutputOptions): void {
-    assert.equal(output.keepNames, false)
-    assert.deepEqual(output.minify, {
-        compress: { target: 'es2018', keepNames: { function: true, class: true } },
-        mangle: { keepNames: true }
-    })
+    assert.equal(output.minify, true)
+    assert.equal(output.keepNames, true)
 }
 
 /** These tests inspect options only: never watch workspace files or populate its shared dependency cache. */
@@ -418,6 +414,7 @@ export const classNames = [new ReadableStream().constructor.name, new Other().co
     ])
     const result = await build({
         input: entry,
+        transform: { target: 'es2018' },
         plugins: [
             {
                 name: 'test:class-names',
@@ -445,11 +442,7 @@ export const classNames = [new ReadableStream().constructor.name, new Other().co
     assert.equal(exports.localValue, 'local stream')
     assert.equal(exports.otherValue, 'other stream')
     assert.ok(Array.isArray(exports.classNames))
-    assert.equal(exports.classNames.length, 2)
-    assert.notEqual(exports.classNames[0], exports.classNames[1])
-    for (const name of exports.classNames) {
-        assert.match(name, /^ReadableStream(?:\$\d+)?$/)
-    }
+    assert.deepEqual([...exports.classNames], ['ReadableStream', 'ReadableStream'])
 })
 
 test('minified development keeps HOC component names compatible with React Refresh', async (context) => {

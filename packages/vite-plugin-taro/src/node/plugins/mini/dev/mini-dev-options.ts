@@ -2,7 +2,6 @@ import path from 'node:path'
 import type { OutputOptions, Plugin, RolldownOptions } from 'rolldown'
 import type { DevEngine } from 'rolldown/experimental'
 import type { ViteDevServer } from 'vite'
-import { esTarget } from '../../../utils/constant.ts'
 import { memoize } from '../../../utils/memoize.ts'
 import { createExactModuleIdFilter } from '../../../utils/modules.ts'
 import { build, rolldownRuntimePath, viteReporterPlugin } from '../../../utils/vite-rolldown.ts'
@@ -53,14 +52,9 @@ export function createMiniDevOptionsPlugin({ server, hmrMode }: { server: ViteDe
                 format: 'es',
                 // Bundled development emits complete physical output repeatedly. Minifying bounds disk transfer and native-tool
                 // compile work; source-level HMR diagnostics still come from Vite/Rolldown before this final output pass.
-                minify: {
-                    // Fast Refresh recognizes HOC-returned components by name. Preserve those names in the existing minifier pass.
-                    compress: { target: esTarget, keepNames: { function: true, class: true } },
-                    mangle: { keepNames: true }
-                },
-                // Bundler-level name restoration generates ES2022 class static blocks after source lowering. The minifier
-                // preserves post-bundling names instead; bindings renamed to resolve module collisions retain their unique names.
-                keepNames: false,
+                minify: true,
+                // Fast Refresh recognizes components returned by higher-order functions by their original names.
+                keepNames: true,
                 // Native tools execute physical project files and HMR applies module factories rather than browser source maps. Disabling
                 // maps avoids extra output files and prevents Vite's Oxc sourcemap transform from touching generated host code.
                 sourcemap: false
