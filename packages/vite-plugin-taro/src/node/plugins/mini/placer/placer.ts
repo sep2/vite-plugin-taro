@@ -1,9 +1,10 @@
 import type { Plugin, Rolldown } from 'vite'
+import type { MiniSubpackage } from '../mini-contract.ts'
 import { classifyMiniModule, isMiniFrameworkVendorModule, isMiniPolyfillModule } from '../module/module.ts'
 import { getNativeComponentAssetBytes } from '../native/native-component-assets.ts'
-import { createPlacement, type GeneratedSubpackage, type PackageLocation, type Placement } from './placement.ts'
+import { createPlacement, type PackageLocation, type Placement } from './placement.ts'
 
-export type { GeneratedSubpackage, Placement } from './placement.ts'
+export type { Placement } from './placement.ts'
 
 // Both supported Mini Program hosts impose the same 2 MB main/subpackage ceiling. Reserving 100 KB for native-tool metadata
 // keeps graph placement deterministic across targets; this belongs to the shared package planner, not to a platform adapter.
@@ -13,14 +14,14 @@ type PlacementState =
     | { phase: 'idle' }
     | { phase: 'awaiting-chunks' }
     | { phase: 'planned'; placement: Placement }
-    | { phase: 'finalized'; placement: Placement; subpackages: readonly GeneratedSubpackage[] }
+    | { phase: 'finalized'; placement: Placement; subpackages: readonly MiniSubpackage[] }
 
 /** Placement services consumed by the later Mini Program rendering and output hooks. */
 export type MiniPlacementPlugin = Plugin &
     Readonly<{
         getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation
         getPhysicalChunkId(chunk: Rolldown.RenderedChunk | string): string
-        getSubpackages(): readonly GeneratedSubpackage[]
+        getSubpackages(): readonly MiniSubpackage[]
     }>
 
 /**
@@ -165,7 +166,7 @@ export function createMiniPlacementPlugin(automaticSubpackages: boolean): MiniPl
             return requirePlacement().getPhysicalChunkId(chunk)
         },
 
-        getSubpackages(): readonly GeneratedSubpackage[] {
+        getSubpackages(): readonly MiniSubpackage[] {
             if (state.phase !== 'finalized') {
                 throw new Error('Mini Program subpackages are unavailable before output finalization')
             }

@@ -3,6 +3,7 @@ import type { Rolldown } from 'vite'
 import type { VptOptions, VptPageOption } from '../../../../options.ts'
 import { normalizeModuleId } from '../../../utils/modules.ts'
 import { createAppConfig, getPageConfig } from '../../../utils/project-config.ts'
+import type { ResolvedPage } from '../../page/resolve-page.ts'
 import type { MiniJsonObject, MiniNativeComponentRegistration } from '../mini-contract.ts'
 import { isGeneratedSubpackageFile } from '../placer/placement.ts'
 
@@ -44,14 +45,17 @@ export type SkeletonNativeComponentConfig = {
     componentPlaceholder: Record<string, string>
 }
 
-/** Creates application configuration with generated package declarations appended by the target skeleton. */
+/** Lists main pages alongside the complete native subpackage declarations. */
 export function createSkeletonAppJson(
     options: Readonly<VptOptions>,
-    pages: readonly VptPageOption[],
+    pages: readonly ResolvedPage[],
     subpackages: readonly MiniJsonObject[]
 ): MiniJsonObject {
     return {
-        ...createAppConfig(options, pages),
+        ...createAppConfig(
+            options,
+            pages.filter((page) => page.subpackage === undefined)
+        ),
         ...(subpackages.length > 0 ? { subPackages: subpackages } : {})
     }
 }

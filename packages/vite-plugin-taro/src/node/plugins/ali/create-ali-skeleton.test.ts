@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { resolvePage } from '../page/resolve-page.ts'
 import { buildAliBaseTemplate } from './create-ali-skeleton.ts'
 import { createAliMiniContract } from './plugins.ts'
 
@@ -42,8 +43,8 @@ test('assembles shared AXML templates from the target contract', () => {
     const output = contract.output.generateProjectSkeleton(
         {
             bundle: {},
-            pages: contract.options.pages!,
-            subpackages: [{ root: 'sub/p_example' }],
+            pages: contract.options.pages.map(resolvePage),
+            subpackages: [{ root: 'sub/p_example', pages: [] }],
             nativeComponents: [
                 {
                     name: 'native-counter',

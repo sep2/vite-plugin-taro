@@ -4,6 +4,7 @@ import test from 'node:test'
 import { build, type InputOption, type OutputBundle, type OutputChunk, type OutputOptions, type Plugin } from 'rolldown'
 import { normalizePath } from 'vite'
 import { packageRequire } from '../../../utils/packages.ts'
+import type { MiniSubpackage } from '../mini-contract.ts'
 import {
     isMiniFrameworkVendorModule,
     miniAppCapsuleId,
@@ -11,7 +12,7 @@ import {
     miniBootstrapId,
     miniTaroRuntimeId
 } from '../module/module.ts'
-import { createPlacement, type GeneratedSubpackage, type Placement } from './placement.ts'
+import { createPlacement, type Placement } from './placement.ts'
 import { createMiniPlacementPlugin, createPlacementRolldownOptions } from './placer.ts'
 
 const planningBudgetBytes = 1_900_000
@@ -28,13 +29,13 @@ type FixtureOutput = {
     readonly bundle: OutputBundle
     readonly chunks: readonly OutputChunk[]
     readonly placement: Placement
-    readonly subpackages: readonly GeneratedSubpackage[]
+    readonly subpackages: readonly MiniSubpackage[]
 }
 
 /** Builds virtual modules through the real Rolldown output lifecycle used by the placer. */
 async function buildFixture({ modules, input, additionalBytes }: BuildFixture): Promise<FixtureOutput> {
     let placement: Placement | undefined
-    let subpackages: readonly GeneratedSubpackage[] = []
+    let subpackages: readonly MiniSubpackage[] = []
     const virtualModules: Plugin = {
         name: 'test:placer-fixture',
         resolveId(source, importer) {
@@ -311,7 +312,7 @@ test('preserves Rolldown naming for one lazy static closure', async () => {
     assert.equal(feature.fileName, `${root}/common/feature-panel.js`)
     assert.equal(output.placement.getPackageLocation(application).kind, 'main')
     assert.equal(output.placement.getPackageLocation(feature).kind, 'subpackage')
-    assert.deepEqual(output.subpackages, [{ root: root }])
+    assert.deepEqual(output.subpackages, [{ root, pages: [] }])
 })
 
 test('keeps same-named chunks from different source folders as distinct owners', async () => {

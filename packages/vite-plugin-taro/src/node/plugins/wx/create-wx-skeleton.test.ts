@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Rolldown } from 'vite'
+import { resolvePage } from '../page/resolve-page.ts'
 import { createWxMiniContract } from './plugins.ts'
 
 const contract = createWxMiniContract({
@@ -53,7 +54,13 @@ test('preserves top-level application glass-easel settings without injecting Pag
         }
     })
     const output = configured.output.generateProjectSkeleton(
-        { bundle: {}, pages: configured.options.pages!, subpackages: [], nativeComponents: [], isProduction: true },
+        {
+            bundle: {},
+            pages: configured.options.pages.map(resolvePage),
+            subpackages: [],
+            nativeComponents: [],
+            isProduction: true
+        },
         configured
     )
     const assets = new Map(output.map((asset) => [asset.fileName, String(asset.source)]))
@@ -70,8 +77,8 @@ test('creates native rendering and configuration assets', () => {
     const output = contract.output.generateProjectSkeleton(
         {
             bundle: {} as Rolldown.OutputBundle,
-            pages: contract.options.pages!,
-            subpackages: [{ root: 'sub/p_example' }],
+            pages: contract.options.pages.map(resolvePage),
+            subpackages: [{ root: 'sub/p_example', pages: [] }],
             isProduction: false,
             nativeComponents: [
                 {

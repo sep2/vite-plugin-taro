@@ -80,7 +80,9 @@ export function createWxSkeleton(
             createSkeletonAppJson(
                 options,
                 pages,
-                subpackages.map((subpackage) => createWxSubpackageJson(subpackage.root))
+                subpackages.map((pkg) =>
+                    pkg.pages.length === 0 ? { name: pkg.root.slice(pkg.root.lastIndexOf('/') + 1), ...pkg } : pkg
+                )
             )
         ),
         createTextAsset(
@@ -149,13 +151,4 @@ function buildWxPageTemplate(source: string): string {
         '<comp i="{{app}}"><template is="taro_tmpl" data="{{root:page}}" /></comp>',
         'Page template entry'
     )
-}
-
-/** Declares one WX code-only generated package without inventing a native route. */
-function createWxSubpackageJson(root: string): MiniJsonObject {
-    return {
-        name: root.slice(root.lastIndexOf('/') + 1),
-        root: root,
-        pages: []
-    }
 }

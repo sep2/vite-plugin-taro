@@ -3,6 +3,7 @@ import test from 'node:test'
 import { resolveConfig } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { miniPageCapsuleId } from '../mini/module/module.ts'
+import { resolvePage } from '../page/resolve-page.ts'
 import { createTtSkeleton } from './create-tt-skeleton.ts'
 import { createTtMiniContract, createTtMiniPlugins } from './plugins.ts'
 
@@ -77,8 +78,8 @@ for (const isProduction of [false, true]) {
         const output = contract.output.generateProjectSkeleton(
             {
                 bundle: {},
-                pages: contract.options.pages!,
-                subpackages: [{ root: 'sub/p_example' }],
+                pages: contract.options.pages.map(resolvePage),
+                subpackages: [{ root: 'sub/p_example', pages: [] }],
                 nativeComponents: [
                     { name: 'native-card', componentPath: '/sub/p_example/card/index', fields: ['@select'] }
                 ],
@@ -155,7 +156,7 @@ for (const [description, projectPrivateConfigJson, expected] of [
         const output = contract.output.generateProjectSkeleton(
             {
                 bundle: {},
-                pages: contract.options.pages!,
+                pages: contract.options.pages.map(resolvePage),
                 subpackages: [],
                 nativeComponents: [],
                 isProduction: true

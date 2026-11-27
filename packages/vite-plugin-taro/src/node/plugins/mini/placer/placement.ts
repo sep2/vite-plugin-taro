@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Rolldown } from 'vite'
-import type { MiniGeneratedSubpackage } from '../mini-contract.ts'
+import type { MiniSubpackage } from '../mini-contract.ts'
 
 const generatedSubpackageRootPrefix = 'sub/p_'
 
@@ -15,15 +15,12 @@ export type SubpackageLocation = {
 /** Physical package ownership for one final Rolldown chunk. */
 export type PackageLocation = { kind: 'main' } | SubpackageLocation
 
-/** One generated code package retained by the final output graph. */
-export type GeneratedSubpackage = MiniGeneratedSubpackage
-
 /** Immutable ownership and materialization operations for one complete final-chunk graph. */
 export type Placement = Readonly<{
     getPackageLocation(chunk: Rolldown.RenderedChunk | Rolldown.OutputChunk): PackageLocation
     /** Resolves a rendered chunk or its exact entry module ID to its planned physical path. */
     getPhysicalChunkId(chunk: Rolldown.RenderedChunk | string): string
-    finalize(bundle: Rolldown.OutputBundle): readonly GeneratedSubpackage[]
+    finalize(bundle: Rolldown.OutputBundle): readonly MiniSubpackage[]
 }>
 
 /** Shared location for chunks owned by the main package. */
@@ -142,7 +139,7 @@ export function createPlacement({
         },
 
         /** Assigns each final chunk's Rolldown-owned physical filename and declares typed owners that survived output. */
-        finalize(bundle: Rolldown.OutputBundle): readonly GeneratedSubpackage[] {
+        finalize(bundle: Rolldown.OutputBundle): readonly MiniSubpackage[] {
             const outputChunks = Object.values(bundle).filter(
                 (output): output is Rolldown.OutputChunk => output.type === 'chunk'
             )
@@ -163,7 +160,7 @@ export function createPlacement({
                 }
             }
 
-            return [...roots].sort().map((root) => ({ root: root }))
+            return [...roots].sort().map((root) => ({ root, pages: [] }))
         }
     }
 }

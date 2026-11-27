@@ -13,7 +13,7 @@ export function createXhsSkeleton(input: MiniProjectSkeletonInput, contract: Min
             template: createXhsTemplate(),
             extension: '.xhsml',
             directive: 'xhs',
-            subpackages: input.subpackages.map(({ root }) => ({ root, pages: [] }))
+            subpackages: input.subpackages
         })
     ]
 }

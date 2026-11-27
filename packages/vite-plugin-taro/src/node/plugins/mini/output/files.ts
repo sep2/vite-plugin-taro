@@ -1,8 +1,8 @@
 import type { Rolldown } from 'vite'
-import type { VptPageOption } from '../../../../options.ts'
-import type { MiniContract } from '../mini-contract.ts'
+import type { ResolvedPage } from '../../page/resolve-page.ts'
+import type { MiniContract, MiniSubpackage } from '../mini-contract.ts'
 import { createNativeComponentOutput } from '../native/create-native-component-output.ts'
-import type { GeneratedSubpackage, PackageLocation } from '../placer/placement.ts'
+import type { PackageLocation } from '../placer/placement.ts'
 
 /** Creates every compiler-owned Mini Program file derived from the final Rolldown bundle. */
 export async function createOutputFiles({
@@ -16,14 +16,15 @@ export async function createOutputFiles({
 }: {
     bundle: Rolldown.OutputBundle
     contract: MiniContract
-    pages: readonly VptPageOption[]
-    subpackages: readonly GeneratedSubpackage[]
+    pages: readonly ResolvedPage[]
+    subpackages: readonly MiniSubpackage[]
     isProduction: boolean
     getModuleInfo: (moduleId: string) => { meta: Rolldown.CustomPluginOptions } | null
     getPackageLocation(chunk: Rolldown.OutputChunk): PackageLocation
 }): Promise<Rolldown.EmittedFile[]> {
     const nativeOutput = await createNativeComponentOutput({ bundle, getModuleInfo, getPackageLocation })
 
+    const pagesByRoot = Map.groupBy(pages, (page) => page.subpackage)
     return [
         {
             type: 'asset',
@@ -34,7 +35,14 @@ export async function createOutputFiles({
             {
                 pages: pages,
                 bundle: bundle,
-                subpackages: subpackages,
+                subpackages: [
+                    ...pagesByRoot
+                        .entries()
+                        .flatMap(([root, members]) =>
+                            root === undefined ? [] : [{ root, pages: members.map((page) => page.sourcePath) }]
+                        ),
+                    ...subpackages
+                ],
                 nativeComponents: nativeOutput.registrations,
                 isProduction: isProduction
             },

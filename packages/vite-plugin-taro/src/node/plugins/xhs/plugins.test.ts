@@ -3,6 +3,7 @@ import test from 'node:test'
 import { resolveConfig } from 'vite'
 import type { VptOptions } from '../../../options.ts'
 import { miniPageCapsuleId } from '../mini/module/module.ts'
+import { resolvePage } from '../page/resolve-page.ts'
 import { createXhsSkeleton } from './create-xhs-skeleton.ts'
 import { createXhsTemplate } from './create-xhs-template.ts'
 import { createXhsMiniContract, createXhsMiniPlugins } from './plugins.ts'
@@ -70,8 +71,8 @@ for (const isProduction of [false, true]) {
         const output = createXhsSkeleton(
             {
                 bundle: {},
-                pages: contract.options.pages!,
-                subpackages: [{ root: 'sub/p_example' }],
+                pages: contract.options.pages.map(resolvePage),
+                subpackages: [{ root: 'sub/p_example', pages: [] }],
                 nativeComponents: [
                     { name: 'native-card', componentPath: '/sub/p_example/card/index', fields: ['@select'] }
                 ],
@@ -143,7 +144,13 @@ for (const [description, projectPrivateConfigJson, expected] of [
     test(`preserves ${description} XHS private configuration`, () => {
         const contract = createXhsMiniContract({ ...options, projectPrivateConfigJson })
         const output = createXhsSkeleton(
-            { bundle: {}, pages: contract.options.pages!, subpackages: [], nativeComponents: [], isProduction: true },
+            {
+                bundle: {},
+                pages: contract.options.pages.map(resolvePage),
+                subpackages: [],
+                nativeComponents: [],
+                isProduction: true
+            },
             contract
         )
         assert.deepEqual(

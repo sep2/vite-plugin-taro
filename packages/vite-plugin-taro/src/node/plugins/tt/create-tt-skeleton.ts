@@ -9,6 +9,6 @@ export function createTtSkeleton(input: MiniProjectSkeletonInput, contract: Mini
         template: createTtTemplate(),
         extension: '.ttml',
         directive: 'tt',
-        subpackages: input.subpackages.map(({ root }) => ({ root, pages: [], common: true }))
+        subpackages: input.subpackages.map((pkg) => (pkg.pages.length === 0 ? { ...pkg, common: true } : pkg))
     })
 }

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { resolvePage } from '../../page/resolve-page.ts'
 import { createWxMiniContract } from '../../wx/plugins.ts'
 import { createOutputFiles } from './files.ts'
 
@@ -15,7 +16,7 @@ test('creates the stable app stylesheet wrapper', async () => {
     const outputFiles = await createOutputFiles({
         bundle: {},
         contract: contract,
-        pages: contract.options.pages!,
+        pages: contract.options.pages.map(resolvePage),
         subpackages: [],
         isProduction: false,
         getModuleInfo: () => null,

@@ -1,6 +1,7 @@
 /* c8 ignore start -- Type-only module; validated by tsc. */
 import type { ResolvedConfig, Rolldown } from 'vite'
-import type { VptJsonObject, VptOptions, VptPageOption } from '../../../options.ts'
+import type { VptJsonObject, VptOptions } from '../../../options.ts'
+import type { ResolvedPage } from '../page/resolve-page.ts'
 
 /** Taro compiler bindings selected by one Mini Program target. */
 export type TaroContract = {
@@ -30,16 +31,17 @@ export type MiniNativeComponentRegistration = Readonly<{
     fields: readonly string[]
 }>
 
-/** Graph-retained generated code package awaiting target-specific declaration. */
-export type MiniGeneratedSubpackage = Readonly<{
+/** Native subpackage and its package-relative page routes. Code-only packages have an empty page list. */
+export type MiniSubpackage = Readonly<{
     root: string
+    pages: readonly string[]
 }>
 
 /** Complete final-graph input supplied to one target's project-skeleton generator. */
 export type MiniProjectSkeletonInput = Readonly<{
-    pages: readonly VptPageOption[]
+    pages: readonly ResolvedPage[]
     bundle: Rolldown.OutputBundle
-    subpackages: readonly MiniGeneratedSubpackage[]
+    subpackages: readonly MiniSubpackage[]
     nativeComponents: readonly MiniNativeComponentRegistration[]
     isProduction: boolean
 }>

@@ -83,11 +83,10 @@ export function createAliSkeleton(
     const customWrapperTemplateSource = buildRecursiveCustomWrapperTemplate(
         template.buildCustomComponentTemplate('.axml')
     )
-    const generatedSubpackages = subpackages.map((subpackage) => createAliSubpackageJson(subpackage.root))
     const jsonAsset = (fileName: string, value: MiniJsonObject) => createJsonAsset(fileName, value, isProduction)
 
     return [
-        jsonAsset('app.json', createSkeletonAppJson(options, pages, generatedSubpackages)),
+        jsonAsset('app.json', createSkeletonAppJson(options, pages, subpackages)),
         createTextAsset('base.axml', baseTemplateSource),
         createTextAsset('utils.sjs', template.buildXScript()),
         createTextAsset('comp.axml', recursiveComponentTemplateSource),
@@ -146,12 +145,4 @@ function buildAliPageTemplate({
         '<comp i="{{app}}" p="{{page}}" />',
         'AXML Page template entry'
     )
-}
-
-/** Declares one code-only generated package with an empty native page list. */
-function createAliSubpackageJson(root: string): MiniJsonObject {
-    return {
-        root: root,
-        pages: []
-    }
 }
